@@ -1,7 +1,7 @@
 import net from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMcpServer } from '../src/server/teamMcpServer';
-import type { MailboxMessage, Team, TeamAgent } from '../src/shared/types';
+import type { MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
 
 function makeTeam(): Team {
   return {
@@ -79,6 +79,7 @@ describe('TeamMcpServer', () => {
   let mailboxWrites: MailboxMessage[];
   let wakeAgent: ReturnType<typeof vi.fn>;
   let addAgent: ReturnType<typeof vi.fn>;
+  let taskCreate: ReturnType<typeof vi.fn>;
   let removeAgent: ReturnType<typeof vi.fn>;
   let finishTask: ReturnType<typeof vi.fn>;
   let sendMailboxMessage: ReturnType<typeof vi.fn>;
@@ -99,6 +100,26 @@ describe('TeamMcpServer', () => {
       team.agents.push(agent);
       return agent;
     });
+    taskCreate = vi.fn(async ({ title, description, assignedSlotId, createdBySlotId }: {
+      teamId: string;
+      title: string;
+      description?: string;
+      assignedSlotId?: string;
+      createdBySlotId?: string;
+    }): Promise<TeamTask> => {
+      const task: TeamTask = {
+        id: `task-${title.toLowerCase().replace(/\s+/g, '-')}`,
+        teamId: team.id,
+        title,
+        description,
+        status: 'pending',
+        assignedSlotId,
+        createdBySlotId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      return task;
+    });
     removeAgent = vi.fn(async ({ slotId }: { teamId: string; slotId: string }) => {
       team.agents = team.agents.filter((agent) => agent.slotId !== slotId);
       return { removed: true as const };
@@ -109,8 +130,9 @@ describe('TeamMcpServer', () => {
       await wakeAgent(message.toAgentId);
     });
 
-    server = new TeamMcpServer(team, {
+    server = new TeamMcpServer(team.id, () => team, {
       addAgent,
+      taskCreate,
       removeAgent,
       finishTask,
       sendMailboxMessage,
@@ -182,6 +204,37 @@ describe('TeamMcpServer', () => {
 
     const membersAfterRemove = await callTool(port, authToken, 'team_members');
     expect(membersAfterRemove.result).not.toContain('Researcher');
+  });
+
+  it('delegates a task in one call by provisioning and assigning work', async () => {
+    const response = await callTool(port, authToken, 'team_delegate_task', {
+      agent: 'Researcher',
+      backend: 'claude',
+      title: 'Investigate the flaky test',
+      instructions: 'Inspect the failing assertion and patch the regression.',
+    });
+
+    expect(response.result).toContain('Delegated Investigate the flaky test');
+    expect(addAgent).toHaveBeenCalledWith({
+      teamId: 'team-1',
+      name: 'Researcher',
+      backend: 'claude',
+    });
+    expect(taskCreate).toHaveBeenCalledWith({
+      teamId: 'team-1',
+      title: 'Investigate the flaky test',
+      description: 'Inspect the failing assertion and patch the regression.',
+      assignedSlotId: 'slot-researcher',
+      createdBySlotId: 'slot-lead',
+    });
+    expect(mailboxWrites).toHaveLength(1);
+    expect(mailboxWrites[0]).toMatchObject({
+      teamId: 'team-1',
+      toAgentId: 'slot-researcher',
+      fromAgentId: 'slot-lead',
+      summary: 'Investigate the flaky test',
+    });
+    expect(team.agents.some((agent) => agent.name === 'Researcher')).toBe(true);
   });
 
   it('forwards finish-task updates to the service layer', async () => {

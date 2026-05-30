@@ -85,9 +85,7 @@ export class TeamService {
   }
 
   /**
-   * 向 Team 添加新 Agent（Teammate），并重启 MCP 服务使新成员生效。
-   *
-   * 重启后所有成员的 MCP 配置都会更新为新 server 的端口和 token。
+   * 向 Team 添加新 Agent（Teammate），并为新 conversation 注入当前 Team MCP 配置。
    */
   async addAgent(input: { teamId: string; name: string; backend: AgentBackend }): Promise<TeamAgent> {
     const team = this.requireTeam(input.teamId);
@@ -106,7 +104,8 @@ export class TeamService {
     };
     const updated = { ...team, agents: [...team.agents, agent], updatedAt: Date.now() };
     this.repo.updateTeam(updated);
-    this.scheduleSessionRefresh(updated.id);
+    const session = await this.ensureSession(updated.id);
+    this.injectConversationMcpConfig(session.mcpServer, conversation.id, agent.slotId);
     this.events.emit('team.agent.added', { teamId: updated.id, agent });
     return agent;
   }
@@ -127,7 +126,6 @@ export class TeamService {
       updatedAt: Date.now(),
     };
     this.repo.updateTeam(updated);
-    this.scheduleSessionRefresh(updated.id);
     this.events.emit('team.agent.removed', { teamId: updated.id, slotId: input.slotId });
     return { removed: true };
   }
@@ -315,7 +313,7 @@ export class TeamService {
         entry: this.buildMailboxEntry(team, { ...message, read: true }),
       });
     }
-    const content = formatMailbox(messages, team);
+    const content = formatMailbox(messages, team, agent);
     try {
       await this.conversations.sendMessage({ conversationId: agent.conversationId, content });
       this.events.emit('team.turn.finished', { teamId, slotId });
@@ -350,9 +348,11 @@ export class TeamService {
   private async restartSession(team: Team): Promise<TeamSession> {
     await this.sessions.get(team.id)?.mcpServer.stop();
     const mcpServer = new TeamMcpServer(
-      team,
+      team.id,
+      () => this.repo.getTeam(team.id),
       {
         addAgent: (input) => this.addAgent({ ...input, backend: input.backend as AgentBackend }),
+        taskCreate: (input) => this.taskCreate(input),
         removeAgent: (input) => this.removeAgent(input),
         finishTask: (input) => this.finishTask(input),
         sendMailboxMessage: (message) => this.deliver(message),
@@ -360,34 +360,12 @@ export class TeamService {
     );
     await mcpServer.start();
     for (const agent of team.agents) {
-      const cfg = mcpServer.getStdioConfig(agent.slotId);
-      this.conversations.setMcpServers(agent.conversationId, [
-        {
-          name: cfg.name,
-          command: cfg.command,
-          args: cfg.args,
-          env: Object.entries(cfg.env).map(([name, value]) => ({ name, value })),
-        },
-      ]);
+      this.injectConversationMcpConfig(mcpServer, agent.conversationId, agent.slotId);
       this.conversations.restart(agent.conversationId);
     }
     const session = { team, mcpServer };
     this.sessions.set(team.id, session);
     return session;
-  }
-
-  /** 异步重建 Team runtime，避免在当前 MCP tool 调用期间强行杀掉调用者进程。 */
-  private scheduleSessionRefresh(teamId: string): void {
-    setTimeout(() => {
-      void this.refreshSession(teamId).catch((error) => {
-        console.warn(`[Team] Failed to refresh session for ${teamId}:`, error);
-      });
-    }, 0);
-  }
-
-  private async refreshSession(teamId: string): Promise<TeamSession> {
-    const team = this.requireTeam(teamId);
-    return this.restartSession(team);
   }
 
   /** 查询 Team，不存在则抛出。 */
@@ -401,6 +379,18 @@ export class TeamService {
     const agent = team.agents.find((item) => item.slotId === slotId);
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
     return agent;
+  }
+
+  private injectConversationMcpConfig(mcpServer: TeamMcpServer, conversationId: string, slotId: string): void {
+    const cfg = mcpServer.getStdioConfig(slotId);
+    this.conversations.setMcpServers(conversationId, [
+      {
+        name: cfg.name,
+        command: cfg.command,
+        args: cfg.args,
+        env: Object.entries(cfg.env).map(([name, value]) => ({ name, value })),
+      },
+    ]);
   }
 
   private buildMailboxEntry(team: Team, message: MailboxMessage): TeamMailboxEntry {
@@ -419,17 +409,40 @@ export class TeamService {
 }
 
 /**
- * 将 mailbox 未读消息格式化为 Agent 可读的纯文本 prompt。
+ * 将 mailbox 未读消息格式化为 Agent 可读的团队 prompt。
  *
- * 每条消息独占一段，格式为 `Message from <name>:\n<content>`。
+ * 先给出当前团队身份、成员和可用工具，再附上 mailbox 内容。
  */
-function formatMailbox(messages: MailboxMessage[], team: Team): string {
-  if (messages.length === 0) return 'No unread team messages.';
-  const names = new Map(team.agents.map((agent) => [agent.slotId, agent.name]));
-  return messages
-    .map((message) => {
-      const from = message.fromAgentId === 'user' ? 'user' : names.get(message.fromAgentId) || message.fromAgentId;
-      return `Message from ${from}:\n${message.content}`;
-    })
-    .join('\n\n');
+function formatMailbox(messages: MailboxMessage[], team: Team, agent: TeamAgent): string {
+  const teamLines = team.agents.map((member) => `- ${member.name} (${member.role}, ${member.backend}, ${member.status})`);
+  const mailboxLines =
+    messages.length === 0
+      ? ['Mailbox:', '- No unread team messages.']
+      : [
+          'Mailbox:',
+          ...messages.map((message) => {
+            const from = message.fromAgentId === 'user' ? 'user' : team.agents.find((item) => item.slotId === message.fromAgentId)?.name || message.fromAgentId;
+            return `- From ${from}: ${message.content}`;
+          }),
+        ];
+
+  return [
+    `You are ${agent.name}, a member of team ${team.name}.`,
+    'Current teammates:',
+    ...teamLines,
+    '',
+    'Available team RPC tools:',
+    '- team_members: list teammates',
+    '- team_add_agent: start Claude/Codex and add it to the team',
+    '- team_send_message: send task/message to teammate',
+    '- team_finish_task: report completion',
+    '- team_delegate_task: create a task and assign it in one step',
+    '',
+    'Important:',
+    '- When a task benefits from another agent, call team_add_agent first.',
+    '- To start Claude Code, use backend exactly "claude".',
+    '- After adding a teammate, use team_send_message to assign work.',
+    '',
+    ...mailboxLines,
+  ].join('\n');
 }

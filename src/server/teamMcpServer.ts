@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { MailboxMessage, Team, TeamAgent } from '../shared/types';
+import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamTask } from '../shared/types';
 
 type TcpRequest = {
   authToken?: string;
@@ -19,7 +19,14 @@ export type StdioMcpConfig = {
 };
 
 type TeamCallbacks = {
-  addAgent: (input: { teamId: string; name: string; backend: string }) => Promise<TeamAgent>;
+  addAgent: (input: { teamId: string; name: string; backend: AgentBackend }) => Promise<TeamAgent>;
+  taskCreate: (input: {
+    teamId: string;
+    title: string;
+    description?: string;
+    assignedSlotId?: string;
+    createdBySlotId?: string;
+  }) => Promise<TeamTask>;
   removeAgent: (input: { teamId: string; slotId: string }) => Promise<{ removed: true }>;
   finishTask: (input: { teamId: string; summary: string; taskId?: string; fromSlotId?: string }) => Promise<{
     finished: true;
@@ -33,7 +40,8 @@ export class TeamMcpServer {
   private readonly authToken = crypto.randomUUID();
 
   constructor(
-    private readonly team: Team,
+    private readonly teamId: string,
+    private readonly getTeam: () => Team | null,
     private readonly callbacks: TeamCallbacks
   ) {}
 
@@ -58,8 +66,9 @@ export class TeamMcpServer {
   }
 
   getStdioConfig(slotId: string): StdioMcpConfig {
+    const team = this.resolveTeam();
     return {
-      name: `haunting-souls-team-${this.team.id}`,
+      name: `haunting-souls-team-${team.id}`,
       command: 'node',
       args: [resolveTeamMcpStdioPath()],
       env: {
@@ -68,6 +77,12 @@ export class TeamMcpServer {
         TEAM_AGENT_SLOT_ID: slotId,
       },
     };
+  }
+
+  private resolveTeam(): Team {
+    const team = this.getTeam();
+    if (!team) throw new Error(`Team not found: ${this.teamId}`);
+    return team;
   }
 
   private handleSocket(socket: net.Socket): void {
@@ -102,7 +117,7 @@ export class TeamMcpServer {
   private async callTool(tool: string, args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     switch (tool) {
       case 'team_members':
-        return this.team.agents.map(formatAgent).join('\n');
+        return this.resolveTeam().agents.map(formatAgent).join('\n');
       case 'team_send_message':
         return this.sendMessage(args, fromSlotId);
       case 'team_add_agent':
@@ -111,26 +126,29 @@ export class TeamMcpServer {
         return this.removeAgent(args);
       case 'team_finish_task':
         return this.finishTask(args, fromSlotId);
+      case 'team_delegate_task':
+        return this.delegateTask(args, fromSlotId);
       default:
         throw new Error(`Unknown tool: ${tool}`);
     }
   }
 
   private async sendMessage(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
+    const team = this.resolveTeam();
     const to = String(args.to || '');
     const content = String(args.message || '');
-    const target = this.resolveTarget(to);
+    const target = this.resolveTarget(team, to);
     if (!target) throw new Error(`Teammate not found: ${to}`);
 
     const sender = fromSlotId
-      ? this.team.agents.find((agent) => agent.slotId === fromSlotId)
-      : this.team.agents.find((agent) => agent.role === 'leader') ?? this.team.agents[0];
+      ? team.agents.find((agent) => agent.slotId === fromSlotId)
+      : team.agents.find((agent) => agent.role === 'leader') ?? team.agents[0];
 
     const message: MailboxMessage = {
       id: crypto.randomUUID(),
-      teamId: this.team.id,
+      teamId: team.id,
       toAgentId: target.slotId,
-      fromAgentId: sender?.slotId ?? this.team.leaderSlotId,
+      fromAgentId: sender?.slotId ?? team.leaderSlotId,
       content,
       summary: args.summary ? String(args.summary) : undefined,
       read: false,
@@ -145,32 +163,87 @@ export class TeamMcpServer {
     const backend = String(args.backend || '').trim();
     if (!name) throw new Error('name is required');
     if (!backend) throw new Error('backend is required');
+    if (backend !== 'claude' && backend !== 'codex') throw new Error('backend must be claude or codex');
 
-    const agent = await this.callbacks.addAgent({ teamId: this.team.id, name, backend });
+    const team = this.resolveTeam();
+    const agent = await this.callbacks.addAgent({ teamId: team.id, name, backend: backend as AgentBackend });
     return `Added teammate ${agent.name} (${agent.slotId})`;
   }
 
   private async removeAgent(args: Record<string, unknown>): Promise<string> {
+    const team = this.resolveTeam();
     const agentRef = String(args.agent || '').trim();
     if (!agentRef) throw new Error('agent is required');
-    const target = this.resolveTarget(agentRef);
+    const target = this.resolveTarget(team, agentRef);
     if (!target) throw new Error(`Teammate not found: ${agentRef}`);
-    await this.callbacks.removeAgent({ teamId: this.team.id, slotId: target.slotId });
+    await this.callbacks.removeAgent({ teamId: team.id, slotId: target.slotId });
     return `Removed teammate ${target.name}`;
   }
 
   private async finishTask(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
+    const team = this.resolveTeam();
     const summary = String(args.summary || '').trim();
     if (!summary) throw new Error('summary is required');
     const taskId = args.task_id ? String(args.task_id).trim() : undefined;
-    await this.callbacks.finishTask({ teamId: this.team.id, summary, taskId, fromSlotId });
+    await this.callbacks.finishTask({ teamId: team.id, summary, taskId, fromSlotId });
     return taskId ? `Task ${taskId} marked finished` : 'Task marked finished';
   }
 
-  private resolveTarget(nameOrSlotId: string): TeamAgent | null {
+  private async delegateTask(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
+    const team = this.resolveTeam();
+    const title = String(args.title || '').trim();
+    const instructions = String(args.instructions || '').trim();
+    const targetRef = String(args.agent || args.name || '').trim();
+    const backend = String(args.backend || '').trim();
+    if (!title) throw new Error('title is required');
+    if (!instructions) throw new Error('instructions is required');
+    if (!targetRef) throw new Error('agent is required');
+
+    let target = this.resolveTarget(team, targetRef);
+    let createdAgent = false;
+    if (!target) {
+      if (!backend) throw new Error('backend is required when adding a new teammate');
+      if (backend !== 'claude' && backend !== 'codex') {
+        throw new Error('backend must be claude or codex');
+      }
+      target = await this.callbacks.addAgent({
+        teamId: team.id,
+        name: targetRef,
+        backend: backend as AgentBackend,
+      });
+      createdAgent = true;
+    }
+
+    const task = await this.callbacks.taskCreate({
+      teamId: team.id,
+      title,
+      description: instructions,
+      assignedSlotId: target.slotId,
+      createdBySlotId: fromSlotId,
+    });
+    const sender = fromSlotId
+      ? team.agents.find((agent) => agent.slotId === fromSlotId)
+      : team.agents.find((agent) => agent.role === 'leader') ?? team.agents[0];
+    const message: MailboxMessage = {
+      id: crypto.randomUUID(),
+      teamId: team.id,
+      toAgentId: target.slotId,
+      fromAgentId: sender?.slotId ?? team.leaderSlotId,
+      content: [`Task: ${title}`, instructions, `Task ID: ${task.id}`].join('\n\n'),
+      summary: title,
+      read: false,
+      createdAt: Date.now(),
+    };
+    await this.callbacks.sendMailboxMessage(message);
+    return createdAgent
+      ? `Delegated ${title} to new teammate ${target.name} (${target.slotId})`
+      : `Delegated ${title} to ${target.name}`;
+  }
+
+  private resolveTarget(team: Team, nameOrSlotId: string): TeamAgent | null {
     const normalized = nameOrSlotId.trim().toLowerCase();
     return (
-      this.team.agents.find(
+      team.agents.find(
         (agent) => agent.slotId === nameOrSlotId || agent.name.trim().toLowerCase() === normalized
       ) ?? null
     );

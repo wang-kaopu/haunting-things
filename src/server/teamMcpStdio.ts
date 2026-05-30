@@ -34,10 +34,10 @@ server.tool(
 
 server.tool(
   'team_add_agent',
-  'Add a teammate to the current team.',
+  'Provision a new Claude or Codex teammate so the team can split work and keep moving in parallel.',
   {
     name: z.string().describe('Name for the new teammate'),
-    backend: z.string().describe('Backend for the new teammate, such as claude or codex'),
+    backend: z.enum(['claude', 'codex']).describe('Backend for the new teammate. Use exactly "claude" or "codex".'),
   },
   async (args) => textResult(await callTeamTool('team_add_agent', args))
 );
@@ -59,6 +59,18 @@ server.tool(
     task_id: z.string().optional().describe('Optional task id if one exists'),
   },
   async (args) => textResult(await callTeamTool('team_finish_task', args))
+);
+
+server.tool(
+  'team_delegate_task',
+  'Create or provision a teammate, create a task, and assign the work in one call.',
+  {
+    agent: z.string().describe('Target teammate name or slot id. If missing, a new teammate will be created.'),
+    title: z.string().describe('Task title'),
+    instructions: z.string().describe('Work instructions to send to the teammate'),
+    backend: z.enum(['claude', 'codex']).optional().describe('Backend to use when creating a new teammate'),
+  },
+  async (args) => textResult(await callTeamTool('team_delegate_task', args))
 );
 
 await server.connect(new StdioServerTransport());

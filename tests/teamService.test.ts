@@ -11,12 +11,13 @@ const mockInstances: Array<{
 
 vi.mock('../src/server/teamMcpServer', () => {
   class MockTeamMcpServer {
-    readonly team;
+    readonly teamId;
+    readonly getTeam;
     readonly callbacks;
     readonly start = vi.fn(async () => undefined);
     readonly stop = vi.fn(async () => undefined);
     readonly getStdioConfig = vi.fn((slotId: string) => ({
-      name: `mock-team-${this.team.id}`,
+      name: `mock-team-${this.teamId}`,
       command: 'node',
       args: ['mock-team-mcp.js'],
       env: {
@@ -26,11 +27,12 @@ vi.mock('../src/server/teamMcpServer', () => {
       },
     }));
 
-    constructor(team: { id: string }, callbacks: unknown) {
-      this.team = team;
+    constructor(teamId: string, getTeam: () => Team | null, callbacks: unknown) {
+      this.teamId = teamId;
+      this.getTeam = getTeam;
       this.callbacks = callbacks;
       mockInstances.push({
-        teamId: team.id,
+        teamId,
         start: this.start,
         stop: this.stop,
         getStdioConfig: this.getStdioConfig,
@@ -160,6 +162,7 @@ describe('TeamService', () => {
     expect(team.agents).toHaveLength(1);
     expect(conversations.create).toHaveBeenCalledTimes(1);
     expect(mockInstances).toHaveLength(1);
+    expect(conversations.restart).toHaveBeenCalledTimes(1);
 
     const emitSpy = vi.spyOn(events, 'emit');
 
@@ -168,15 +171,14 @@ describe('TeamService', () => {
 
     const refreshed = repo.getTeam(team.id);
     expect(refreshed?.agents).toHaveLength(2);
-    expect(conversations.setMcpServers).toHaveBeenCalled();
-    expect(conversations.restart).toHaveBeenCalledWith('conv-1');
-    expect(conversations.restart).toHaveBeenCalledWith('conv-2');
+    expect(conversations.setMcpServers).toHaveBeenCalledWith('conv-2', expect.any(Array));
+    expect(conversations.restart).toHaveBeenCalledTimes(1);
     expect(emitSpy).toHaveBeenCalledWith('team.agent.added', {
       teamId: team.id,
       agent: expect.objectContaining({ name: 'Dev', role: 'teammate' }),
     });
-    expect(mockInstances).toHaveLength(2);
-    expect(mockInstances[0].stop).toHaveBeenCalledTimes(1);
+    expect(mockInstances).toHaveLength(1);
+    expect(mockInstances[0].stop).not.toHaveBeenCalled();
   });
 
   it('records mailbox entries in the team timeline and marks them processed after delivery', async () => {
