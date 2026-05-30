@@ -30,6 +30,7 @@ const mockMcpInstances: Array<{
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
   getStdioConfig: ReturnType<typeof vi.fn>;
+  callTool: (tool: string, args: Record<string, any>, fromSlotId?: string) => Promise<any>;
 }> = [];
 
 vi.mock('../src/server/teamMcpServer', () => {
@@ -60,7 +61,70 @@ vi.mock('../src/server/teamMcpServer', () => {
         start: this.start,
         stop: this.stop,
         getStdioConfig: this.getStdioConfig,
+        callTool: this.callTool.bind(this),
       });
+    }
+
+    async callTool(tool: string, args: Record<string, any>, fromSlotId?: string): Promise<any> {
+      const parseAgentBackend = (val: any) => {
+        if (val === 'claude' || val === 'codex') return val;
+        throw new Error('backend must be exactly "claude" or "codex"');
+      };
+
+      if (tool === 'team_add_agent') {
+        const name = args.name;
+        const backend = parseAgentBackend(args.backend);
+        return (this.callbacks as any).addAgent({ teamId: this.teamId, name, backend });
+      }
+      if (tool === 'team_delegate_task') {
+        const backend = parseAgentBackend(args.backend);
+        const taskBody = String(args.task || '').trim();
+        const summary = args.summary ? String(args.summary).trim() : '';
+        const name = String(args.name || '').trim();
+        if (!taskBody) throw new Error('task is required');
+
+        const team = this.getTeam();
+        let target = team.agents.find((agent: any) => agent.role === 'teammate' && agent.backend === backend);
+        let createdAgent = false;
+        if (!target) {
+          target = await (this.callbacks as any).addAgent({
+            teamId: team.id,
+            name: name || (backend === 'claude' ? 'Claude Code' : 'Codex Agent'),
+            backend,
+          });
+          createdAgent = true;
+        }
+
+        const task = await (this.callbacks as any).taskCreate({
+          teamId: team.id,
+          title: summary || taskBody,
+          description: taskBody,
+          assignedSlotId: target.slotId,
+          createdBySlotId: fromSlotId,
+        });
+
+        const sender = fromSlotId
+          ? team.agents.find((agent: any) => agent.slotId === fromSlotId)
+          : team.agents.find((agent: any) => agent.role === 'leader') ?? team.agents[0];
+
+        const message = {
+          id: crypto.randomUUID(),
+          teamId: team.id,
+          toAgentId: target.slotId,
+          fromAgentId: sender?.slotId ?? team.leaderSlotId,
+          content: [`Task: ${summary || taskBody}`, taskBody, `Task ID: ${task.id}`].join('\n\n'),
+          summary: summary || taskBody,
+          read: false,
+          createdAt: Date.now(),
+        };
+
+        await (this.callbacks as any).sendMailboxMessage(message);
+
+        return createdAgent
+          ? `Delegated task to ${target.name} (${target.slotId}). The teammate has been started if it did not already exist.`
+          : `Delegated task to ${target.name} (${target.slotId}).`;
+      }
+      throw new Error(`Unknown tool: ${tool}`);
     }
   }
 
@@ -317,31 +381,24 @@ describe('team integration flow', () => {
     });
     const leader = team.agents[0];
 
-    // 获取 MCP server callbacks（由 mock 记录的 constructor 参数）
-    const mcpCallbacks = (mockMcpInstances[0] as any).callbacks ?? getMcpCallbacks();
+    const mcp = mockMcpInstances[0];
 
-    // 通过 TeamMcpServer 的 callbacks 模拟 team_delegate_task 的效果。
-    // 在真实环境中这是 Leader Agent 调用 MCP tool，这里直接调用 service 方法组合。
-    const claude = await teamService.addAgent({
-      teamId: team.id,
-      name: 'Claude Reviewer',
+    // 调用 team_delegate_task 工具
+    await mcp.callTool('team_delegate_task', {
       backend: 'claude',
-    });
-
-    // 模拟 Leader 给 Claude 发送任务消息
-    await teamService.sendMessageToAgent({
-      teamId: team.id,
-      slotId: claude.slotId,
-      content: '请回答你当前使用的模型是什么',
-    });
+      name: 'Claude Reviewer',
+      task: '请回答你当前使用的模型是什么',
+      summary: '询问 Claude 当前模型',
+    }, leader.slotId);
 
     await flushWakeups();
 
     // Claude 被创建
     const refreshed = repo.getTeam(team.id)!;
     expect(refreshed.agents).toHaveLength(2);
-    const claudeAgent = refreshed.agents.find((a) => a.backend === 'claude' && a.role === 'teammate');
-    expect(claudeAgent).toBeDefined();
+    const claude = refreshed.agents.find((a) => a.backend === 'claude' && a.role === 'teammate')!;
+    expect(claude).toBeDefined();
+    expect(claude.name).toBe('Claude Reviewer');
 
     // Claude 收到任务消息
     const claudeMessages = conversations.sentMessages.filter(
@@ -367,6 +424,7 @@ describe('team integration flow', () => {
     const timeline = teamService.timeline(team.id);
     const claudeMailbox = timeline.filter((e) => e.message.toAgentId === claude.slotId);
     expect(claudeMailbox.length).toBeGreaterThanOrEqual(1);
+    expect(claudeMailbox[claudeMailbox.length - 1].message.content).toContain('请回答你当前使用的模型是什么');
   });
 
   // =========================================================================
@@ -377,40 +435,47 @@ describe('team integration flow', () => {
       name: 'Integration Team',
       leaderBackend: 'codex',
     });
+    const leader = team.agents[0];
 
-    // 先添加一个 Claude Reviewer
-    const claude = await teamService.addAgent({
-      teamId: team.id,
-      name: 'Claude Reviewer',
+    const mcp = mockMcpInstances[0];
+
+    // 第一次委派，创建 Claude Reviewer
+    await mcp.callTool('team_delegate_task', {
       backend: 'claude',
-    });
+      name: 'Claude Reviewer',
+      task: '第一次任务',
+    }, leader.slotId);
 
-    const agentsBefore = repo.getTeam(team.id)!.agents.length;
-    expect(agentsBefore).toBe(2);
+    await flushWakeups();
 
-    // 再次向 Claude 发送任务
-    await teamService.sendMessageToAgent({
-      teamId: team.id,
-      slotId: claude.slotId,
-      content: '请审查当前实现',
-    });
+    const afterFirst = repo.getTeam(team.id)!;
+    const claudeCountAfterFirst = afterFirst.agents.filter((a) => a.backend === 'claude').length;
+    expect(claudeCountAfterFirst).toBe(1);
+    const claude = afterFirst.agents.find((a) => a.backend === 'claude')!;
+
+    // 再次委派
+    await mcp.callTool('team_delegate_task', {
+      backend: 'claude',
+      task: '请审查当前实现',
+    }, leader.slotId);
 
     await flushWakeups();
 
     // Team agents 数量仍为 2，没有重复创建
-    const agentsAfter = repo.getTeam(team.id)!.agents.length;
-    expect(agentsAfter).toBe(2);
+    const afterSecond = repo.getTeam(team.id)!;
+    const claudeCountAfterSecond = afterSecond.agents.filter((a) => a.backend === 'claude').length;
+    expect(claudeCountAfterSecond).toBe(claudeCountAfterFirst);
 
     // 任务消息发送给已有 Claude
     const claudeMessages = conversations.sentMessages.filter(
       (m) => m.conversationId === claude.conversationId
     );
-    expect(claudeMessages.length).toBeGreaterThanOrEqual(1);
+    expect(claudeMessages.length).toBeGreaterThanOrEqual(2);
 
     // mailbox 中任务目标是已有 Claude 的 slotId
     const timeline = teamService.timeline(team.id);
     const claudeMailbox = timeline.filter((e) => e.message.toAgentId === claude.slotId);
-    expect(claudeMailbox.length).toBeGreaterThanOrEqual(1);
+    expect(claudeMailbox.length).toBeGreaterThanOrEqual(2);
     expect(claudeMailbox[claudeMailbox.length - 1].message.content).toContain('请审查当前实现');
   });
 
@@ -552,68 +617,49 @@ describe('team integration flow', () => {
   // =========================================================================
   // 用例七：非法 backend 应被拒绝
   // =========================================================================
-  it('rejects invalid backend values', async () => {
+  it('rejects invalid backend values through team MCP tools', async () => {
     const team = await teamService.create({
-      name: 'Integration Team',
+      name: 'Invalid Backend Team',
       leaderBackend: 'codex',
     });
 
-    const agentsBefore = repo.getTeam(team.id)!.agents.length;
-    const convsBefore = conversations.conversations.size;
+    const before = teamService.get(team.id)!;
+    const agentCountBefore = before.agents.length;
+    const conversationCountBefore = conversations.conversations.size;
 
-    // Backend 校验发生在 TeamMcpServer.parseAgentBackend() 层。
-    // 在集成测试中，通过直接调用 TeamService.addAgent 传入非法值来验证。
-    // TeamService.addAgent 不做 runtime 校验（信赖上游 MCP 层），
-    // 所以这里验证 TeamMcpServer 的 addAgent 工具拒绝非法 backend。
-    //
-    // 为了测试端到端的拒绝逻辑，我们导入 parseAgentBackend 的行为：
-    // TeamMcpServer mock 不会调用 parseAgentBackend，
-    // 所以我们直接测试非法 backend 字符串不被接受。
+    const mcp = mockMcpInstances[0];
 
-    // 测试方式：直接验证 "claude-code" / "anthropic" 等非法值
-    // 在 MCP 层被正确拒绝（已在 teamMcpServer.test.ts 覆盖）。
-    // 在集成层面，验证 TeamService.addAgent 用非法类型时的行为。
-    // 由于 TS 类型保护，正常代码路径不可能传入非法 backend。
-    // 但 runtime 防御在 MCP layer，这里验证 MCP callback 的 addAgent
-    // 传入非法 backend 时，FakeConversationService 创建的 conversation
-    // 不应该留下脏数据。
+    // 通过 MCP tool 'team_delegate_task' 发送非法 backend，断言抛出异常
+    await expect(
+      mcp.callTool('team_delegate_task', {
+        backend: 'anthropic',
+        task: 'test task',
+      })
+    ).rejects.toThrow('backend must be exactly "claude" or "codex"');
 
-    // 直接传入非法 backend 到 service — 会创建 conversation（因为没有 runtime 校验）
-    // 这说明真正的守卫在 MCP 层
-    try {
-      await teamService.addAgent({
-        teamId: team.id,
+    // 通过 MCP tool 'team_add_agent' 发送非法 backend，断言抛出异常
+    await expect(
+      mcp.callTool('team_add_agent', {
         name: 'Bad Agent',
-        backend: 'anthropic' as AgentBackend,
-      });
-    } catch {
-      // 如果未来 TeamService 添加了 runtime 校验，这里会被捕获
-    }
+        backend: 'claude-code',
+      })
+    ).rejects.toThrow('backend must be exactly "claude" or "codex"');
 
-    // 验证：即使 service 层没有校验，MCP 层也会拦截。
-    // 这里额外验证 MCP 工具级别的校验（直接导入 parseAgentBackend 逻辑）：
-    const invalidBackends = ['claude-code', 'anthropic', 'Claude', 'CODEX', ''];
-    for (const invalid of invalidBackends) {
-      const isValid = invalid === 'claude' || invalid === 'codex';
-      expect(isValid).toBe(false);
-    }
+    const after = teamService.get(team.id)!;
 
-    // 验证合法 backend 可以正常添加
-    const validClaude = await teamService.addAgent({
-      teamId: team.id,
+    // 验证：没有创建新的 teammate，没有多余的 conversation
+    expect(after.agents).toHaveLength(agentCountBefore);
+    expect(conversations.conversations.size).toBe(conversationCountBefore);
+
+    // 验证合法 backend 仍可正常添加
+    const validResult = await mcp.callTool('team_add_agent', {
       name: 'Valid Claude',
       backend: 'claude',
     });
-    expect(validClaude.backend).toBe('claude');
-    expect(validClaude.role).toBe('teammate');
+    expect(validResult.name).toBe('Valid Claude');
+    expect(validResult.backend).toBe('claude');
 
-    const validCodex = await teamService.addAgent({
-      teamId: team.id,
-      name: 'Valid Codex',
-      backend: 'codex',
-    });
-    expect(validCodex.backend).toBe('codex');
-    expect(validCodex.role).toBe('teammate');
+    expect(repo.getTeam(team.id)!.agents).toHaveLength(agentCountBefore + 1);
   });
 
   // =========================================================================

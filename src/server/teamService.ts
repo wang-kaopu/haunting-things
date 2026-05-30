@@ -372,15 +372,21 @@ export class TeamService {
    */
   private async deliver(message: MailboxMessage): Promise<void> {
     const team = this.requireTeam(message.teamId);
-    this.repo.writeMailbox(message);
-
-    // 如果是 teammate 显式向他人/Leader 投递消息，标记为已显式回传
     const fromAgent = team.agents.find((agent) => agent.slotId === message.fromAgentId);
-    if (fromAgent && fromAgent.role === 'teammate') {
+
+    if (
+      fromAgent &&
+      fromAgent.role === 'teammate' &&
+      message.toAgentId === team.leaderSlotId
+    ) {
       this.explicitRepliedTurns.set(fromAgent.conversationId, true);
     }
 
-    this.events.emit('team.agent.message', { teamId: message.teamId, entry: this.buildMailboxEntry(team, message) });
+    this.repo.writeMailbox(message);
+    this.events.emit('team.agent.message', {
+      teamId: message.teamId,
+      entry: this.buildMailboxEntry(team, message),
+    });
     this.scheduleWakeAgent(message.teamId, message.toAgentId);
   }
 
