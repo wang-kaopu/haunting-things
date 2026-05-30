@@ -32,6 +32,35 @@ server.tool(
   async (args) => textResult(await callTeamTool('team_send_message', args))
 );
 
+server.tool(
+  'team_add_agent',
+  'Add a teammate to the current team.',
+  {
+    name: z.string().describe('Name for the new teammate'),
+    backend: z.string().describe('Backend for the new teammate, such as claude or codex'),
+  },
+  async (args) => textResult(await callTeamTool('team_add_agent', args))
+);
+
+server.tool(
+  'team_remove_agent',
+  'Remove a teammate from the current team.',
+  {
+    agent: z.string().describe('Teammate name or slot id to remove'),
+  },
+  async (args) => textResult(await callTeamTool('team_remove_agent', args))
+);
+
+server.tool(
+  'team_finish_task',
+  'Report that the current task is complete and notify the leader.',
+  {
+    summary: z.string().describe('Short summary of what was completed'),
+    task_id: z.string().optional().describe('Optional task id if one exists'),
+  },
+  async (args) => textResult(await callTeamTool('team_finish_task', args))
+);
+
 await server.connect(new StdioServerTransport());
 
 async function callTeamTool(tool: string, args: Record<string, unknown>): Promise<string> {

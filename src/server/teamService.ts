@@ -1,4 +1,4 @@
-import type { AgentBackend, MailboxMessage, Team, TeamAgent } from '../shared/types';
+import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamMailboxEntry } from '../shared/types';
 import type { Repository } from './db';
 import type { ConversationService } from './conversations';
 import type { EventBus } from './events';
@@ -106,9 +106,66 @@ export class TeamService {
     };
     const updated = { ...team, agents: [...team.agents, agent], updatedAt: Date.now() };
     this.repo.updateTeam(updated);
-    await this.restartSession(updated);
+    this.scheduleSessionRefresh(updated.id);
     this.events.emit('team.agent.added', { teamId: updated.id, agent });
     return agent;
+  }
+
+  /**
+   * 从 Team 中移除一个 Agent（leader 不允许被移除）。
+   */
+  async removeAgent(input: { teamId: string; slotId: string }): Promise<{ removed: true }> {
+    const team = this.requireTeam(input.teamId);
+    const agent = team.agents.find((item) => item.slotId === input.slotId);
+    if (!agent) throw new Error(`Agent not found: ${input.slotId}`);
+    if (agent.role === 'leader') throw new Error('Leader cannot be removed');
+
+    this.conversations.stop(agent.conversationId);
+    const updated = {
+      ...team,
+      agents: team.agents.filter((item) => item.slotId !== input.slotId),
+      updatedAt: Date.now(),
+    };
+    this.repo.updateTeam(updated);
+    this.scheduleSessionRefresh(updated.id);
+    this.events.emit('team.agent.removed', { teamId: updated.id, slotId: input.slotId });
+    return { removed: true };
+  }
+
+  /**
+   * 记录某个 Agent 的任务完成结果，默认通知 leader。
+   *
+   * 当前仓库没有完整的 task board，因此这里采用最小闭环：
+   * 将完成摘要写入 leader mailbox，并唤醒 leader 处理后续协作。
+   */
+  async finishTask(input: { teamId: string; summary: string; taskId?: string; fromSlotId?: string }): Promise<{ finished: true }> {
+    const team = this.requireTeam(input.teamId);
+    const summary = input.summary.trim();
+    if (!summary) throw new Error('summary is required');
+    const leader = team.agents.find((agent) => agent.role === 'leader');
+    if (!leader) throw new Error(`Leader not found for team ${team.id}`);
+
+    const caller =
+      (input.fromSlotId && team.agents.find((agent) => agent.slotId === input.fromSlotId)) ??
+      team.agents.find((agent) => agent.role !== 'leader') ??
+      leader;
+
+    if (!caller || caller.role === 'leader') {
+      return { finished: true };
+    }
+
+    const content = input.taskId ? `Task ${input.taskId} finished: ${summary}` : `Task finished: ${summary}`;
+    await this.deliver({
+      id: crypto.randomUUID(),
+      teamId: team.id,
+      toAgentId: leader.slotId,
+      fromAgentId: caller.slotId,
+      content,
+      summary: input.taskId ? `${input.taskId}: ${summary}` : summary,
+      read: false,
+      createdAt: Date.now(),
+    });
+    return { finished: true };
   }
 
   /**
@@ -164,10 +221,20 @@ export class TeamService {
   }
 
   /**
+   * 返回 Team mailbox 的完整时间线。
+   */
+  timeline(teamId: string): TeamMailboxEntry[] {
+    const team = this.requireTeam(teamId);
+    return this.repo.listMailbox(teamId).map((message) => this.buildMailboxEntry(team, message));
+  }
+
+  /**
    * 将消息写入 mailbox 并立即唤醒目标 Agent。
    */
   private async deliver(message: MailboxMessage): Promise<void> {
+    const team = this.requireTeam(message.teamId);
     this.repo.writeMailbox(message);
+    this.events.emit('team.agent.message', { teamId: message.teamId, entry: this.buildMailboxEntry(team, message) });
     await this.wakeAgent(message.teamId, message.toAgentId);
   }
 
@@ -182,6 +249,12 @@ export class TeamService {
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
     const messages = this.repo.readUnreadAndMark(teamId, slotId);
+    for (const message of messages) {
+      this.events.emit('team.agent.message', {
+        teamId,
+        entry: this.buildMailboxEntry(team, { ...message, read: true }),
+      });
+    }
     const content = formatMailbox(messages, team);
     try {
       await this.conversations.sendMessage({ conversationId: agent.conversationId, content });
@@ -216,7 +289,15 @@ export class TeamService {
    */
   private async restartSession(team: Team): Promise<TeamSession> {
     await this.sessions.get(team.id)?.mcpServer.stop();
-    const mcpServer = new TeamMcpServer(team, this.repo, (slotId) => this.wakeAgent(team.id, slotId));
+    const mcpServer = new TeamMcpServer(
+      team,
+      {
+        addAgent: (input) => this.addAgent({ ...input, backend: input.backend as AgentBackend }),
+        removeAgent: (input) => this.removeAgent(input),
+        finishTask: (input) => this.finishTask(input),
+        sendMailboxMessage: (message) => this.deliver(message),
+      }
+    );
     await mcpServer.start();
     for (const agent of team.agents) {
       const cfg = mcpServer.getStdioConfig(agent.slotId);
@@ -228,10 +309,25 @@ export class TeamService {
           env: Object.entries(cfg.env).map(([name, value]) => ({ name, value })),
         },
       ]);
+      this.conversations.restart(agent.conversationId);
     }
     const session = { team, mcpServer };
     this.sessions.set(team.id, session);
     return session;
+  }
+
+  /** 异步重建 Team runtime，避免在当前 MCP tool 调用期间强行杀掉调用者进程。 */
+  private scheduleSessionRefresh(teamId: string): void {
+    setTimeout(() => {
+      void this.refreshSession(teamId).catch((error) => {
+        console.warn(`[Team] Failed to refresh session for ${teamId}:`, error);
+      });
+    }, 0);
+  }
+
+  private async refreshSession(teamId: string): Promise<TeamSession> {
+    const team = this.requireTeam(teamId);
+    return this.restartSession(team);
   }
 
   /** 查询 Team，不存在则抛出。 */
@@ -239,6 +335,20 @@ export class TeamService {
     const team = this.repo.getTeam(teamId);
     if (!team) throw new Error(`Team not found: ${teamId}`);
     return team;
+  }
+
+  private buildMailboxEntry(team: Team, message: MailboxMessage): TeamMailboxEntry {
+    return {
+      message,
+      fromAgentName: this.resolveAgentName(team, message.fromAgentId),
+      toAgentName: this.resolveAgentName(team, message.toAgentId),
+      processed: message.read,
+    };
+  }
+
+  private resolveAgentName(team: Team, agentId: string): string {
+    if (agentId === 'user') return 'user';
+    return team.agents.find((agent) => agent.slotId === agentId)?.name ?? agentId;
   }
 }
 

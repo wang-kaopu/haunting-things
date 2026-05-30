@@ -104,6 +104,8 @@ bridge.register('conversation.confirmPermission', (params) => {
 });
 bridge.register('team.create', (params) => teams.create(params));
 bridge.register('team.addAgent', (params) => teams.addAgent(params));
+bridge.register('team.removeAgent', (params) => teams.removeAgent(params));
+bridge.register('team.finishTask', (params) => teams.finishTask(params));
 bridge.register('team.get', ({ teamId }) => teams.get(teamId));
 bridge.register('team.list', () => teams.list());
 bridge.register('team.sendMessage', async (params) => {
@@ -114,6 +116,7 @@ bridge.register('team.sendMessageToAgent', async (params) => {
   await teams.sendMessageToAgent(params);
   return { accepted: true };
 });
+bridge.register('team.timeline', ({ teamId }) => teams.timeline(teamId));
 bridge.register('team.stop', async ({ teamId }) => {
   await teams.stop(teamId);
   return { stopped: true };

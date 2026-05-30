@@ -109,6 +109,14 @@ export class ConversationService {
   }
 
   /**
+   * 让指定 Conversation 的 runtime 下次以最新 MCP 配置重新启动。
+   * 当前实现采用 stop + delete，等待下一次 sendMessage 时重新构建 runtime。
+   */
+  restart(conversationId: string): void {
+    this.stop(conversationId);
+  }
+
+  /**
    * 获取或创建指定 Conversation 的 `AcpRuntime`。
    *
    * 首次创建时注册四类事件转发：

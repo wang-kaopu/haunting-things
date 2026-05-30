@@ -212,6 +212,13 @@ export class Repository {
     });
     return tx();
   }
+
+  listMailbox(teamId: string): MailboxMessage[] {
+    const rows = this.db
+      .prepare('SELECT * FROM mailbox WHERE team_id = ? ORDER BY created_at ASC')
+      .all(teamId) as any[];
+    return rows.map(rowToMailbox);
+  }
 }
 
 function rowToConversation(row: any): Conversation {

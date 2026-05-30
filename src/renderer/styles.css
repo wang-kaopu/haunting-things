@@ -114,6 +114,11 @@ header p,
   overflow-wrap: anywhere;
 }
 
+.muted {
+  color: #667085;
+  font-size: 12px;
+}
+
 .list {
   display: grid;
   gap: 8px;
@@ -195,6 +200,45 @@ p {
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid #edf0f4;
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.timeline-item {
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fdfefe;
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #667085;
+}
+
+.timeline-meta .processed {
+  color: #027a48;
+}
+
+.timeline-meta .pending {
+  color: #b54708;
+}
+
+.timeline-content {
+  white-space: pre-wrap;
+  color: #18202f;
+  font-size: 13px;
 }
 
 code {

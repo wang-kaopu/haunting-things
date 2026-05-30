@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AgentBackend,
   AgentInfo,
   ChatMessage,
   PermissionRequest,
+  TeamMailboxEntry,
   ServerInfo,
   Team,
   TeamAgentStatus,
 } from '../shared/types';
 import { bridge } from './bridgeClient';
+import { mergeTeamMailboxEntries, resolveTeamSendInvocation } from './teamViewModel';
 import './styles.css';
 
 type AuthUser = { id: string; username: string };
@@ -76,6 +78,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [activeTeamId, setActiveTeamId] = useState<string>('');
   const [activeSlotId, setActiveSlotId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
@@ -98,6 +101,15 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     setTeams(teamList);
     setServerInfo(info);
     if (!activeTeamId && teamList[0]) setActiveTeamId(teamList[0].id);
+  }
+
+  async function loadTimeline(teamId: string): Promise<void> {
+    try {
+      const entries = await bridge.invoke('team.timeline', { teamId });
+      setTimeline(entries);
+    } catch {
+      setTimeline([]);
+    }
   }
 
   useEffect(() => {
@@ -129,11 +141,23 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       void refresh();
     });
 
+    const unsubAgentRemoved = bridge.on('team.agent.removed', () => {
+      void refresh();
+    });
+
+    const unsubTeamMessage = bridge.on('team.agent.message', ({ teamId, entry }) => {
+      const team = activeTeamRef.current;
+      if (team?.id !== teamId) return;
+      setTimeline((current) => mergeTeamMailboxEntries(current, entry));
+    });
+
     return () => {
       unsubStream();
       unsubPermission();
       unsubAgentStatus();
       unsubAgentAdded();
+      unsubAgentRemoved();
+      unsubTeamMessage();
     };
   }, []);
 
@@ -163,12 +187,25 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       .catch(() => setMessages([]));
   }, [activeSlotId, activeTeam?.id]);
 
+  useEffect(() => {
+    if (activeTeam?.id) void loadTimeline(activeTeam.id);
+    else setTimeline([]);
+  }, [activeTeam?.id]);
+
   async function logout(): Promise<void> {
     await fetch('/logout', { method: 'POST', credentials: 'include' });
     onLogout();
   }
 
   const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
+  const handleTeamSend = useCallback(
+    async (content: string) => {
+      const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
+      if (!invocation) return;
+      await bridge.invoke(invocation.name, invocation.params);
+    },
+    [activeTeam, activeSlotId]
+  );
 
   return (
     <main className="app">
@@ -205,7 +242,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
             </header>
             <MessageList messages={messages} />
-            <SendBox onSend={(content) => bridge.invoke('team.sendMessage', { teamId: activeTeam.id, content })} />
+            <SendBox onSend={handleTeamSend} />
             {permission && (
               <PermissionDialog
                 permission={permission}
@@ -250,6 +287,27 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
             </button>
           );
         })}
+
+        <h3>Timeline</h3>
+        <div className="timeline">
+          {timeline.length === 0 ? (
+            <p className="muted">No team messages yet.</p>
+          ) : (
+            timeline.map((entry) => (
+              <div key={entry.message.id} className="timeline-item">
+                <div className="timeline-meta">
+                  <span>
+                    {entry.fromAgentName} → {entry.toAgentName}
+                  </span>
+                  <span className={entry.processed ? 'processed' : 'pending'}>
+                    {entry.processed ? 'processed' : 'pending'}
+                  </span>
+                </div>
+                <div className="timeline-content">{entry.message.content}</div>
+              </div>
+            ))
+          )}
+        </div>
 
         <h3>Server</h3>
         {serverInfo?.urls.map((url) => (

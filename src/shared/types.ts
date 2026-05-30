@@ -97,6 +97,14 @@ export type MailboxMessage = {
   createdAt: number;
 };
 
+/** Team mailbox / timeline 的可展示条目。 */
+export type TeamMailboxEntry = {
+  message: MailboxMessage;
+  fromAgentName: string;
+  toAgentName: string;
+  processed: boolean;
+};
+
 /** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {
   host: string;
@@ -137,6 +145,11 @@ export type InvokeMap = {
     result: Team;
   };
   'team.addAgent': { params: { teamId: string; name: string; backend: AgentBackend }; result: TeamAgent };
+  'team.removeAgent': { params: { teamId: string; slotId: string }; result: { removed: true } };
+  'team.finishTask': {
+    params: { teamId: string; summary: string; taskId?: string };
+    result: { finished: true };
+  };
   'team.get': { params: { teamId: string }; result: Team | null };
   'team.list': { params: void; result: Team[] };
   'team.sendMessage': { params: { teamId: string; content: string; files?: string[] }; result: { accepted: true } };
@@ -144,6 +157,7 @@ export type InvokeMap = {
     params: { teamId: string; slotId: string; content: string; files?: string[] };
     result: { accepted: true };
   };
+  'team.timeline': { params: { teamId: string }; result: TeamMailboxEntry[] };
   'team.stop': { params: { teamId: string }; result: { stopped: true } };
   'server.info': { params: void; result: ServerInfo };
 };
@@ -158,7 +172,8 @@ export type EventMap = {
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };
   'team.agent.status': { teamId: string; slotId: string; status: TeamAgentStatus; error?: string };
-  'team.agent.message': { teamId: string; slotId: string; message: ChatMessage };
+  'team.agent.message': { teamId: string; entry: TeamMailboxEntry };
   'team.agent.added': { teamId: string; agent: TeamAgent };
+  'team.agent.removed': { teamId: string; slotId: string };
   'team.turn.finished': { teamId: string; slotId: string };
 };
