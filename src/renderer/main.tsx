@@ -1,132 +1,229 @@
-/**
- * @license
- * Copyright 2025 AionUi (aionui.com)
- * SPDX-License-Identifier: Apache-2.0
- */
+import React, { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { AgentBackend, AgentInfo, ChatMessage, Conversation, ServerInfo, Team } from '../shared/types';
+import { bridge } from './bridgeClient';
+import './styles.css';
 
-// Sentry must be initialized first
-// Use electron-specific renderer package only inside Electron; fall back to the
-// browser SDK when running as a standalone web server (no window.electronAPI).
-if ((window as { electronAPI?: unknown }).electronAPI) {
-  // Dynamic import avoids bundling sentry-ipc:// protocol code into the web build
-  import('@sentry/electron/renderer').then((Sentry) => Sentry.init()).catch(() => {});
+type AuthUser = { id: string; username: string };
+
+function App(): React.ReactElement {
+  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
+
+  useEffect(() => {
+    fetch('/api/auth/user', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setUser(data?.user ?? null))
+      .catch(() => setUser(null));
+  }, []);
+
+  if (user === undefined) return <div className="center">Loading...</div>;
+  if (!user) return <Login onLogin={setUser} />;
+  return <Workbench user={user} onLogout={() => setUser(null)} />;
 }
 
-// Runtime patches must be imported early
-import './utils/ui/runtimePatches';
+function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactElement {
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-// Browser adapter setup
-import '@/common/adapter/browser';
-
-// React and core dependencies
-import type { PropsWithChildren } from 'react';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-
-// Context providers
-import { AuthProvider } from './hooks/context/AuthContext';
-import { ThemeProvider } from './hooks/context/ThemeContext';
-import { PreviewProvider } from './pages/conversation/Preview/context/PreviewContext';
-import { ConversationTabsProvider } from './pages/conversation/hooks/ConversationTabsContext';
-
-// Arco Design
-import { ConfigProvider } from '@arco-design/web-react';
-// Configure Arco Design to use React 18's createRoot, fixing Message component's CopyReactDOM.render error
-import '@arco-design/web-react/es/_util/react-19-adapter';
-import '@arco-design/web-react/dist/css/arco.css';
-import enUS from '@arco-design/web-react/es/locale/en-US';
-import jaJP from '@arco-design/web-react/es/locale/ja-JP';
-import zhCN from '@arco-design/web-react/es/locale/zh-CN';
-import zhTW from '@arco-design/web-react/es/locale/zh-TW';
-import koKR from '@arco-design/web-react/es/locale/ko-KR';
-import { useTranslation } from 'react-i18next';
-
-// Styles
-import 'uno.css';
-import './styles/arco-override.css';
-import './styles/themes/index.css';
-
-// i18n
-import './services/i18n';
-import { registerPwa } from './services/registerPwa';
-
-// Components and utilities
-import Layout from './components/layout/Layout';
-import Router from './components/layout/Router';
-import Sider from './components/layout/Sider';
-import { useAuth } from './hooks/context/AuthContext';
-import { ConversationHistoryProvider } from './hooks/context/ConversationHistoryContext';
-import HOC from './utils/ui/HOC';
-
-// Patch Korean locale with missing properties from English locale
-const koKRComplete = {
-  ...koKR,
-  Calendar: {
-    ...koKR.Calendar,
-    monthFormat: enUS.Calendar.monthFormat,
-    yearFormat: enUS.Calendar.yearFormat,
-  },
-  DatePicker: {
-    ...koKR.DatePicker,
-    Calendar: {
-      ...koKR.DatePicker.Calendar,
-      monthFormat: enUS.Calendar.monthFormat,
-      yearFormat: enUS.Calendar.yearFormat,
-    },
-  },
-  Form: enUS.Form,
-  ColorPicker: enUS.ColorPicker,
-};
-
-const arcoLocales: Record<string, typeof enUS> = {
-  'zh-CN': zhCN,
-  'zh-TW': zhTW,
-  'ja-JP': jaJP,
-  'ko-KR': koKRComplete,
-  'en-US': enUS,
-};
-
-const AppProviders: React.FC<PropsWithChildren> = ({ children }) =>
-  React.createElement(
-    AuthProvider,
-    null,
-    React.createElement(
-      ThemeProvider,
-      null,
-      React.createElement(PreviewProvider, null, React.createElement(ConversationTabsProvider, null, children))
-    )
-  );
-
-const Config: React.FC<PropsWithChildren> = ({ children }) => {
-  const {
-    i18n: { language },
-  } = useTranslation();
-  const arcoLocale = arcoLocales[language] ?? enUS;
-
-  return React.createElement(ConfigProvider, { theme: { primaryColor: '#4E5969' }, locale: arcoLocale }, children);
-};
-
-const Main = () => {
-  const { ready } = useAuth();
-
-  if (!ready) {
-    return null;
+  async function submit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    setError('');
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Login failed');
+      return;
+    }
+    onLogin(data.user);
   }
 
   return (
-    <Router
-      layout={
-        <ConversationHistoryProvider>
-          <Layout sider={<Sider />} />
-        </ConversationHistoryProvider>
-      }
-    />
+    <main className="login">
+      <form className="panel login-panel" onSubmit={submit}>
+        <h1>Haunting Souls</h1>
+        <label>
+          Username
+          <input value={username} onChange={(event) => setUsername(event.target.value)} />
+        </label>
+        <label>
+          Password
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button type="submit">Login</button>
+      </form>
+    </main>
   );
-};
+}
 
-const App = HOC.Wrapper(Config)(Main);
+function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void }): React.ReactElement {
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTeamId, setActiveTeamId] = useState<string>('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
 
-void registerPwa();
+  const activeTeam = useMemo(() => teams.find((team) => team.id === activeTeamId) ?? teams[0], [teams, activeTeamId]);
 
-const root = createRoot(document.getElementById('root')!);
-root.render(React.createElement(AppProviders, null, React.createElement(App)));
+  async function refresh(): Promise<void> {
+    const [agentList, teamList, info] = await Promise.all([
+      bridge.invoke('agent.list', undefined),
+      bridge.invoke('team.list', undefined),
+      bridge.invoke('server.info', undefined),
+    ]);
+    setAgents(agentList);
+    setTeams(teamList);
+    setServerInfo(info);
+    if (!activeTeamId && teamList[0]) setActiveTeamId(teamList[0].id);
+  }
+
+  useEffect(() => {
+    void refresh();
+    return bridge.on('conversation.stream', ({ message }) => {
+      setMessages((current) => {
+        const index = current.findIndex((item) => item.id === message.id);
+        if (index < 0) return [...current, message];
+        const next = [...current];
+        next[index] = message;
+        return next;
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const leader = activeTeam?.agents.find((agent) => agent.role === 'leader');
+    if (!leader) {
+      setMessages([]);
+      return;
+    }
+    bridge.invoke('conversation.messages', { conversationId: leader.conversationId }).then(setMessages).catch(() => setMessages([]));
+  }, [activeTeam?.id]);
+
+  async function logout(): Promise<void> {
+    await fetch('/logout', { method: 'POST', credentials: 'include' });
+    onLogout();
+  }
+
+  return (
+    <main className="app">
+      <aside className="sidebar">
+        <div className="brand">
+          <strong>Haunting Souls</strong>
+          <span>{user.username}</span>
+        </div>
+        <button onClick={() => void createTeam()}>New Team</button>
+        <div className="list">
+          {teams.map((team) => (
+            <button
+              key={team.id}
+              className={team.id === activeTeam?.id ? 'selected' : ''}
+              onClick={() => setActiveTeamId(team.id)}
+            >
+              {team.name}
+            </button>
+          ))}
+        </div>
+        <button className="secondary" onClick={logout}>
+          Logout
+        </button>
+      </aside>
+      <section className="chat">
+        {activeTeam ? (
+          <>
+            <header>
+              <div>
+                <h2>{activeTeam.name}</h2>
+                <p>{activeTeam.workspace}</p>
+              </div>
+              <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
+            </header>
+            <MessageList messages={messages} />
+            <SendBox onSend={(content) => bridge.invoke('team.sendMessage', { teamId: activeTeam.id, content })} />
+          </>
+        ) : (
+          <div className="empty">Create a team to start.</div>
+        )}
+      </section>
+      <aside className="inspector">
+        <h3>Agents</h3>
+        {agents.map((agent) => (
+          <div key={agent.backend} className="agent">
+            <span>{agent.name}</span>
+            <code>{agent.available ? 'available' : 'missing'}</code>
+          </div>
+        ))}
+        <h3>Team</h3>
+        {activeTeam?.agents.map((agent) => (
+          <div key={agent.slotId} className="agent">
+            <span>{agent.name}</span>
+            <code>{agent.backend}</code>
+          </div>
+        ))}
+        <h3>Server</h3>
+        {serverInfo?.urls.map((url) => (
+          <p key={url} className="url">
+            {url}
+          </p>
+        ))}
+      </aside>
+    </main>
+  );
+
+  async function createTeam(): Promise<void> {
+    const name = window.prompt('Team name', 'New Team');
+    if (!name) return;
+    const backend = pickBackend();
+    const team = await bridge.invoke('team.create', { name, leaderBackend: backend });
+    await refresh();
+    setActiveTeamId(team.id);
+  }
+
+  async function addAgent(teamId: string): Promise<void> {
+    const name = window.prompt('Agent name', 'Teammate');
+    if (!name) return;
+    await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend() });
+    await refresh();
+  }
+}
+
+function MessageList({ messages }: { messages: ChatMessage[] }): React.ReactElement {
+  return (
+    <div className="messages">
+      {messages.map((message) => (
+        <article key={message.id} className={`message ${message.role}`}>
+          <small>{message.role}</small>
+          <div>{message.content || (message.status === 'streaming' ? '...' : '')}</div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SendBox({ onSend }: { onSend: (content: string) => Promise<unknown> }): React.ReactElement {
+  const [content, setContent] = useState('');
+  async function submit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    setContent('');
+    await onSend(trimmed);
+  }
+  return (
+    <form className="sendbox" onSubmit={submit}>
+      <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="Message the team" />
+      <button type="submit">Send</button>
+    </form>
+  );
+}
+
+function pickBackend(): AgentBackend {
+  return window.confirm('Use Codex? Cancel selects Claude.') ? 'codex' : 'claude';
+}
+
+createRoot(document.getElementById('root')!).render(<App />);

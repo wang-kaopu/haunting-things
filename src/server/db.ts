@@ -1,0 +1,263 @@
+import Database from 'better-sqlite3';
+import type { ChatMessage, Conversation, MailboxMessage, Team, User } from '../shared/types';
+
+export type Db = Database.Database;
+
+export function openDatabase(dbPath: string): Db {
+  const db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      jwt_secret TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      last_login INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      backend TEXT NOT NULL,
+      name TEXT NOT NULL,
+      workspace TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      workspace TEXT NOT NULL,
+      leader_slot_id TEXT NOT NULL,
+      agents TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mailbox (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      to_agent_id TEXT NOT NULL,
+      from_agent_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      summary TEXT,
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
+  `);
+  return db;
+}
+
+export class Repository {
+  constructor(private readonly db: Db) {}
+
+  getUserByUsername(username: string): (User & { passwordHash: string; jwtSecret: string }) | null {
+    const row = this.db
+      .prepare('SELECT id, username, password_hash, jwt_secret FROM users WHERE username = ?')
+      .get(username) as { id: string; username: string; password_hash: string; jwt_secret: string } | undefined;
+    return row
+      ? { id: row.id, username: row.username, passwordHash: row.password_hash, jwtSecret: row.jwt_secret }
+      : null;
+  }
+
+  getAnyUser(): (User & { passwordHash: string; jwtSecret: string }) | null {
+    const row = this.db
+      .prepare('SELECT id, username, password_hash, jwt_secret FROM users ORDER BY created_at ASC LIMIT 1')
+      .get() as { id: string; username: string; password_hash: string; jwt_secret: string } | undefined;
+    return row
+      ? { id: row.id, username: row.username, passwordHash: row.password_hash, jwtSecret: row.jwt_secret }
+      : null;
+  }
+
+  createUser(input: { id: string; username: string; passwordHash: string; jwtSecret: string }): User {
+    const now = Date.now();
+    this.db
+      .prepare(
+        'INSERT INTO users (id, username, password_hash, jwt_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(input.id, input.username, input.passwordHash, input.jwtSecret, now, now);
+    return { id: input.id, username: input.username };
+  }
+
+  updateLastLogin(userId: string): void {
+    this.db.prepare('UPDATE users SET last_login = ?, updated_at = ? WHERE id = ?').run(Date.now(), Date.now(), userId);
+  }
+
+  updatePassword(userId: string, passwordHash: string, jwtSecret: string): void {
+    this.db
+      .prepare('UPDATE users SET password_hash = ?, jwt_secret = ?, updated_at = ? WHERE id = ?')
+      .run(passwordHash, jwtSecret, Date.now(), userId);
+  }
+
+  createConversation(conversation: Conversation): Conversation {
+    this.db
+      .prepare(
+        'INSERT INTO conversations (id, backend, name, workspace, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(
+        conversation.id,
+        conversation.backend,
+        conversation.name,
+        conversation.workspace,
+        conversation.status,
+        conversation.createdAt,
+        conversation.updatedAt
+      );
+    return conversation;
+  }
+
+  updateConversationStatus(id: string, status: Conversation['status']): void {
+    this.db.prepare('UPDATE conversations SET status = ?, updated_at = ? WHERE id = ?').run(status, Date.now(), id);
+  }
+
+  listConversations(): Conversation[] {
+    const rows = this.db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all() as any[];
+    return rows.map(rowToConversation);
+  }
+
+  getConversation(id: string): Conversation | null {
+    const row = this.db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as any;
+    return row ? rowToConversation(row) : null;
+  }
+
+  addMessage(message: ChatMessage): ChatMessage {
+    this.db
+      .prepare('INSERT INTO messages (id, conversation_id, role, content, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(message.id, message.conversationId, message.role, message.content, message.status ?? null, message.createdAt);
+    return message;
+  }
+
+  updateMessage(message: ChatMessage): void {
+    this.db
+      .prepare('UPDATE messages SET content = ?, status = ? WHERE id = ?')
+      .run(message.content, message.status ?? null, message.id);
+  }
+
+  listMessages(conversationId: string): ChatMessage[] {
+    const rows = this.db
+      .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC')
+      .all(conversationId) as any[];
+    return rows.map(rowToMessage);
+  }
+
+  createTeam(team: Team): Team {
+    this.db
+      .prepare(
+        'INSERT INTO teams (id, name, workspace, leader_slot_id, agents, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(team.id, team.name, team.workspace, team.leaderSlotId, JSON.stringify(team.agents), team.createdAt, team.updatedAt);
+    return team;
+  }
+
+  updateTeam(team: Team): void {
+    this.db
+      .prepare('UPDATE teams SET name = ?, workspace = ?, leader_slot_id = ?, agents = ?, updated_at = ? WHERE id = ?')
+      .run(team.name, team.workspace, team.leaderSlotId, JSON.stringify(team.agents), Date.now(), team.id);
+  }
+
+  getTeam(id: string): Team | null {
+    const row = this.db.prepare('SELECT * FROM teams WHERE id = ?').get(id) as any;
+    return row ? rowToTeam(row) : null;
+  }
+
+  listTeams(): Team[] {
+    const rows = this.db.prepare('SELECT * FROM teams ORDER BY updated_at DESC').all() as any[];
+    return rows.map(rowToTeam);
+  }
+
+  writeMailbox(message: MailboxMessage): MailboxMessage {
+    this.db
+      .prepare(
+        'INSERT INTO mailbox (id, team_id, to_agent_id, from_agent_id, content, summary, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(
+        message.id,
+        message.teamId,
+        message.toAgentId,
+        message.fromAgentId,
+        message.content,
+        message.summary ?? null,
+        message.read ? 1 : 0,
+        message.createdAt
+      );
+    return message;
+  }
+
+  readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[] {
+    const tx = this.db.transaction(() => {
+      const rows = this.db
+        .prepare('SELECT * FROM mailbox WHERE team_id = ? AND to_agent_id = ? AND read = 0 ORDER BY created_at ASC')
+        .all(teamId, toAgentId) as any[];
+      this.db.prepare('UPDATE mailbox SET read = 1 WHERE team_id = ? AND to_agent_id = ? AND read = 0').run(teamId, toAgentId);
+      return rows.map(rowToMailbox);
+    });
+    return tx();
+  }
+}
+
+function rowToConversation(row: any): Conversation {
+  return {
+    id: row.id,
+    backend: row.backend,
+    name: row.name,
+    workspace: row.workspace,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function rowToMessage(row: any): ChatMessage {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    role: row.role,
+    content: row.content,
+    status: row.status ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function rowToTeam(row: any): Team {
+  return {
+    id: row.id,
+    name: row.name,
+    workspace: row.workspace,
+    leaderSlotId: row.leader_slot_id,
+    agents: JSON.parse(row.agents),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function rowToMailbox(row: any): MailboxMessage {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    toAgentId: row.to_agent_id,
+    fromAgentId: row.from_agent_id,
+    content: row.content,
+    summary: row.summary ?? undefined,
+    read: row.read === 1,
+    createdAt: row.created_at,
+  };
+}
