@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { ChatMessage, Conversation, MailboxMessage, Team, User } from '../shared/types';
+import type { ChatMessage, Conversation, MailboxMessage, Team, TeamTask, User } from '../shared/types';
 
 export type Db = Database.Database;
 
@@ -61,8 +61,25 @@ export function openDatabase(dbPath: string): Db {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL,
+      created_by_slot_id TEXT,
+      assigned_slot_id TEXT,
+      completed_by_slot_id TEXT,
+      completion_summary TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
   `);
   return db;
 }
@@ -219,6 +236,57 @@ export class Repository {
       .all(teamId) as any[];
     return rows.map(rowToMailbox);
   }
+
+  createTask(task: TeamTask): TeamTask {
+    this.db
+      .prepare(
+        'INSERT INTO tasks (id, team_id, title, description, status, created_by_slot_id, assigned_slot_id, completed_by_slot_id, completion_summary, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(
+        task.id,
+        task.teamId,
+        task.title,
+        task.description ?? null,
+        task.status,
+        task.createdBySlotId ?? null,
+        task.assignedSlotId ?? null,
+        task.completedBySlotId ?? null,
+        task.completionSummary ?? null,
+        task.createdAt,
+        task.updatedAt,
+        task.completedAt ?? null
+      );
+    return task;
+  }
+
+  updateTask(task: TeamTask): void {
+    this.db
+      .prepare(
+        'UPDATE tasks SET title = ?, description = ?, status = ?, created_by_slot_id = ?, assigned_slot_id = ?, completed_by_slot_id = ?, completion_summary = ?, updated_at = ?, completed_at = ? WHERE id = ?'
+      )
+      .run(
+        task.title,
+        task.description ?? null,
+        task.status,
+        task.createdBySlotId ?? null,
+        task.assignedSlotId ?? null,
+        task.completedBySlotId ?? null,
+        task.completionSummary ?? null,
+        task.updatedAt,
+        task.completedAt ?? null,
+        task.id
+      );
+  }
+
+  getTask(id: string): TeamTask | null {
+    const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
+    return row ? rowToTask(row) : null;
+  }
+
+  listTasks(teamId: string): TeamTask[] {
+    const rows = this.db.prepare('SELECT * FROM tasks WHERE team_id = ? ORDER BY updated_at DESC').all(teamId) as any[];
+    return rows.map(rowToTask);
+  }
 }
 
 function rowToConversation(row: any): Conversation {
@@ -266,5 +334,22 @@ function rowToMailbox(row: any): MailboxMessage {
     summary: row.summary ?? undefined,
     read: row.read === 1,
     createdAt: row.created_at,
+  };
+}
+
+function rowToTask(row: any): TeamTask {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    title: row.title,
+    description: row.description ?? undefined,
+    status: row.status,
+    createdBySlotId: row.created_by_slot_id ?? undefined,
+    assignedSlotId: row.assigned_slot_id ?? undefined,
+    completedBySlotId: row.completed_by_slot_id ?? undefined,
+    completionSummary: row.completion_summary ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at ?? undefined,
   };
 }

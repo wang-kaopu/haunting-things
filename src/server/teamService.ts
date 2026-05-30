@@ -1,4 +1,4 @@
-import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamMailboxEntry } from '../shared/types';
+import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamMailboxEntry, TeamTask } from '../shared/types';
 import type { Repository } from './db';
 import type { ConversationService } from './conversations';
 import type { EventBus } from './events';
@@ -133,38 +133,98 @@ export class TeamService {
   }
 
   /**
-   * 记录某个 Agent 的任务完成结果，默认通知 leader。
+   * 创建一个显式任务记录，默认处于 pending 状态。
+   */
+  async taskCreate(input: {
+    teamId: string;
+    title: string;
+    description?: string;
+    assignedSlotId?: string;
+    createdBySlotId?: string;
+  }): Promise<TeamTask> {
+    const team = this.requireTeam(input.teamId);
+    const title = input.title.trim();
+    if (!title) throw new Error('title is required');
+    if (input.assignedSlotId) this.requireAgent(team, input.assignedSlotId);
+    if (input.createdBySlotId) this.requireAgent(team, input.createdBySlotId);
+
+    const now = Date.now();
+    return this.repo.createTask({
+      id: crypto.randomUUID(),
+      teamId: team.id,
+      title,
+      description: input.description?.trim() || undefined,
+      status: 'pending',
+      createdBySlotId: input.createdBySlotId,
+      assignedSlotId: input.assignedSlotId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /** 返回当前 Team 的任务列表。 */
+  tasks(teamId: string): TeamTask[] {
+    this.requireTeam(teamId);
+    return this.repo.listTasks(teamId);
+  }
+
+  /**
+   * 记录某个 Agent 的任务完成结果。
    *
-   * 当前仓库没有完整的 task board，因此这里采用最小闭环：
-   * 将完成摘要写入 leader mailbox，并唤醒 leader 处理后续协作。
+   * 如果没有显式 taskId，会先创建一条临时任务，再将其标记为 done，
+   * 这样任务状态和完成结果都能持久化。
    */
   async finishTask(input: { teamId: string; summary: string; taskId?: string; fromSlotId?: string }): Promise<{ finished: true }> {
     const team = this.requireTeam(input.teamId);
     const summary = input.summary.trim();
     if (!summary) throw new Error('summary is required');
-    const leader = team.agents.find((agent) => agent.role === 'leader');
-    if (!leader) throw new Error(`Leader not found for team ${team.id}`);
+    const actor =
+      (input.fromSlotId && this.requireAgent(team, input.fromSlotId)) ??
+      team.agents.find((agent) => agent.role === 'leader') ??
+      team.agents[0];
+    if (!actor) throw new Error(`Leader not found for team ${team.id}`);
 
-    const caller =
-      (input.fromSlotId && team.agents.find((agent) => agent.slotId === input.fromSlotId)) ??
-      team.agents.find((agent) => agent.role !== 'leader') ??
-      leader;
-
-    if (!caller || caller.role === 'leader') {
-      return { finished: true };
+    const now = Date.now();
+    let task = input.taskId ? this.repo.getTask(input.taskId) : null;
+    if (task && task.teamId !== team.id) {
+      throw new Error(`Task not found: ${input.taskId}`);
     }
-
-    const content = input.taskId ? `Task ${input.taskId} finished: ${summary}` : `Task finished: ${summary}`;
-    await this.deliver({
-      id: crypto.randomUUID(),
-      teamId: team.id,
-      toAgentId: leader.slotId,
-      fromAgentId: caller.slotId,
-      content,
-      summary: input.taskId ? `${input.taskId}: ${summary}` : summary,
-      read: false,
-      createdAt: Date.now(),
+    if (!task) {
+      task = this.repo.createTask({
+        id: input.taskId ?? crypto.randomUUID(),
+        teamId: team.id,
+        title: input.taskId ? `Task ${input.taskId}` : 'Ad hoc task',
+        description: undefined,
+        status: 'pending',
+        createdBySlotId: actor.slotId,
+        assignedSlotId: actor.role === 'teammate' ? actor.slotId : undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    this.repo.updateTask({
+      ...task,
+      status: 'done',
+      completionSummary: summary,
+      completedBySlotId: actor.slotId,
+      completedAt: now,
+      updatedAt: now,
     });
+
+    const leader = team.agents.find((agent) => agent.role === 'leader');
+    if (leader && actor.role !== 'leader') {
+      const content = input.taskId ? `Task ${input.taskId} finished: ${summary}` : `Task finished: ${summary}`;
+      await this.deliver({
+        id: crypto.randomUUID(),
+        teamId: team.id,
+        toAgentId: leader.slotId,
+        fromAgentId: actor.slotId,
+        content,
+        summary: input.taskId ? `${input.taskId}: ${summary}` : summary,
+        read: false,
+        createdAt: now,
+      });
+    }
     return { finished: true };
   }
 
@@ -335,6 +395,12 @@ export class TeamService {
     const team = this.repo.getTeam(teamId);
     if (!team) throw new Error(`Team not found: ${teamId}`);
     return team;
+  }
+
+  private requireAgent(team: Team, slotId: string): TeamAgent {
+    const agent = team.agents.find((item) => item.slotId === slotId);
+    if (!agent) throw new Error(`Agent not found: ${slotId}`);
+    return agent;
   }
 
   private buildMailboxEntry(team: Team, message: MailboxMessage): TeamMailboxEntry {

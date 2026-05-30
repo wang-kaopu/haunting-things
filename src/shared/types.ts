@@ -105,6 +105,25 @@ export type TeamMailboxEntry = {
   processed: boolean;
 };
 
+/** Team 任务状态。 */
+export type TeamTaskStatus = 'pending' | 'done';
+
+/** Team 内部的任务记录。 */
+export type TeamTask = {
+  id: string;
+  teamId: string;
+  title: string;
+  description?: string;
+  status: TeamTaskStatus;
+  createdBySlotId?: string;
+  assignedSlotId?: string;
+  completedBySlotId?: string;
+  completionSummary?: string;
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+};
+
 /** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {
   host: string;
@@ -150,6 +169,17 @@ export type InvokeMap = {
     params: { teamId: string; summary: string; taskId?: string };
     result: { finished: true };
   };
+  'team.taskCreate': {
+    params: {
+      teamId: string;
+      title: string;
+      description?: string;
+      assignedSlotId?: string;
+      createdBySlotId?: string;
+    };
+    result: TeamTask;
+  };
+  'team.tasks': { params: { teamId: string }; result: TeamTask[] };
   'team.get': { params: { teamId: string }; result: Team | null };
   'team.list': { params: void; result: Team[] };
   'team.sendMessage': { params: { teamId: string; content: string; files?: string[] }; result: { accepted: true } };
