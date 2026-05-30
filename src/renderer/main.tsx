@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { AgentBackend, AgentInfo, ChatMessage, Conversation, ServerInfo, Team } from '../shared/types';
+import type { AgentBackend, AgentInfo, ChatMessage, Conversation, PermissionRequest, ServerInfo, Team } from '../shared/types';
 import { bridge } from './bridgeClient';
 import './styles.css';
 
@@ -68,6 +68,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [activeTeamId, setActiveTeamId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
+  const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
   const activeTeam = useMemo(() => teams.find((team) => team.id === activeTeamId) ?? teams[0], [teams, activeTeamId]);
 
@@ -85,7 +86,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
   useEffect(() => {
     void refresh();
-    return bridge.on('conversation.stream', ({ message }) => {
+    const unsubStream = bridge.on('conversation.stream', ({ message }) => {
       setMessages((current) => {
         const index = current.findIndex((item) => item.id === message.id);
         if (index < 0) return [...current, message];
@@ -94,6 +95,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         return next;
       });
     });
+    const unsubPermission = bridge.on('conversation.permission', (req) => {
+      setPermission(req);
+    });
+    return () => {
+      unsubStream();
+      unsubPermission();
+    };
   }, []);
 
   useEffect(() => {
@@ -145,6 +153,20 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
             </header>
             <MessageList messages={messages} />
             <SendBox onSend={(content) => bridge.invoke('team.sendMessage', { teamId: activeTeam.id, content })} />
+            {permission && (
+              <PermissionDialog
+                permission={permission}
+                onRespond={(optionId) => {
+                  void bridge.invoke('conversation.confirmPermission', {
+                    conversationId: permission.conversationId,
+                    callId: permission.callId,
+                    optionId,
+                  });
+                  setPermission(null);
+                }}
+                onDismiss={() => setPermission(null)}
+              />
+            )}
           </>
         ) : (
           <div className="empty">Create a team to start.</div>
@@ -224,6 +246,49 @@ function SendBox({ onSend }: { onSend: (content: string) => Promise<unknown> }):
 
 function pickBackend(): AgentBackend {
   return window.confirm('Use Codex? Cancel selects Claude.') ? 'codex' : 'claude';
+}
+
+function PermissionDialog({
+  permission,
+  onRespond,
+  onDismiss,
+}: {
+  permission: PermissionRequest;
+  onRespond: (optionId: string) => void;
+  onDismiss: () => void;
+}): React.ReactElement {
+  const [selected, setSelected] = useState(permission.options[0]?.id ?? '');
+  return (
+    <div className="permission-overlay">
+      <div className="permission-dialog panel">
+        <h3>{permission.title}</h3>
+        {permission.body && <pre className="permission-body">{permission.body}</pre>}
+        <div className="permission-options">
+          {permission.options.map((opt) => (
+            <label key={opt.id} className="permission-option">
+              <input
+                type="radio"
+                name="permission"
+                value={opt.id}
+                checked={selected === opt.id}
+                onChange={() => setSelected(opt.id)}
+              />
+              {opt.label}
+              {opt.description && <span className="permission-desc"> — {opt.description}</span>}
+            </label>
+          ))}
+        </div>
+        <div className="permission-actions">
+          <button onClick={() => onRespond(selected)} disabled={!selected}>
+            Confirm
+          </button>
+          <button className="secondary" onClick={onDismiss}>
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

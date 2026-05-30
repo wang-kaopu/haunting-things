@@ -1,5 +1,8 @@
+/** 应用层所有共享类型定义：Agent、Conversation、Team、消息、权限请求及 WebSocket Bridge API。 */
+
 export type AgentBackend = 'claude' | 'codex';
 
+/** 已检测到的 Agent CLI 信息。 */
 export type AgentInfo = {
   backend: AgentBackend;
   name: string;
@@ -9,13 +12,16 @@ export type AgentInfo = {
   error?: string;
 };
 
+/** Agent 健康检查结果，在 `AgentInfo` 基础上增加握手状态。 */
 export type AgentHealth = AgentInfo & {
   ok: boolean;
   handshake?: boolean;
 };
 
+/** Conversation 当前状态。 */
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
 
+/** 单个 Conversation 的元数据。 */
 export type Conversation = {
   id: string;
   backend: AgentBackend;
@@ -26,8 +32,10 @@ export type Conversation = {
   updatedAt: number;
 };
 
+/** 聊天消息的发送者角色。 */
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
 
+/** 单条聊天消息，`status` 在流式输出期间为 `streaming`，完成后为 `done`。 */
 export type ChatMessage = {
   id: string;
   conversationId: string;
@@ -37,12 +45,14 @@ export type ChatMessage = {
   status?: 'streaming' | 'done' | 'error';
 };
 
+/** 权限确认的单个选项。 */
 export type PermissionOption = {
   id: string;
   label: string;
   description?: string;
 };
 
+/** Agent 发起的权限请求，需用户在 UI 中选择一个选项后才能继续执行。 */
 export type PermissionRequest = {
   conversationId: string;
   callId: string;
@@ -51,8 +61,10 @@ export type PermissionRequest = {
   options: PermissionOption[];
 };
 
+/** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
 
+/** Team 中单个 Agent 成员的完整描述。 */
 export type TeamAgent = {
   slotId: string;
   conversationId: string;
@@ -62,6 +74,7 @@ export type TeamAgent = {
   status: TeamAgentStatus;
 };
 
+/** Team 的完整描述，包含所有成员列表。 */
 export type Team = {
   id: string;
   name: string;
@@ -72,6 +85,7 @@ export type Team = {
   updatedAt: number;
 };
 
+/** Team 内部成员间的异步消息（存储在 mailbox 表）。 */
 export type MailboxMessage = {
   id: string;
   teamId: string;
@@ -83,6 +97,7 @@ export type MailboxMessage = {
   createdAt: number;
 };
 
+/** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {
   host: string;
   port: number;
@@ -90,11 +105,16 @@ export type ServerInfo = {
   urls: string[];
 };
 
+/** 已登录用户的公开信息。 */
 export type User = {
   id: string;
   username: string;
 };
 
+/**
+ * WebSocket Bridge 可调用 API 的完整映射。
+ * key 为 API 名称，value 包含 `params`（请求参数）和 `result`（返回值）类型。
+ */
 export type InvokeMap = {
   'agent.list': { params: void; result: AgentInfo[] };
   'agent.health': { params: { backend: AgentBackend }; result: AgentHealth };
@@ -128,6 +148,10 @@ export type InvokeMap = {
   'server.info': { params: void; result: ServerInfo };
 };
 
+/**
+ * WebSocket Bridge 服务端主动推送事件的完整映射。
+ * key 为事件名称，value 为事件数据类型。
+ */
 export type EventMap = {
   'conversation.stream': { conversationId: string; message: ChatMessage };
   'conversation.permission': PermissionRequest;
