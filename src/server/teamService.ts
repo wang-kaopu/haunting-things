@@ -32,6 +32,14 @@ export class TeamService {
   ) {}
 
   /**
+   * 服务重启后恢复已有 Team 的 MCP session，幂等。
+   * 在 index.ts 启动阶段调用，确保旧 Team 的 MCP 配置已注入所有成员的 AcpRuntime。
+   */
+  async restoreSession(teamId: string): Promise<void> {
+    await this.ensureSession(teamId);
+  }
+
+  /**
    * 创建新 Team，自动建立 Leader conversation 并启动 MCP 服务。
    *
    * @param input.name          - Team 名称

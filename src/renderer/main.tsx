@@ -1,6 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { AgentBackend, AgentInfo, ChatMessage, Conversation, PermissionRequest, ServerInfo, Team } from '../shared/types';
+import type {
+  AgentBackend,
+  AgentInfo,
+  ChatMessage,
+  PermissionRequest,
+  ServerInfo,
+  Team,
+  TeamAgentStatus,
+} from '../shared/types';
 import { bridge } from './bridgeClient';
 import './styles.css';
 
@@ -66,11 +74,19 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>('');
+  const [activeSlotId, setActiveSlotId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
   const activeTeam = useMemo(() => teams.find((team) => team.id === activeTeamId) ?? teams[0], [teams, activeTeamId]);
+
+  // useRef 避免 stale closure：conversation.stream 回调需要读最新的 activeSlotId
+  const activeSlotIdRef = useRef(activeSlotId);
+  const activeTeamRef = useRef(activeTeam);
+  useEffect(() => { activeSlotIdRef.current = activeSlotId; }, [activeSlotId]);
+  useEffect(() => { activeTeamRef.current = activeTeam; }, [activeTeam]);
 
   async function refresh(): Promise<void> {
     const [agentList, teamList, info] = await Promise.all([
@@ -86,7 +102,12 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
   useEffect(() => {
     void refresh();
-    const unsubStream = bridge.on('conversation.stream', ({ message }) => {
+
+    const unsubStream = bridge.on('conversation.stream', ({ conversationId, message }) => {
+      const team = activeTeamRef.current;
+      const slotId = activeSlotIdRef.current;
+      const activeAgent = team?.agents.find((a) => a.slotId === slotId);
+      if (conversationId !== activeAgent?.conversationId) return;
       setMessages((current) => {
         const index = current.findIndex((item) => item.id === message.id);
         if (index < 0) return [...current, message];
@@ -95,28 +116,59 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         return next;
       });
     });
+
     const unsubPermission = bridge.on('conversation.permission', (req) => {
       setPermission(req);
     });
+
+    const unsubAgentStatus = bridge.on('team.agent.status', ({ slotId, status }) => {
+      setAgentStatuses((prev) => ({ ...prev, [slotId]: status }));
+    });
+
+    const unsubAgentAdded = bridge.on('team.agent.added', () => {
+      void refresh();
+    });
+
     return () => {
       unsubStream();
       unsubPermission();
+      unsubAgentStatus();
+      unsubAgentAdded();
     };
   }, []);
 
+  // 切换 Team 时：重置 activeSlotId 为 leader，重置 agentStatuses，加载 leader 消息
   useEffect(() => {
-    const leader = activeTeam?.agents.find((agent) => agent.role === 'leader');
-    if (!leader) {
+    if (!activeTeam) {
+      setMessages([]);
+      setActiveSlotId('');
+      return;
+    }
+    const leader = activeTeam.agents.find((a) => a.role === 'leader');
+    const targetSlotId = leader?.slotId ?? activeTeam.agents[0]?.slotId ?? '';
+    setActiveSlotId(targetSlotId);
+    setAgentStatuses({});
+  }, [activeTeam?.id]);
+
+  // 切换激活 Agent 时加载其历史消息
+  useEffect(() => {
+    const agent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
+    if (!agent) {
       setMessages([]);
       return;
     }
-    bridge.invoke('conversation.messages', { conversationId: leader.conversationId }).then(setMessages).catch(() => setMessages([]));
-  }, [activeTeam?.id]);
+    bridge
+      .invoke('conversation.messages', { conversationId: agent.conversationId })
+      .then(setMessages)
+      .catch(() => setMessages([]));
+  }, [activeSlotId, activeTeam?.id]);
 
   async function logout(): Promise<void> {
     await fetch('/logout', { method: 'POST', credentials: 'include' });
     onLogout();
   }
+
+  const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
 
   return (
     <main className="app">
@@ -141,13 +193,14 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           Logout
         </button>
       </aside>
+
       <section className="chat">
         {activeTeam ? (
           <>
             <header>
               <div>
                 <h2>{activeTeam.name}</h2>
-                <p>{activeTeam.workspace}</p>
+                <p className="muted">{activeAgent?.name ?? ''}</p>
               </div>
               <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
             </header>
@@ -172,21 +225,32 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           <div className="empty">Create a team to start.</div>
         )}
       </section>
+
       <aside className="inspector">
-        <h3>Agents</h3>
+        <h3>Backends</h3>
         {agents.map((agent) => (
           <div key={agent.backend} className="agent">
             <span>{agent.name}</span>
             <code>{agent.available ? 'available' : 'missing'}</code>
           </div>
         ))}
-        <h3>Team</h3>
-        {activeTeam?.agents.map((agent) => (
-          <div key={agent.slotId} className="agent">
-            <span>{agent.name}</span>
-            <code>{agent.backend}</code>
-          </div>
-        ))}
+
+        <h3>Team Agents</h3>
+        {activeTeam?.agents.map((agent) => {
+          const status = agentStatuses[agent.slotId] ?? agent.status;
+          const isActive = agent.slotId === activeSlotId;
+          return (
+            <button
+              key={agent.slotId}
+              className={`agent-tab${isActive ? ' selected' : ''}`}
+              onClick={() => setActiveSlotId(agent.slotId)}
+            >
+              <span className="agent-name">{agent.name}</span>
+              <span className={`agent-badge ${status}`}>{status}</span>
+            </button>
+          );
+        })}
+
         <h3>Server</h3>
         {serverInfo?.urls.map((url) => (
           <p key={url} className="url">

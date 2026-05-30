@@ -11,7 +11,7 @@ import {
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
 import type { AgentBackend, ChatMessage, ConversationStatus, PermissionRequest } from '../shared/types';
-import { getBridgePackage } from './agentRegistry';
+import { getBridgePackageVersioned } from './agentRegistry';
 import { ndjsonFromChildProcess } from './ndjsonTransport';
 
 type AcpRuntimeEvents = {
@@ -166,7 +166,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private async ensureStarted(): Promise<void> {
     if (this.connection) return;
 
-    const bridgePackage = getBridgePackage(this.input.backend);
+    const bridgePackage = getBridgePackageVersioned(this.input.backend);
     const cwd = path.resolve(this.input.workspace || process.cwd());
 
     const child = spawn('npx', ['-y', bridgePackage], {

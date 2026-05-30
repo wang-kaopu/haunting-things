@@ -23,6 +23,17 @@ export function getBridgePackage(backend: AgentBackend): string {
   return BACKENDS[backend].bridgePackage;
 }
 
+/** 锁定版本的 bridge package，与 AionUi 保持一致，避免启动时版本漂移。 */
+const BRIDGE_VERSIONS: Record<AgentBackend, string> = {
+  claude: '0.29.2',
+  codex: '0.9.5',
+};
+
+/** 返回带版本锁的 bridge package 名，用于 `npx -y <pkg>` 启动。 */
+export function getBridgePackageVersioned(backend: AgentBackend): string {
+  return `${BACKENDS[backend].bridgePackage}@${BRIDGE_VERSIONS[backend]}`;
+}
+
 export async function listAgents(): Promise<AgentInfo[]> {
   return Promise.all((Object.keys(BACKENDS) as AgentBackend[]).map(detectAgent));
 }
