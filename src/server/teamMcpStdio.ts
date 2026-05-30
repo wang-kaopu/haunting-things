@@ -34,10 +34,10 @@ server.tool(
 
 server.tool(
   'team_add_agent',
-  'Provision a new Claude or Codex teammate so the team can split work and keep moving in parallel.',
+  'Start another AI agent and add it to the current team. Use backend="claude" to start Claude Code, backend="codex" to start Codex. Use this when the task benefits from review, parallel work, cross-checking, or another agent.',
   {
-    name: z.string().describe('Name for the new teammate'),
-    backend: z.enum(['claude', 'codex']).describe('Backend for the new teammate. Use exactly "claude" or "codex".'),
+    name: z.string().describe('Human-readable teammate name, e.g. "Claude Reviewer" or "Codex Implementer"'),
+    backend: z.enum(['claude', 'codex']).describe('Exact backend to start: "claude" or "codex"'),
   },
   async (args) => textResult(await callTeamTool('team_add_agent', args))
 );
@@ -63,12 +63,12 @@ server.tool(
 
 server.tool(
   'team_delegate_task',
-  'Create or provision a teammate, create a task, and assign the work in one call.',
+  'Delegate a task in one call. It will reuse an existing teammate with the requested backend when available, otherwise it will start that backend and assign the task.',
   {
-    agent: z.string().describe('Target teammate name or slot id. If missing, a new teammate will be created.'),
-    title: z.string().describe('Task title'),
-    instructions: z.string().describe('Work instructions to send to the teammate'),
-    backend: z.enum(['claude', 'codex']).optional().describe('Backend to use when creating a new teammate'),
+    backend: z.enum(['claude', 'codex']).describe('Backend to delegate to'),
+    name: z.string().optional().describe('Optional teammate name. If omitted, use a default name based on backend.'),
+    task: z.string().describe('Task message to send to the teammate'),
+    summary: z.string().optional().describe('Short UI summary'),
   },
   async (args) => textResult(await callTeamTool('team_delegate_task', args))
 );

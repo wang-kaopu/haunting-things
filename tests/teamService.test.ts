@@ -52,6 +52,7 @@ type FakeRepository = {
   listTeams(): Team[];
   writeMailbox(message: MailboxMessage): MailboxMessage;
   readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[];
+  listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[];
   listMailbox(teamId: string): MailboxMessage[];
   createTask(task: TeamTask): TeamTask;
   updateTask(task: TeamTask): void;
@@ -93,6 +94,11 @@ function createFakeRepository(): FakeRepository {
         }
       }
       return unread;
+    },
+    listUnreadMailbox(teamId, toAgentId) {
+      return mailbox
+        .filter((message) => message.teamId === teamId && message.toAgentId === toAgentId && !message.read)
+        .map((message) => structuredClone(message));
     },
     listMailbox(teamId) {
       return mailbox.filter((message) => message.teamId === teamId).map((message) => structuredClone(message));
@@ -186,6 +192,7 @@ describe('TeamService', () => {
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
 
     await service.sendMessage({ teamId: team.id, content: 'Hello leader' });
+    await vi.runAllTimersAsync();
 
     const timeline = service.timeline(team.id);
     expect(timeline).toHaveLength(1);
@@ -198,7 +205,50 @@ describe('TeamService', () => {
         read: true,
       },
     });
-    expect(conversations.sendMessage).toHaveBeenCalled();
+    expect(conversations.sendMessage).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      content: expect.stringContaining('You are Leader, a member of team Alpha.'),
+    });
+    expect(conversations.sendMessage).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      content: expect.stringContaining('Current teammates:'),
+    });
+    expect(conversations.sendMessage).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      content: expect.stringContaining('Available team RPC tools:'),
+    });
+    expect(conversations.sendMessage).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      content: expect.stringContaining('team_delegate_task: create a task and assign it in one step'),
+    });
+  });
+
+  it('queues wakeups without blocking and serializes repeated prompts for the same agent', async () => {
+    const service = new TeamService(repo as any, conversations as any, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
+
+    let resolveFirstWake: (() => void) | null = null;
+    conversations.sendMessage.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirstWake = resolve;
+        })
+    );
+
+    await service.sendMessage({ teamId: team.id, content: 'First message' });
+    expect(conversations.sendMessage).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(conversations.sendMessage).toHaveBeenCalledTimes(1);
+
+    await service.sendMessage({ teamId: team.id, content: 'Second message' });
+    expect(conversations.sendMessage).toHaveBeenCalledTimes(1);
+
+    resolveFirstWake?.();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(conversations.sendMessage).toHaveBeenCalledTimes(2);
   });
 
   it('creates explicit tasks through taskCreate', async () => {
@@ -230,6 +280,7 @@ describe('TeamService', () => {
       summary: 'Implemented the retry path',
       fromSlotId: teammate.slotId,
     });
+    await vi.runAllTimersAsync();
 
     const tasks = service.tasks(team.id);
     expect(tasks).toHaveLength(1);

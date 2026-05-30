@@ -24,6 +24,10 @@ type TeamSession = {
 export class TeamService {
   /** teamId → 当前运行时会话。 */
   private readonly sessions = new Map<string, TeamSession>();
+  /** 已排队等待唤醒的 teamId:slotId。 */
+  private readonly pendingWakeups = new Set<string>();
+  /** 当前正在唤醒的 teamId:slotId。 */
+  private readonly activeWakeups = new Set<string>();
 
   constructor(
     private readonly repo: Repository,
@@ -293,7 +297,38 @@ export class TeamService {
     const team = this.requireTeam(message.teamId);
     this.repo.writeMailbox(message);
     this.events.emit('team.agent.message', { teamId: message.teamId, entry: this.buildMailboxEntry(team, message) });
-    await this.wakeAgent(message.teamId, message.toAgentId);
+    this.scheduleWakeAgent(message.teamId, message.toAgentId);
+  }
+
+  /**
+   * 异步排队唤醒目标 Agent，避免同一 agent 重复并发起 prompt。
+   */
+  private scheduleWakeAgent(teamId: string, slotId: string): void {
+    const key = `${teamId}:${slotId}`;
+    if (this.pendingWakeups.has(key) || this.activeWakeups.has(key)) return;
+    this.pendingWakeups.add(key);
+    setTimeout(() => {
+      this.pendingWakeups.delete(key);
+      void this.runWakeCycle(teamId, slotId);
+    }, 0);
+  }
+
+  /**
+   * 执行一轮唤醒；如果在执行期间又收到新消息，则在结束后再补一轮。
+   */
+  private async runWakeCycle(teamId: string, slotId: string): Promise<void> {
+    const key = `${teamId}:${slotId}`;
+    if (this.activeWakeups.has(key)) return;
+    this.activeWakeups.add(key);
+    try {
+      await this.wakeAgent(teamId, slotId);
+    } catch {
+      // wakeAgent 已经发出失败状态，这里只负责收尾和补轮次。
+    } finally {
+      this.activeWakeups.delete(key);
+      const hasUnread = this.repo.listUnreadMailbox(teamId, slotId).length > 0;
+      if (hasUnread) this.scheduleWakeAgent(teamId, slotId);
+    }
   }
 
   /**
@@ -351,7 +386,7 @@ export class TeamService {
       team.id,
       () => this.repo.getTeam(team.id),
       {
-        addAgent: (input) => this.addAgent({ ...input, backend: input.backend as AgentBackend }),
+        addAgent: (input) => this.addAgent(input),
         taskCreate: (input) => this.taskCreate(input),
         removeAgent: (input) => this.removeAgent(input),
         finishTask: (input) => this.finishTask(input),
@@ -415,16 +450,16 @@ export class TeamService {
  */
 function formatMailbox(messages: MailboxMessage[], team: Team, agent: TeamAgent): string {
   const teamLines = team.agents.map((member) => `- ${member.name} (${member.role}, ${member.backend}, ${member.status})`);
-  const mailboxLines =
+  const messageLines =
     messages.length === 0
-      ? ['Mailbox:', '- No unread team messages.']
-      : [
-          'Mailbox:',
-          ...messages.map((message) => {
-            const from = message.fromAgentId === 'user' ? 'user' : team.agents.find((item) => item.slotId === message.fromAgentId)?.name || message.fromAgentId;
-            return `- From ${from}: ${message.content}`;
-          }),
-        ];
+      ? ['- No unread team messages.']
+      : messages.map((message) => {
+          const from =
+            message.fromAgentId === 'user'
+              ? 'user'
+              : team.agents.find((item) => item.slotId === message.fromAgentId)?.name || message.fromAgentId;
+          return `- From ${from}: ${message.content}`;
+        });
 
   return [
     `You are ${agent.name}, a member of team ${team.name}.`,
@@ -443,6 +478,7 @@ function formatMailbox(messages: MailboxMessage[], team: Team, agent: TeamAgent)
     '- To start Claude Code, use backend exactly "claude".',
     '- After adding a teammate, use team_send_message to assign work.',
     '',
-    ...mailboxLines,
+    'Unread team messages:',
+    ...messageLines,
   ].join('\n');
 }

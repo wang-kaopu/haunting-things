@@ -155,7 +155,7 @@ export class TeamMcpServer {
       createdAt: Date.now(),
     };
     await this.callbacks.sendMailboxMessage(message);
-    return `Message sent to ${target.name}`;
+    return `Message queued for ${target.name}`;
   }
 
   private async addAgent(args: Record<string, unknown>): Promise<string> {
@@ -163,10 +163,9 @@ export class TeamMcpServer {
     const backend = String(args.backend || '').trim();
     if (!name) throw new Error('name is required');
     if (!backend) throw new Error('backend is required');
-    if (backend !== 'claude' && backend !== 'codex') throw new Error('backend must be claude or codex');
 
     const team = this.resolveTeam();
-    const agent = await this.callbacks.addAgent({ teamId: team.id, name, backend: backend as AgentBackend });
+    const agent = await this.callbacks.addAgent({ teamId: team.id, name, backend: parseAgentBackend(backend) });
     return `Added teammate ${agent.name} (${agent.slotId})`;
   }
 
@@ -191,33 +190,27 @@ export class TeamMcpServer {
 
   private async delegateTask(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     const team = this.resolveTeam();
-    const title = String(args.title || '').trim();
-    const instructions = String(args.instructions || '').trim();
-    const targetRef = String(args.agent || args.name || '').trim();
-    const backend = String(args.backend || '').trim();
-    if (!title) throw new Error('title is required');
-    if (!instructions) throw new Error('instructions is required');
-    if (!targetRef) throw new Error('agent is required');
+    const backend = parseAgentBackend(args.backend);
+    const taskBody = String(args.task || '').trim();
+    const summary = args.summary ? String(args.summary).trim() : '';
+    const name = String(args.name || '').trim();
+    if (!taskBody) throw new Error('task is required');
 
-    let target = this.resolveTarget(team, targetRef);
+    let target = team.agents.find((agent) => agent.role === 'teammate' && agent.backend === backend) ?? null;
     let createdAgent = false;
     if (!target) {
-      if (!backend) throw new Error('backend is required when adding a new teammate');
-      if (backend !== 'claude' && backend !== 'codex') {
-        throw new Error('backend must be claude or codex');
-      }
       target = await this.callbacks.addAgent({
         teamId: team.id,
-        name: targetRef,
-        backend: backend as AgentBackend,
+        name: name || defaultDelegateName(backend),
+        backend,
       });
       createdAgent = true;
     }
 
     const task = await this.callbacks.taskCreate({
       teamId: team.id,
-      title,
-      description: instructions,
+      title: summary || taskBody,
+      description: taskBody,
       assignedSlotId: target.slotId,
       createdBySlotId: fromSlotId,
     });
@@ -229,15 +222,15 @@ export class TeamMcpServer {
       teamId: team.id,
       toAgentId: target.slotId,
       fromAgentId: sender?.slotId ?? team.leaderSlotId,
-      content: [`Task: ${title}`, instructions, `Task ID: ${task.id}`].join('\n\n'),
-      summary: title,
+      content: [`Task: ${summary || taskBody}`, taskBody, `Task ID: ${task.id}`].join('\n\n'),
+      summary: summary || taskBody,
       read: false,
       createdAt: Date.now(),
     };
     await this.callbacks.sendMailboxMessage(message);
     return createdAgent
-      ? `Delegated ${title} to new teammate ${target.name} (${target.slotId})`
-      : `Delegated ${title} to ${target.name}`;
+      ? `Delegated task to ${target.name} (${target.slotId}). The teammate has been started if it did not already exist.`
+      : `Delegated task to ${target.name} (${target.slotId}).`;
   }
 
   private resolveTarget(team: Team, nameOrSlotId: string): TeamAgent | null {
@@ -252,6 +245,15 @@ export class TeamMcpServer {
 
 function formatAgent(agent: TeamAgent): string {
   return `- ${agent.name} (${agent.role}, ${agent.backend}, ${agent.status})`;
+}
+
+function parseAgentBackend(value: unknown): AgentBackend {
+  if (value === 'claude' || value === 'codex') return value;
+  throw new Error('backend must be exactly "claude" or "codex"');
+}
+
+function defaultDelegateName(backend: AgentBackend): string {
+  return backend === 'claude' ? 'Claude Code' : 'Codex Agent';
 }
 
 function writeTcpMessage(socket: net.Socket, payload: unknown): void {

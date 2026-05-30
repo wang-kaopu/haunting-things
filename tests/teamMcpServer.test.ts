@@ -165,7 +165,7 @@ describe('TeamMcpServer', () => {
       summary: 'bug fix',
     });
 
-    expect(response.result).toContain('Message sent to Dev');
+    expect(response.result).toContain('Message queued for Dev');
     expect(mailboxWrites).toHaveLength(1);
     expect(mailboxWrites[0]).toMatchObject({
       teamId: 'team-1',
@@ -208,13 +208,13 @@ describe('TeamMcpServer', () => {
 
   it('delegates a task in one call by provisioning and assigning work', async () => {
     const response = await callTool(port, authToken, 'team_delegate_task', {
-      agent: 'Researcher',
       backend: 'claude',
-      title: 'Investigate the flaky test',
-      instructions: 'Inspect the failing assertion and patch the regression.',
+      name: 'Researcher',
+      task: 'Inspect the failing assertion and patch the regression.',
+      summary: 'Investigate the flaky test',
     });
 
-    expect(response.result).toContain('Delegated Investigate the flaky test');
+    expect(response.result).toContain('Delegated task to Researcher');
     expect(addAgent).toHaveBeenCalledWith({
       teamId: 'team-1',
       name: 'Researcher',
@@ -235,6 +235,45 @@ describe('TeamMcpServer', () => {
       summary: 'Investigate the flaky test',
     });
     expect(team.agents.some((agent) => agent.name === 'Researcher')).toBe(true);
+  });
+
+  it('reuses an existing teammate with the requested backend', async () => {
+    team.agents.push({
+      slotId: 'slot-claude',
+      conversationId: 'conv-claude',
+      role: 'teammate',
+      backend: 'claude',
+      name: 'Claude Reviewer',
+      status: 'idle',
+    });
+
+    const response = await callTool(port, authToken, 'team_delegate_task', {
+      backend: 'claude',
+      task: 'Review the implementation for edge cases and regressions.',
+    });
+
+    expect(response.result).toContain('Delegated task to Claude Reviewer');
+    expect(addAgent).not.toHaveBeenCalled();
+    expect(taskCreate).toHaveBeenCalledWith({
+      teamId: 'team-1',
+      title: 'Review the implementation for edge cases and regressions.',
+      description: 'Review the implementation for edge cases and regressions.',
+      assignedSlotId: 'slot-claude',
+      createdBySlotId: 'slot-lead',
+    });
+    expect(mailboxWrites[0]).toMatchObject({
+      toAgentId: 'slot-claude',
+      summary: 'Review the implementation for edge cases and regressions.',
+    });
+  });
+
+  it('rejects invalid backend values at runtime', async () => {
+    const response = await callTool(port, authToken, 'team_add_agent', {
+      name: 'Bad Agent',
+      backend: 'Claude',
+    });
+
+    expect(response.error).toBe('backend must be exactly "claude" or "codex"');
   });
 
   it('forwards finish-task updates to the service layer', async () => {

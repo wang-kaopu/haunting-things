@@ -230,6 +230,13 @@ export class Repository {
     return tx();
   }
 
+  listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[] {
+    const rows = this.db
+      .prepare('SELECT * FROM mailbox WHERE team_id = ? AND to_agent_id = ? AND read = 0 ORDER BY created_at ASC')
+      .all(teamId, toAgentId) as any[];
+    return rows.map(rowToMailbox);
+  }
+
   listMailbox(teamId: string): MailboxMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM mailbox WHERE team_id = ? ORDER BY created_at ASC')
