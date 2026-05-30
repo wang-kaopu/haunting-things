@@ -19,6 +19,10 @@ export class ConversationService {
   private readonly runtimes = new Map<string, AcpRuntime>();
   /** conversationId → 待注入的 MCP server 配置列表。 */
   private readonly mcpServers = new Map<string, any[]>();
+  /** 本地 finish 监听器，用于 Team 协作回流等服务内逻辑。 */
+  private readonly finishHandlers = new Set<
+    (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
+  >();
 
   constructor(
     private readonly repo: Repository,
@@ -67,6 +71,18 @@ export class ConversationService {
   /** 返回指定 Conversation 的历史消息。 */
   messages(conversationId: string): ChatMessage[] {
     return this.repo.listMessages(conversationId);
+  }
+
+  /**
+   * 订阅 conversation.finish 本地回调。
+   *
+   * 这是服务内协作钩子，不依赖 WebSocket 广播层。
+   */
+  onFinish(
+    handler: (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
+  ): () => void {
+    this.finishHandlers.add(handler);
+    return () => this.finishHandlers.delete(handler);
   }
 
   /**
@@ -146,7 +162,15 @@ export class ConversationService {
       this.repo.updateConversationStatus(conversation.id, status);
       this.events.emit('conversation.status', { conversationId: conversation.id, status, error });
     });
-    runtime.on('finish', (status) => this.events.emit('conversation.finish', { conversationId: conversation.id, status }));
+    runtime.on('finish', (status) => {
+      const event = { conversationId: conversation.id, status };
+      this.events.emit('conversation.finish', event);
+      for (const handler of this.finishHandlers) {
+        Promise.resolve(handler(event)).catch((error) => {
+          console.warn(`[ConversationService] finish handler failed for ${conversation.id}:`, error);
+        });
+      }
+    });
     this.runtimes.set(conversation.id, runtime);
     return runtime;
   }

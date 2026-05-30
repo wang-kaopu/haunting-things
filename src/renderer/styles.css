@@ -5,6 +5,14 @@
   color: #18202f;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -31,6 +39,17 @@ button:hover,
 button.selected {
   background: #e9f0ff;
   border-color: #7fa3e8;
+}
+
+.danger {
+  color: #b42318;
+  border-color: #f3c2bc;
+  background: #fff5f4;
+}
+
+.danger:hover {
+  background: #ffe8e6;
+  border-color: #f1a6a0;
 }
 
 .center,
@@ -79,7 +98,9 @@ textarea {
 }
 
 .app {
-  height: 100vh;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 240px minmax(360px, 1fr) 300px;
 }
@@ -93,6 +114,9 @@ textarea {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .inspector {
@@ -122,7 +146,23 @@ header p,
 .list {
   display: grid;
   gap: 8px;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.team-select {
+  min-width: 0;
+  text-align: left;
+}
+
+.team-delete {
+  white-space: nowrap;
 }
 
 .secondary {
@@ -131,8 +171,11 @@ header p,
 
 .chat {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 header {
@@ -153,7 +196,10 @@ p {
 }
 
 .messages {
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -205,8 +251,10 @@ p {
 .timeline {
   display: grid;
   gap: 10px;
-  max-height: 280px;
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
   padding-right: 2px;
 }
 

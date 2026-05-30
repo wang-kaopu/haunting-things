@@ -103,6 +103,7 @@ bridge.register('conversation.confirmPermission', (params) => {
   return { accepted: true };
 });
 bridge.register('team.create', (params) => teams.create(params));
+bridge.register('team.delete', ({ teamId }) => teams.delete(teamId));
 bridge.register('team.addAgent', (params) => teams.addAgent(params));
 bridge.register('team.removeAgent', (params) => teams.removeAgent(params));
 bridge.register('team.finishTask', (params) => teams.finishTask(params));

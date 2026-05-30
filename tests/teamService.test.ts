@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../src/server/events';
-import type { Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
+import type { ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
 
 const mockInstances: Array<{
   teamId: string;
@@ -50,6 +50,7 @@ type FakeRepository = {
   updateTeam(team: Team): void;
   getTeam(id: string): Team | null;
   listTeams(): Team[];
+  deleteTeam(id: string): void;
   writeMailbox(message: MailboxMessage): MailboxMessage;
   readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[];
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[];
@@ -79,6 +80,9 @@ function createFakeRepository(): FakeRepository {
     },
     listTeams() {
       return [...teams.values()].map((team) => structuredClone(team));
+    },
+    deleteTeam(id) {
+      teams.delete(id);
     },
     writeMailbox(message) {
       mailbox.push(structuredClone(message));
@@ -132,12 +136,18 @@ describe('TeamService', () => {
     restart: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
+    messages: ReturnType<typeof vi.fn>;
+    onFinish: ReturnType<typeof vi.fn>;
   };
   let events: EventBus;
+  let finishHandler: ((event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) | null;
+  let conversationMessages: Map<string, ChatMessage[]>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     repo = createFakeRepository();
+    finishHandler = null;
+    conversationMessages = new Map();
     conversations = {
       create: vi.fn((input: { backend: string; workspace?: string; name?: string }): Conversation => ({
         id: `conv-${mockInstances.length + 1}`,
@@ -152,6 +162,13 @@ describe('TeamService', () => {
       restart: vi.fn(),
       stop: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue(undefined),
+      messages: vi.fn((conversationId: string) => structuredClone(conversationMessages.get(conversationId) ?? [])),
+      onFinish: vi.fn((handler: (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) => {
+        finishHandler = handler;
+        return () => {
+          if (finishHandler === handler) finishHandler = null;
+        };
+      }),
     };
     events = new EventBus();
   });
@@ -185,6 +202,20 @@ describe('TeamService', () => {
     });
     expect(mockInstances).toHaveLength(1);
     expect(mockInstances[0].stop).not.toHaveBeenCalled();
+  });
+
+  it('deletes a team by stopping its runtimes and removing persisted state', async () => {
+    const service = new TeamService(repo as any, conversations as any, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
+    await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
+
+    const result = await service.delete(team.id);
+
+    expect(result).toEqual({ deleted: true });
+    expect(repo.getTeam(team.id)).toBeNull();
+    expect(conversations.stop).toHaveBeenCalledWith('conv-1');
+    expect(conversations.stop).toHaveBeenCalledWith('conv-2');
+    expect(mockInstances[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it('records mailbox entries in the team timeline and marks them processed after delivery', async () => {
@@ -300,5 +331,40 @@ describe('TeamService', () => {
       processed: true,
     });
     expect(conversations.sendMessage).toHaveBeenCalled();
+  });
+
+  it('auto-returns the teammate final assistant reply to the leader mailbox on conversation finish', async () => {
+    const service = new TeamService(repo as any, conversations as any, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
+    const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
+
+    conversationMessages.set(teammate.conversationId, [
+      {
+        id: 'reply-1',
+        conversationId: teammate.conversationId,
+        role: 'assistant',
+        content: 'I fixed the bug and added coverage.',
+        createdAt: Date.now(),
+        status: 'done',
+      },
+    ]);
+
+    await finishHandler?.({ conversationId: teammate.conversationId, status: 'idle' });
+    await vi.runAllTimersAsync();
+
+    const timeline = service.timeline(team.id);
+    expect(timeline).toHaveLength(1);
+    expect(timeline[0]).toMatchObject({
+      fromAgentName: 'Dev',
+      toAgentName: 'Leader',
+      processed: true,
+      message: {
+        content: expect.stringContaining('Reply from Dev:'),
+      },
+    });
+    expect(conversations.sendMessage).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      content: expect.stringContaining('Reply from Dev:'),
+    });
   });
 });

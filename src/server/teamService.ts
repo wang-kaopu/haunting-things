@@ -1,4 +1,13 @@
-import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamMailboxEntry, TeamTask } from '../shared/types';
+import type {
+  AgentBackend,
+  ChatMessage,
+  ConversationStatus,
+  MailboxMessage,
+  Team,
+  TeamAgent,
+  TeamMailboxEntry,
+  TeamTask,
+} from '../shared/types';
 import type { Repository } from './db';
 import type { ConversationService } from './conversations';
 import type { EventBus } from './events';
@@ -28,12 +37,16 @@ export class TeamService {
   private readonly pendingWakeups = new Set<string>();
   /** 当前正在唤醒的 teamId:slotId。 */
   private readonly activeWakeups = new Set<string>();
+  /** 记录已自动回流的 teammate assistant message，避免重复投递。 */
+  private readonly autoRepliedAssistantMessages = new Map<string, string>();
 
   constructor(
     private readonly repo: Repository,
     private readonly conversations: ConversationService,
     private readonly events: EventBus
-  ) {}
+  ) {
+    this.conversations.onFinish((event) => this.handleConversationFinish(event));
+  }
 
   /**
    * 服务重启后恢复已有 Team 的 MCP session，幂等。
@@ -86,6 +99,28 @@ export class TeamService {
   /** 按 ID 查询单个 Team，不存在返回 null。 */
   get(teamId: string): Team | null {
     return this.repo.getTeam(teamId);
+  }
+
+  /**
+   * 删除整个 Team 工作空间，停止所有成员 runtime，并清理持久化记录。
+   */
+  async delete(teamId: string): Promise<{ deleted: true }> {
+    const team = this.repo.getTeam(teamId);
+    if (!team) throw new Error(`Team not found: ${teamId}`);
+
+    const session = this.sessions.get(teamId);
+    if (session) {
+      await session.mcpServer.stop();
+      this.sessions.delete(teamId);
+    }
+    for (const agent of team.agents) {
+      this.conversations.stop(agent.conversationId);
+      this.autoRepliedAssistantMessages.delete(agent.conversationId);
+      this.pendingWakeups.delete(`${teamId}:${agent.slotId}`);
+      this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
+    }
+    this.repo.deleteTeam(teamId);
+    return { deleted: true };
   }
 
   /**
@@ -266,6 +301,31 @@ export class TeamService {
   }
 
   /**
+   * 当 teammate 的 conversation 自然结束时，把最终 assistant 回复回流给 leader mailbox。
+   */
+  private async handleConversationFinish(event: { conversationId: string; status: ConversationStatus }): Promise<void> {
+    if (event.status !== 'idle') return;
+
+    const { team, agent } = this.findTeamAgentByConversationId(event.conversationId) ?? {};
+    if (!team || !agent || agent.role !== 'teammate') return;
+
+    const reply = this.getLatestAssistantReply(event.conversationId);
+    if (!reply || !reply.content.trim()) return;
+    if (this.autoRepliedAssistantMessages.get(event.conversationId) === reply.id) return;
+    this.autoRepliedAssistantMessages.set(event.conversationId, reply.id);
+
+    await this.deliver({
+      id: crypto.randomUUID(),
+      teamId: team.id,
+      toAgentId: team.leaderSlotId,
+      fromAgentId: agent.slotId,
+      content: `Reply from ${agent.name}:\n${reply.content}`,
+      read: false,
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
    * 停止 Team：关闭 MCP server，并停止所有成员的 ACP 进程。
    */
   async stop(teamId: string): Promise<void> {
@@ -440,6 +500,23 @@ export class TeamService {
   private resolveAgentName(team: Team, agentId: string): string {
     if (agentId === 'user') return 'user';
     return team.agents.find((agent) => agent.slotId === agentId)?.name ?? agentId;
+  }
+
+  private findTeamAgentByConversationId(conversationId: string): { team: Team; agent: TeamAgent } | null {
+    for (const team of this.repo.listTeams()) {
+      const agent = team.agents.find((item) => item.conversationId === conversationId);
+      if (agent) return { team, agent };
+    }
+    return null;
+  }
+
+  private getLatestAssistantReply(conversationId: string): ChatMessage | null {
+    const messages = this.conversations.messages(conversationId);
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role === 'assistant') return message;
+    }
+    return null;
   }
 }
 

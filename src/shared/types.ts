@@ -163,6 +163,7 @@ export type InvokeMap = {
     params: { name: string; workspace?: string; leaderBackend: AgentBackend };
     result: Team;
   };
+  'team.delete': { params: { teamId: string }; result: { deleted: true } };
   'team.addAgent': { params: { teamId: string; name: string; backend: AgentBackend }; result: TeamAgent };
   'team.removeAgent': { params: { teamId: string; slotId: string }; result: { removed: true } };
   'team.finishTask': {

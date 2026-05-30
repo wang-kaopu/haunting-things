@@ -100,7 +100,10 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     setAgents(agentList);
     setTeams(teamList);
     setServerInfo(info);
-    if (!activeTeamId && teamList[0]) setActiveTeamId(teamList[0].id);
+    setActiveTeamId((current) => {
+      if (current && teamList.some((team) => team.id === current)) return current;
+      return teamList[0]?.id ?? '';
+    });
   }
 
   async function loadTimeline(teamId: string): Promise<void> {
@@ -214,16 +217,20 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           <strong>Haunting Souls</strong>
           <span>{user.username}</span>
         </div>
-        <button onClick={() => void createTeam()}>New Team</button>
+        <button onClick={() => void createTeam()}>Create Team</button>
         <div className="list">
           {teams.map((team) => (
-            <button
-              key={team.id}
-              className={team.id === activeTeam?.id ? 'selected' : ''}
-              onClick={() => setActiveTeamId(team.id)}
-            >
-              {team.name}
-            </button>
+            <div key={team.id} className="team-row">
+              <button
+                className={team.id === activeTeam?.id ? 'selected team-select' : 'team-select'}
+                onClick={() => setActiveTeamId(team.id)}
+              >
+                {team.name}
+              </button>
+              <button className="danger team-delete" onClick={() => void deleteTeam(team.id)} title={`Delete ${team.name}`}>
+                Delete
+              </button>
+            </div>
           ))}
         </div>
         <button className="secondary" onClick={logout}>
@@ -320,7 +327,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   );
 
   async function createTeam(): Promise<void> {
-    const name = window.prompt('Team name', 'New Team');
+    const name = window.prompt('Create Team', 'New Team');
     if (!name) return;
     const backend = pickBackend();
     const team = await bridge.invoke('team.create', { name, leaderBackend: backend });
@@ -334,11 +341,33 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend() });
     await refresh();
   }
+
+  async function deleteTeam(teamId: string): Promise<void> {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+    const confirmed = window.confirm(`Delete Team "${team.name}"? This will remove the workspace and all members.`);
+    if (!confirmed) return;
+    await bridge.invoke('team.delete', { teamId });
+    await refresh();
+  }
 }
 
 function MessageList({ messages }: { messages: ChatMessage[] }): React.ReactElement {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const lastMessage = messages[messages.length - 1];
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [messages.length, lastMessage?.content, lastMessage?.status]);
+
   return (
-    <div className="messages">
+    <div className="messages" ref={listRef}>
       {messages.map((message) => (
         <article key={message.id} className={`message ${message.role}`}>
           <small>{message.role}</small>

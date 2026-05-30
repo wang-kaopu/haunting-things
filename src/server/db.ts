@@ -201,6 +201,10 @@ export class Repository {
     return rows.map(rowToTeam);
   }
 
+  deleteTeam(id: string): void {
+    this.db.prepare('DELETE FROM teams WHERE id = ?').run(id);
+  }
+
   writeMailbox(message: MailboxMessage): MailboxMessage {
     this.db
       .prepare(
