@@ -67,10 +67,11 @@ export class TeamMcpServer {
 
   getStdioConfig(slotId: string): StdioMcpConfig {
     const team = this.resolveTeam();
+    const invocation = resolveTeamMcpStdioInvocation();
     return {
       name: `haunting-souls-team-${team.id}`,
-      command: 'node',
-      args: [resolveTeamMcpStdioPath()],
+      command: invocation.command,
+      args: invocation.args,
       env: {
         TEAM_MCP_PORT: String(this.port),
         TEAM_MCP_TOKEN: this.authToken,
@@ -263,8 +264,20 @@ function writeTcpMessage(socket: net.Socket, payload: unknown): void {
   socket.write(Buffer.concat([header, body]));
 }
 
-function resolveTeamMcpStdioPath(): string {
-  const current = fileURLToPath(import.meta.url);
-  const built = path.join(path.dirname(current), 'teamMcpStdio.js');
-  return built;
+export function resolveTeamMcpStdioInvocation(currentModuleUrl: string = import.meta.url): {
+  command: string;
+  args: string[];
+} {
+  const current = fileURLToPath(currentModuleUrl);
+  const isBuilt = current.includes(`${path.sep}dist-server${path.sep}`);
+  if (isBuilt) {
+    return {
+      command: 'node',
+      args: [path.join(path.dirname(current), 'teamMcpStdio.js')],
+    };
+  }
+  return {
+    command: 'npx',
+    args: ['tsx', path.join(path.dirname(current), 'teamMcpStdio.ts')],
+  };
 }

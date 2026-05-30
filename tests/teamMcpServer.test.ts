@@ -1,6 +1,8 @@
 import net from 'node:net';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamMcpServer } from '../src/server/teamMcpServer';
+import { TeamMcpServer, resolveTeamMcpStdioInvocation } from '../src/server/teamMcpServer';
 import type { MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
 
 function makeTeam(): Team {
@@ -150,6 +152,20 @@ describe('TeamMcpServer', () => {
   it('rejects requests with a bad token', async () => {
     const response = await callTool(port, 'wrong-token', 'team_members');
     expect(response.error).toBe('Unauthorized');
+  });
+
+  it('resolves the stdio launcher differently for dev and production builds', () => {
+    const dev = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('src/server/teamMcpServer.ts')).href);
+    expect(dev).toEqual({
+      command: 'npx',
+      args: ['tsx', path.resolve('src/server/teamMcpStdio.ts')],
+    });
+
+    const prod = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('dist-server/server/teamMcpServer.js')).href);
+    expect(prod).toEqual({
+      command: 'node',
+      args: [path.resolve('dist-server/server/teamMcpStdio.js')],
+    });
   });
 
   it('returns the current team members', async () => {

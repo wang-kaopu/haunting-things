@@ -12,6 +12,10 @@ if (!port || !authToken) {
   process.exit(1);
 }
 
+process.stderr.write(
+  `[teamMcpStdio] starting pid=${process.pid} port=${port} slot=${fromSlotId || 'unknown'}\n`
+);
+
 const server = new McpServer({ name: 'haunting-souls-team', version: '0.1.0' }, { capabilities: { tools: {} } });
 
 server.tool(
