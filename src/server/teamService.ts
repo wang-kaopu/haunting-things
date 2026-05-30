@@ -39,6 +39,10 @@ export class TeamService {
   private readonly activeWakeups = new Set<string>();
   /** 记录已自动回流的 teammate assistant message，避免重复投递。 */
   private readonly autoRepliedAssistantMessages = new Map<string, string>();
+  /** 记录每个 conversationId 的本轮唤醒起点时间。 */
+  private readonly turnStarts = new Map<string, number>();
+  /** 记录每个 conversationId 本轮是否已显式回传。 */
+  private readonly explicitRepliedTurns = new Map<string, boolean>();
 
   constructor(
     private readonly repo: Repository,
@@ -116,6 +120,8 @@ export class TeamService {
     for (const agent of team.agents) {
       this.conversations.stop(agent.conversationId);
       this.autoRepliedAssistantMessages.delete(agent.conversationId);
+      this.turnStarts.delete(agent.conversationId);
+      this.explicitRepliedTurns.delete(agent.conversationId);
       this.pendingWakeups.delete(`${teamId}:${agent.slotId}`);
       this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
     }
@@ -221,6 +227,8 @@ export class TeamService {
       team.agents[0];
     if (!actor) throw new Error(`Leader not found for team ${team.id}`);
 
+    this.explicitRepliedTurns.set(actor.conversationId, true);
+
     const now = Date.now();
     let task = input.taskId ? this.repo.getTask(input.taskId) : null;
     if (task && task.teamId !== team.id) {
@@ -309,8 +317,17 @@ export class TeamService {
     const { team, agent } = this.findTeamAgentByConversationId(event.conversationId) ?? {};
     if (!team || !agent || agent.role !== 'teammate') return;
 
+    // 检查本轮是否已显式回传
+    const alreadyReplied = this.explicitRepliedTurns.get(event.conversationId) ?? false;
+    if (alreadyReplied) return;
+
     const reply = this.getLatestAssistantReply(event.conversationId);
     if (!reply || !reply.content.trim()) return;
+
+    // 检查是否为本轮唤醒后的新 assistant 消息
+    const turnStart = this.turnStarts.get(event.conversationId) ?? 0;
+    if (reply.createdAt < turnStart) return;
+
     if (this.autoRepliedAssistantMessages.get(event.conversationId) === reply.id) return;
     this.autoRepliedAssistantMessages.set(event.conversationId, reply.id);
 
@@ -356,6 +373,13 @@ export class TeamService {
   private async deliver(message: MailboxMessage): Promise<void> {
     const team = this.requireTeam(message.teamId);
     this.repo.writeMailbox(message);
+
+    // 如果是 teammate 显式向他人/Leader 投递消息，标记为已显式回传
+    const fromAgent = team.agents.find((agent) => agent.slotId === message.fromAgentId);
+    if (fromAgent && fromAgent.role === 'teammate') {
+      this.explicitRepliedTurns.set(fromAgent.conversationId, true);
+    }
+
     this.events.emit('team.agent.message', { teamId: message.teamId, entry: this.buildMailboxEntry(team, message) });
     this.scheduleWakeAgent(message.teamId, message.toAgentId);
   }
@@ -400,6 +424,11 @@ export class TeamService {
     const team = this.requireTeam(teamId);
     const agent = team.agents.find((item) => item.slotId === slotId);
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
+
+    // 本轮唤醒起点
+    this.turnStarts.set(agent.conversationId, Date.now());
+    this.explicitRepliedTurns.set(agent.conversationId, false);
+
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
     const messages = this.repo.readUnreadAndMark(teamId, slotId);
     for (const message of messages) {

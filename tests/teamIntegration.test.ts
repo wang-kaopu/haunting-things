@@ -11,6 +11,7 @@ import { openDatabase, Repository } from '../src/server/db';
 import { EventBus } from '../src/server/events';
 import type {
   AgentBackend,
+  ChatMessage,
   Conversation,
   ConversationStatus,
   EventMap,
@@ -78,6 +79,7 @@ class FakeConversationService {
   sentMessages: Array<{ conversationId: string; content: string }> = [];
   restarted: string[] = [];
   stopped: string[] = [];
+  messagesMap = new Map<string, ChatMessage[]>();
 
   private nextConversationIndex = 0;
   private finishHandler:
@@ -115,8 +117,35 @@ class FakeConversationService {
     this.sentMessages.push(input);
   }
 
-  messages(_conversationId: string) {
-    return [];
+  messages(conversationId: string) {
+    return this.messagesMap.get(conversationId) || [];
+  }
+
+  addDummyMessage(
+    conversationId: string,
+    role: 'assistant' | 'user',
+    content: string,
+    createdAt: number = Date.now(),
+    id?: string
+  ): ChatMessage {
+    const messages = this.messagesMap.get(conversationId) || [];
+    const msg: ChatMessage = {
+      id: id || `msg-${crypto.randomUUID().slice(0, 8)}`,
+      conversationId,
+      role,
+      content,
+      createdAt,
+      status: 'done',
+    };
+    messages.push(msg);
+    this.messagesMap.set(conversationId, messages);
+    return msg;
+  }
+
+  triggerFinish(conversationId: string, status: ConversationStatus): void {
+    if (this.finishHandler) {
+      void this.finishHandler({ conversationId, status });
+    }
   }
 
   onFinish(
@@ -133,6 +162,7 @@ class FakeConversationService {
     this.sentMessages = [];
     this.restarted = [];
     this.stopped = [];
+    this.messagesMap.clear();
   }
 }
 
@@ -730,6 +760,244 @@ describe('team integration flow', () => {
     for (const entry of timeline) {
       expect(entry.processed).toBe(true);
     }
+  });
+
+  // =========================================================================
+  // 补充：Teammate 重复回流与旧消息过滤防御用例
+  // =========================================================================
+
+  // 用例 1: teammate 已调用 team_finish_task 时，不再自动回流 Reply from ...
+  it('does not auto-reply when teammate has already called finishTask', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const leader = team.agents[0];
+    const claude = await teamService.addAgent({
+      teamId: team.id,
+      name: 'Claude Worker',
+      backend: 'claude',
+    });
+
+    // 唤醒 claude
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务',
+    });
+    await flushWakeups();
+
+    // 模拟 claude 已经显式调用 finishTask
+    await teamService.finishTask({
+      teamId: team.id,
+      fromSlotId: claude.slotId,
+      summary: '显式汇报结果',
+    });
+    await flushWakeups();
+
+    // 往 claude 对应的 conversation 里塞一条 assistant 消息
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '这是自然语言文本回复');
+
+    // 触发 finish 到 idle 的回调
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    // 再次检查，mailbox 中关于 leader 的 timeline 里不应存在 "Reply from ..." 消息
+    const timeline = teamService.timeline(team.id);
+    const replies = timeline.filter(
+      (e) => e.message.toAgentId === leader.slotId && e.message.content.includes('Reply from')
+    );
+    expect(replies).toHaveLength(0);
+  });
+
+  // 用例 2: leader conversation finish 时，不触发自动回流
+  it('does not auto-reply when leader conversation finishes', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const leader = team.agents[0];
+
+    // 给 leader 添加 assistant 消息并触发其 finish
+    conversations.addDummyMessage(leader.conversationId, 'assistant', 'Leader 回复内容');
+    
+    const timelineBefore = teamService.timeline(team.id);
+    const initialMailboxCount = timelineBefore.length;
+
+    conversations.triggerFinish(leader.conversationId, 'idle');
+    await flushWakeups();
+
+    // 信箱里不应新增自动回流消息
+    const timelineAfter = teamService.timeline(team.id);
+    expect(timelineAfter.length).toBe(initialMailboxCount);
+  });
+
+  // 用例 3: teammate assistant 内容为空时，不触发自动回流
+  it('does not auto-reply when teammate assistant message is empty', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const claude = await teamService.addAgent({
+      teamId: team.id,
+      name: 'Claude Worker',
+      backend: 'claude',
+    });
+
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务',
+    });
+    await flushWakeups();
+
+    // 塞一条空内容消息
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '   ');
+
+    const timelineBefore = teamService.timeline(team.id);
+    const initialMailboxCount = timelineBefore.length;
+
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    const timelineAfter = teamService.timeline(team.id);
+    expect(timelineAfter.length).toBe(initialMailboxCount);
+  });
+
+  // 用例 4: 非 idle finish，如 failed/stopped，不触发自动回流
+  it('does not auto-reply on non-idle finishes like failed or stopped', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const claude = await teamService.addAgent({
+      teamId: team.id,
+      name: 'Claude Worker',
+      backend: 'claude',
+    });
+
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务',
+    });
+    await flushWakeups();
+
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '出错了');
+
+    const timelineBefore = teamService.timeline(team.id);
+    const initialMailboxCount = timelineBefore.length;
+
+    // 触发 failed
+    conversations.triggerFinish(claude.conversationId, 'failed');
+    await flushWakeups();
+
+    // 触发 stopped
+    conversations.triggerFinish(claude.conversationId, 'stopped');
+    await flushWakeups();
+
+    const timelineAfter = teamService.timeline(team.id);
+    expect(timelineAfter.length).toBe(initialMailboxCount);
+  });
+
+  // 用例 5: 同一个 assistant message id 触发多次 finish，只投递一次
+  it('does not auto-reply duplicate times for the same assistant message ID', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const leader = team.agents[0];
+    const claude = await teamService.addAgent({
+      teamId: team.id,
+      name: 'Claude Worker',
+      backend: 'claude',
+    });
+
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务',
+    });
+    await flushWakeups();
+
+    // 塞一条带固定 ID 的 assistant 消息
+    const msgId = 'fixed-assistant-msg-id';
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '测试排重', Date.now(), msgId);
+
+    // 第一次触发 idle
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    const timelineFirst = teamService.timeline(team.id);
+    const repliesFirst = timelineFirst.filter(
+      (e) => e.message.toAgentId === leader.slotId && e.message.content.includes('Reply from')
+    );
+    expect(repliesFirst).toHaveLength(1);
+
+    // 第二次触发 idle
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    const timelineSecond = teamService.timeline(team.id);
+    const repliesSecond = timelineSecond.filter(
+      (e) => e.message.toAgentId === leader.slotId && e.message.content.includes('Reply from')
+    );
+    expect(repliesSecond).toHaveLength(1); // 依然只是 1
+  });
+
+  // 用例 6: 本轮没有新 assistant，只存在历史 assistant 时，不自动回流旧消息
+  it('does not auto-reply using old historical assistant messages if no new assistant message was created in the current turn', async () => {
+    const team = await teamService.create({
+      name: 'Integration Team',
+      leaderBackend: 'codex',
+    });
+    const leader = team.agents[0];
+    const claude = await teamService.addAgent({
+      teamId: team.id,
+      name: 'Claude Worker',
+      backend: 'claude',
+    });
+
+    // 1. 第一轮：产出一条 assistant 消息
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务一',
+    });
+    await flushWakeups();
+
+    const firstTime = Date.now();
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '第一轮回答', firstTime);
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    // 此时第一轮已被自动回流
+    const timelineFirst = teamService.timeline(team.id);
+    const repliesFirst = timelineFirst.filter(
+      (e) => e.message.toAgentId === leader.slotId && e.message.content.includes('第一轮回答')
+    );
+    expect(repliesFirst).toHaveLength(1);
+
+    // 2. 第二轮唤醒：推进虚拟时间，没有产出新的 assistant 消息（只存在旧消息）
+    vi.advanceTimersByTime(2000); // 推进时间确保转轮时间更新
+
+    await teamService.sendMessageToAgent({
+      teamId: team.id,
+      slotId: claude.slotId,
+      content: '任务二',
+    });
+    await flushWakeups();
+
+    // 不添加任何新 message，直接触发 finish 到 idle
+    conversations.triggerFinish(claude.conversationId, 'idle');
+    await flushWakeups();
+
+    // 此时信箱中不应再次自动回流第一轮的旧消息，即相关消息依然只有最开始的那 1 条
+    const timelineSecond = teamService.timeline(team.id);
+    const repliesSecond = timelineSecond.filter(
+      (e) => e.message.toAgentId === leader.slotId && e.message.content.includes('Reply from Claude Worker:\n第一轮回答')
+    );
+    expect(repliesSecond).toHaveLength(1);
   });
 });
 
