@@ -22,6 +22,7 @@ import { mergeTeamMailboxEntries, resolveTeamSendInvocation } from './teamViewMo
 import './styles.css';
 
 type AuthUser = { id: string; username: string };
+type InspectorTab = 'agents' | 'activity' | 'config' | 'debug';
 
 function App(): React.ReactElement {
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
@@ -54,7 +55,7 @@ function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactE
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || 'Login failed');
+      setError(data.error || '登录失败');
       return;
     }
     onLogin(data.user);
@@ -73,7 +74,7 @@ function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactE
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit">Login</button>
+        <button type="submit">登录</button>
       </form>
     </main>
   );
@@ -84,6 +85,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>('');
   const [activeSlotId, setActiveSlotId] = useState<string>('');
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('agents');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
@@ -93,6 +95,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
   const [modelsByConversation, setModelsByConversation] = useState<Record<string, ConversationModels>>({});
   const [modeByConversation, setModeByConversation] = useState<Record<string, ConversationMode>>({});
+  const [promptByConversation, setPromptByConversation] = useState<Record<string, string>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
@@ -196,6 +199,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       }));
     });
 
+    const unsubPrompt = bridge.on('team.agent.prompt', ({ conversationId, prompt }) => {
+      setPromptByConversation((prev) => ({
+        ...prev,
+        [conversationId]: prompt,
+      }));
+    });
+
     const unsubAgentAdded = bridge.on('team.agent.added', () => {
       void refresh();
     });
@@ -219,6 +229,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       unsubCommands();
       unsubModels();
       unsubMode();
+      unsubPrompt();
       unsubAgentAdded();
       unsubAgentRemoved();
       unsubTeamMessage();
@@ -342,6 +353,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const activeModels = activeAgent ? modelsByConversation[activeAgent.conversationId] : undefined;
   const activeMode = activeAgent ? modeByConversation[activeAgent.conversationId] : undefined;
   const activeAgentEvents = activeAgent ? agentEventsByConversation[activeAgent.conversationId] ?? [] : [];
+  const activePrompt = activeAgent ? promptByConversation[activeAgent.conversationId] : undefined;
   const handleTeamSend = useCallback(
     async (content: string) => {
       const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
@@ -358,7 +370,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           <strong>Haunting Souls</strong>
           <span>{user.username}</span>
         </div>
-        <button onClick={() => void createTeam()}>Create Team</button>
+        <button onClick={() => void createTeam()}>创建团队</button>
         <div className="list">
           {teams.map((team) => (
             <div key={team.id} className="team-row">
@@ -368,14 +380,14 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               >
                 {team.name}
               </button>
-              <button className="danger team-delete" onClick={() => void deleteTeam(team.id)} title={`Delete ${team.name}`}>
-                Delete
+              <button className="team-delete" onClick={() => void deleteTeam(team.id)} title={`删除 ${team.name}`}>
+                删除
               </button>
             </div>
           ))}
         </div>
         <button className="secondary" onClick={logout}>
-          Logout
+          退出登录
         </button>
       </aside>
 
@@ -392,9 +404,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                   {activeMode?.mode ? <span className="mode-badge">模式：{activeMode.mode}</span> : null}
                 </div>
               </div>
-              <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
+              <button onClick={() => void addAgent(activeTeam.id)}>添加 Agent</button>
             </header>
             <MessageList messages={messages} activePhase={activePhase} />
+            <details className="prompt-preview panel">
+              <summary>查看发送给 {activeAgent?.name ?? '当前 Agent'} 的完整 Prompt</summary>
+              {activePrompt ? <pre>{activePrompt}</pre> : <p className="muted">当前没有可预览的 prompt。</p>}
+            </details>
             <SendBox onSend={handleTeamSend} />
             {permission && (
               <PermissionDialog
@@ -412,111 +428,178 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
             )}
           </>
         ) : (
-          <div className="empty">Create a team to start.</div>
+          <div className="empty">先创建一个团队开始。</div>
         )}
       </section>
 
       <aside className="inspector">
-        <h3>Backends</h3>
-        {agents.map((agent) => (
-          <div key={agent.backend} className="agent">
-            <span>{agent.name}</span>
-            <code>{agent.available ? 'available' : 'missing'}</code>
-          </div>
-        ))}
-
-        <h3>Team Agents</h3>
-        {activeTeam?.agents.map((agent) => {
-          const status = agentStatuses[agent.slotId] ?? agent.status;
-          const isActive = agent.slotId === activeSlotId;
-          const phase = phaseByConversation[agent.conversationId];
-          const mode = modeByConversation[agent.conversationId];
-          return (
-            <button
-              key={agent.slotId}
-              className={`agent-tab${isActive ? ' selected' : ''}`}
-              onClick={() => setActiveSlotId(agent.slotId)}
-            >
-              <span className="agent-name">{agent.name}</span>
-              <span className="agent-meta">
-                {agent.backend}
-                {agent.model ? ` · ${agent.model}` : ''}
-              </span>
-              <span className={`agent-badge ${status}`}>{status}</span>
-              {phase && phase !== 'done' ? <span className={`agent-phase ${phase}`}>{formatPhase(phase)}</span> : null}
-              {mode?.mode ? <span className="mode-badge">{mode.mode}</span> : null}
-            </button>
-          );
-        })}
-
-        <section className="panel model-panel">
-          <h3>Model</h3>
-          <AgentModelSelect
-            agent={activeAgent}
-            models={activeModels}
-            onChange={(model) => void setAgentModel(model)}
-          />
-        </section>
-
-        <section className="panel command-panel">
-          <h3>Agent Commands</h3>
-          <AgentCommandsPanel commands={activeCommands} />
-        </section>
-
-        <section className="panel activity-panel">
-          <h3>Agent Activity</h3>
-          <AgentActivityPanel events={activeAgentEvents} />
-        </section>
-
-        <h3>Timeline</h3>
-        <div className="timeline">
-          {timeline.length === 0 ? (
-            <p className="muted">No team messages yet.</p>
-          ) : (
-            timeline.map((entry) => (
-              <div key={entry.message.id} className="timeline-item">
-                <div className="timeline-meta">
-                  <span>
-                    {entry.fromAgentName} → {entry.toAgentName}
-                  </span>
-                  <span className={entry.processed ? 'processed' : 'pending'}>
-                    {entry.processed ? 'processed' : 'pending'}
-                  </span>
-                </div>
-                <div className="timeline-content">{entry.message.content}</div>
-              </div>
-            ))
-          )}
+        <div className="inspector-tabs" role="tablist" aria-label="Inspector tabs">
+          <button className={inspectorTab === 'agents' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('agents')}>
+            团队
+          </button>
+          <button className={inspectorTab === 'activity' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('activity')}>
+            活动
+          </button>
+          <button className={inspectorTab === 'config' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('config')}>
+            配置
+          </button>
+          <button className={inspectorTab === 'debug' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('debug')}>
+            调试
+          </button>
         </div>
 
-        <h3>Server</h3>
-        {serverInfo?.urls.map((url) => (
-          <p key={url} className="url">
-            {url}
-          </p>
-        ))}
+        <div className="inspector-body">
+          {inspectorTab === 'agents' ? (
+            <>
+              <section className="inspector-section">
+                <h3>后端</h3>
+                {agents.length === 0 ? (
+                  <p className="muted">暂无后端信息。</p>
+                ) : (
+                  agents.map((agent) => (
+                    <div key={agent.backend} className="agent">
+                      <span>{agent.name}</span>
+                      <code>{agent.available ? '可用' : '不可用'}</code>
+                    </div>
+                  ))
+                )}
+              </section>
+
+              <section className="inspector-section">
+                <h3>团队成员</h3>
+                {activeTeam?.agents.length ? (
+                  activeTeam.agents.map((agent) => {
+                    const status = agentStatuses[agent.slotId] ?? agent.status;
+                    const isActive = agent.slotId === activeSlotId;
+                    const phase = phaseByConversation[agent.conversationId];
+                    const mode = modeByConversation[agent.conversationId];
+                    const commandCount = commandsByConversation[agent.conversationId]?.commands.length ?? 0;
+                    return (
+                      <button
+                        key={agent.slotId}
+                        className={`agent-tab${isActive ? ' selected' : ''}`}
+                        onClick={() => setActiveSlotId(agent.slotId)}
+                      >
+                        <span className="agent-tab-header">
+                          <span className="agent-name">{agent.name}</span>
+                          <span className={`agent-badge ${status}`}>{formatTeamAgentStatus(status)}</span>
+                        </span>
+                        <span className="agent-meta">
+                          {agent.backend}
+                          {agent.model ? ` · ${agent.model}` : ''}
+                          {commandCount > 0 ? ` · ${commandCount} 命令` : ''}
+                        </span>
+                        <span className="agent-submeta">
+                          {phase && phase !== 'done' ? <span className={`agent-phase ${phase}`}>{formatPhase(phase)}</span> : null}
+                          {mode?.mode ? <span className="mode-badge">模式：{mode.mode}</span> : null}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="muted">暂无团队成员。</p>
+                )}
+              </section>
+            </>
+          ) : null}
+
+          {inspectorTab === 'activity' ? (
+            <section className="inspector-section panel activity-panel">
+              <h3>Agent 活动</h3>
+              <AgentActivityPanel events={activeAgentEvents} />
+            </section>
+          ) : null}
+
+          {inspectorTab === 'config' ? (
+            <>
+              <section className="inspector-section panel model-panel">
+                <h3>模型</h3>
+                <AgentModelSelect
+                  agent={activeAgent}
+                  models={activeModels}
+                  onChange={(model) => void setAgentModel(model)}
+                />
+              </section>
+
+              <section className="inspector-section panel command-panel">
+                <h3>Agent 命令</h3>
+                <AgentCommandsPanel commands={activeCommands} />
+              </section>
+
+              <section className="inspector-section panel">
+                <h3>模式</h3>
+                {activeMode?.mode ? <span className="mode-badge">当前：{activeMode.mode}</span> : <p className="muted">暂无模式快照。</p>}
+              </section>
+
+              <section className="inspector-section panel">
+                <h3>Usage</h3>
+                {activeUsage ? <UsageBadge usage={activeUsage} /> : <p className="muted">暂无 usage。</p>}
+              </section>
+            </>
+          ) : null}
+
+          {inspectorTab === 'debug' ? (
+            <>
+              <section className="inspector-section">
+                <h3>时间线</h3>
+                <div className="timeline">
+                  {timeline.length === 0 ? (
+                    <p className="muted">暂无团队消息。</p>
+                  ) : (
+                    timeline.map((entry) => (
+                      <div key={entry.message.id} className="timeline-item">
+                        <div className="timeline-meta">
+                          <span>
+                            {entry.fromAgentName} → {entry.toAgentName}
+                          </span>
+                          <span className={entry.processed ? 'processed' : 'pending'}>
+                            {entry.processed ? '已处理' : '待处理'}
+                          </span>
+                        </div>
+                        <div className="timeline-content">{entry.message.content}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="inspector-section">
+                <h3>服务</h3>
+                {serverInfo?.urls.length ? (
+                  serverInfo.urls.map((url) => (
+                    <p key={url} className="url">
+                      {url}
+                    </p>
+                  ))
+                ) : (
+                  <p className="muted">暂无服务地址。</p>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
       </aside>
     </main>
   );
 
   async function createTeam(): Promise<void> {
-    const name = window.prompt('Create Team', 'New Team');
+    const name = window.prompt('创建团队', 'New Team');
     if (!name) return;
     const backend = pickBackend();
-    const leaderModel = pickModel('Leader model (optional)', undefined);
+    const leaderModel = pickModel('Leader 模型（可选）', undefined);
     const team = await bridge.invoke('team.create', { name, leaderBackend: backend, leaderModel });
     await refresh();
     setActiveTeamId(team.id);
   }
 
   async function addAgent(teamId: string): Promise<void> {
-    const name = window.prompt('Agent name', 'Teammate');
+    const name = window.prompt('Agent 名称', 'Teammate');
     if (!name) return;
     const activeAgentConversationId = activeAgent?.conversationId;
     const model = activeAgentConversationId
       ? modelsByConversation[activeAgentConversationId]?.currentModelId ?? ''
       : '';
-    const agentModel = pickModel('Agent model (optional)', model || undefined);
+    const agentModel = pickModel('Agent 模型（可选）', model || undefined);
     await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend(), model: agentModel });
     await refresh();
   }
@@ -560,6 +643,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       delete next[conversationId];
       return next;
     });
+    setPromptByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
     await refresh();
   }
 }
@@ -591,7 +679,7 @@ function MessageList({
           <small>{message.role}</small>
           <div>{message.content || (message.status === 'streaming' ? phaseMessage(activePhase) : '')}</div>
           {message.status === 'error' ? (
-            <p className="message-error">本轮回复失败，请查看右侧 Agent Activity。</p>
+            <p className="message-error">本轮回复失败，请查看右侧活动面板。</p>
           ) : null}
         </article>
       ))}
@@ -657,7 +745,7 @@ function AgentModelSelect({
   const [customModel, setCustomModel] = useState('');
 
   if (!agent) {
-    return <p className="muted">No active agent.</p>;
+    return <p className="muted">暂无当前 Agent。</p>;
   }
 
   const options = models?.models ?? [];
@@ -666,7 +754,7 @@ function AgentModelSelect({
   return (
     <div className="model-select">
       <label className="field">
-        <span>Model</span>
+        <span>模型</span>
 
         {options.length > 0 ? (
           <select
@@ -676,7 +764,7 @@ function AgentModelSelect({
               if (value) onChange(value);
             }}
           >
-            {!current && <option value="">Default</option>}
+            {!current && <option value="">默认</option>}
             {current && !options.some((model) => model.id === current) ? <option value={current}>{current}</option> : null}
             {options.map((model) => (
               <option key={model.id} value={model.id}>
@@ -688,7 +776,7 @@ function AgentModelSelect({
           <div className="inline-form">
             <input
               value={customModel}
-              placeholder={current || 'Enter model id'}
+              placeholder={current || '输入模型 ID'}
               onChange={(event) => setCustomModel(event.target.value)}
             />
             <button
@@ -705,7 +793,7 @@ function AgentModelSelect({
       </label>
 
       {options.length === 0 ? (
-        <p className="muted">No model snapshot reported yet. You can enter a model id manually.</p>
+        <p className="muted">暂无模型快照，可手动输入模型 ID。</p>
       ) : null}
     </div>
   );
@@ -715,7 +803,7 @@ function AgentActivityPanel({ events }: { events: AgentEvent[] }): React.ReactEl
   const visible = events.filter(shouldShowInActivity).slice(-30);
 
   if (visible.length === 0) {
-    return <p className="muted">No activity yet.</p>;
+    return <p className="muted">暂无活动。</p>;
   }
 
   return (
@@ -814,7 +902,7 @@ function AgentCommandsPanel({
   commands?: ConversationCommands | null;
 }): React.ReactElement {
   if (!commands || commands.commands.length === 0) {
-    return <p className="muted">No commands reported yet.</p>;
+    return <p className="muted">暂无命令快照。</p>;
   }
 
   return (
@@ -828,7 +916,7 @@ function AgentCommandsPanel({
           {command.input != null ? (
             <pre>{JSON.stringify(command.input, null, 2)}</pre>
           ) : (
-            <p className="muted">No input schema</p>
+            <p className="muted">暂无输入 schema。</p>
           )}
         </details>
       ))}
@@ -853,14 +941,14 @@ function SendBox({ onSend }: { onSend: (content: string) => Promise<unknown> }):
   }
   return (
     <form className="sendbox" onSubmit={submit}>
-      <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="Message the team" />
-      <button type="submit">Send</button>
+      <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="给团队发送消息" />
+      <button type="submit">发送</button>
     </form>
   );
 }
 
 function pickBackend(): AgentBackend {
-  return window.confirm('Use Codex? Cancel selects Claude.') ? 'codex' : 'claude';
+  return window.confirm('使用 Codex？取消则选择 Claude。') ? 'codex' : 'claude';
 }
 
 function PermissionDialog({
@@ -895,15 +983,25 @@ function PermissionDialog({
         </div>
         <div className="permission-actions">
           <button onClick={() => onRespond(selected)} disabled={!selected}>
-            Confirm
+            确认
           </button>
           <button className="secondary" onClick={onDismiss}>
-            Dismiss
+            关闭
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function formatTeamAgentStatus(status: TeamAgentStatus): string {
+  const labels: Record<TeamAgentStatus, string> = {
+    idle: '空闲',
+    active: '运行中',
+    failed: '失败',
+    stopped: '已停止',
+  };
+  return labels[status];
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

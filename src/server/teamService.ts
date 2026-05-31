@@ -608,6 +608,12 @@ export class TeamService {
       });
     }
     const content = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
+    this.events.emit('team.agent.prompt', {
+      teamId,
+      slotId,
+      conversationId: agent.conversationId,
+      prompt: content,
+    });
     this.logger.info('agent_prompt_send', {
       teamId,
       slotId,

@@ -394,6 +394,7 @@ export type EventMap = {
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };
   'team.agent.status': { teamId: string; slotId: string; status: TeamAgentStatus; error?: string };
+  'team.agent.prompt': { teamId: string; slotId: string; conversationId: string; prompt: string };
   'team.agent.message': { teamId: string; entry: TeamMailboxEntry };
   'team.agent.added': { teamId: string; agent: TeamAgent };
   'team.agent.removed': { teamId: string; slotId: string };
