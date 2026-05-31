@@ -4,6 +4,7 @@ import type {
   AgentBackend,
   AgentInfo,
   ChatMessage,
+  ConversationCommands,
   ConversationUsage,
   PermissionRequest,
   TeamMailboxEntry,
@@ -82,6 +83,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
+  const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
@@ -149,6 +151,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       }));
     });
 
+    const unsubCommands = bridge.on('conversation.commands', (snapshot) => {
+      setCommandsByConversation((prev) => ({
+        ...prev,
+        [snapshot.conversationId]: snapshot,
+      }));
+    });
+
     const unsubAgentAdded = bridge.on('team.agent.added', () => {
       void refresh();
     });
@@ -168,6 +177,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       unsubPermission();
       unsubAgentStatus();
       unsubUsage();
+      unsubCommands();
       unsubAgentAdded();
       unsubAgentRemoved();
       unsubTeamMessage();
@@ -198,6 +208,16 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       .invoke('conversation.messages', { conversationId: agent.conversationId })
       .then(setMessages)
       .catch(() => setMessages([]));
+    bridge
+      .invoke('conversation.commands', { conversationId: agent.conversationId })
+      .then((snapshot) => {
+        if (!snapshot) return;
+        setCommandsByConversation((prev) => ({
+          ...prev,
+          [agent.conversationId]: snapshot,
+        }));
+      })
+      .catch(() => {});
   }, [activeSlotId, activeTeam?.id]);
 
   useEffect(() => {
@@ -212,6 +232,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
   const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
   const activeUsage = activeAgent ? usageByConversation[activeAgent.conversationId] : undefined;
+  const activeCommands = activeAgent ? commandsByConversation[activeAgent.conversationId] : undefined;
   const handleTeamSend = useCallback(
     async (content: string) => {
       const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
@@ -304,8 +325,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               <span className="agent-name">{agent.name}</span>
               <span className={`agent-badge ${status}`}>{status}</span>
             </button>
-          );
+            );
         })}
+
+        <h3>Agent Commands</h3>
+        <AgentCommandsPanel commands={activeCommands} />
 
         <h3>Timeline</h3>
         <div className="timeline">
@@ -397,6 +421,34 @@ function UsageBadge({ usage }: { usage: ConversationUsage }): React.ReactElement
         {usage.used.toLocaleString()} / {usage.size.toLocaleString()}
       </span>
       <span>{Math.round(usage.ratio * 100)}%</span>
+    </div>
+  );
+}
+
+function AgentCommandsPanel({
+  commands,
+}: {
+  commands?: ConversationCommands | null;
+}): React.ReactElement {
+  if (!commands || commands.commands.length === 0) {
+    return <p className="muted">No commands reported yet.</p>;
+  }
+
+  return (
+    <div className="command-list">
+      {commands.commands.map((command) => (
+        <details key={command.name} className="command-item">
+          <summary>
+            <code>{command.name}</code>
+            {command.description && <span>{command.description}</span>}
+          </summary>
+          {command.input != null ? (
+            <pre>{JSON.stringify(command.input, null, 2)}</pre>
+          ) : (
+            <p className="muted">No input schema</p>
+          )}
+        </details>
+      ))}
     </div>
   );
 }

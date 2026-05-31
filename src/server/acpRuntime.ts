@@ -16,6 +16,7 @@ import type {
   AgentTurnPhase,
   ChatMessage,
   ConversationStatus,
+  ConversationCommands,
   ConversationUsage,
   PermissionRequest,
 } from '../shared/types';
@@ -26,6 +27,7 @@ type AcpRuntimeEvents = {
   message: [ChatMessage];
   agentEvent: [AgentEvent];
   usage: [ConversationUsage];
+  commands: [ConversationCommands];
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
@@ -104,6 +106,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private hasReplyStarted = false;
   private usageSnapshot: ConversationUsage | null = null;
   private lastUsageEmitAt = 0;
+  private availableCommandsSnapshot: ConversationCommands | null = null;
   private readonly toolCalls = new Map<string, { toolName: string; title: string }>();
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
@@ -208,6 +211,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
   getUsageSnapshot(): ConversationUsage | null {
     return this.usageSnapshot;
+  }
+
+  getAvailableCommandsSnapshot(): ConversationCommands | null {
+    return this.availableCommandsSnapshot;
   }
 
   /**
@@ -394,6 +401,9 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       case 'usage_update':
         this.handleUsageUpdate(update);
         return;
+      case 'available_commands_update':
+        this.handleAvailableCommandsUpdate(update);
+        return;
       default:
         console.debug('[ACP sessionUpdate ignored]', updateType, update);
     }
@@ -549,6 +559,35 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       if (Number.isFinite(parsed)) return parsed;
     }
     return null;
+  }
+
+  private handleAvailableCommandsUpdate(update: Record<string, unknown>): void {
+    const rawCommands = Array.isArray(update.availableCommands) ? update.availableCommands : [];
+
+    const commands = rawCommands
+      .map((item): ConversationCommands['commands'][number] | null => {
+        if (!item || typeof item !== 'object') return null;
+
+        const raw = item as Record<string, unknown>;
+        const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+        if (!name) return null;
+
+        return {
+          name,
+          description: typeof raw.description === 'string' ? raw.description : undefined,
+          input: raw.input,
+        };
+      })
+      .filter((item): item is ConversationCommands['commands'][number] => item != null);
+
+    const snapshot: ConversationCommands = {
+      conversationId: this.input.conversationId,
+      commands,
+      updatedAt: Date.now(),
+    };
+
+    this.availableCommandsSnapshot = snapshot;
+    this.emit('commands', snapshot);
   }
 
   /**

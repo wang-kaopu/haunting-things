@@ -162,6 +162,48 @@ header p,
   font-weight: 600;
 }
 
+.command-list {
+  display: grid;
+  gap: 8px;
+}
+
+.command-item {
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  background: #fdfefe;
+  overflow: hidden;
+}
+
+.command-item summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.command-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.command-item summary code {
+  font-size: 12px;
+}
+
+.command-item summary span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.command-item pre {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: #475467;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .list {
   display: grid;
   gap: 8px;

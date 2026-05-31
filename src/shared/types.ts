@@ -55,6 +55,13 @@ export type PermissionOption = {
   description?: string;
 };
 
+/** ACP 可用命令。 */
+export type AcpAvailableCommand = {
+  name: string;
+  description?: string;
+  input?: unknown;
+};
+
 /** 标准化的 Agent 运行过程事件。 */
 export type AgentEvent =
   | {
@@ -160,6 +167,13 @@ export type ConversationUsage = {
   updatedAt: number;
 };
 
+/** Conversation 的实时可用命令快照。 */
+export type ConversationCommands = {
+  conversationId: string;
+  commands: AcpAvailableCommand[];
+  updatedAt: number;
+};
+
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
 
@@ -251,6 +265,7 @@ export type InvokeMap = {
   'conversation.list': { params: void; result: Conversation[] };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
   'conversation.agentEvents': { params: { conversationId: string }; result: AgentEvent[] };
+  'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
@@ -301,6 +316,7 @@ export type EventMap = {
   'conversation.stream': { conversationId: string; message: ChatMessage };
   'conversation.agentEvent': AgentEvent;
   'conversation.usage': ConversationUsage;
+  'conversation.commands': ConversationCommands;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

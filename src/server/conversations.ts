@@ -1,6 +1,13 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, AgentEvent, ChatMessage, Conversation, ConversationUsage } from '../shared/types';
+import type {
+  AgentBackend,
+  AgentEvent,
+  ChatMessage,
+  Conversation,
+  ConversationCommands,
+  ConversationUsage,
+} from '../shared/types';
 import type { Repository } from './db';
 import type { EventBus } from './events';
 import { AcpRuntime } from './acpRuntime';
@@ -19,6 +26,8 @@ export class ConversationService {
   private readonly runtimes = new Map<string, AcpRuntime>();
   /** conversationId → 待注入的 MCP server 配置列表。 */
   private readonly mcpServers = new Map<string, any[]>();
+  /** conversationId → 可用命令快照。 */
+  private readonly commandSnapshots = new Map<string, ConversationCommands>();
   /** 本地 finish 监听器，用于 Team 协作回流等服务内逻辑。 */
   private readonly finishHandlers = new Set<
     (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
@@ -80,6 +89,11 @@ export class ConversationService {
     return this.repo.listAgentEvents(conversationId);
   }
 
+  /** 返回指定 Conversation 的可用命令快照。 */
+  commands(conversationId: string): ConversationCommands | null {
+    return this.commandSnapshots.get(conversationId) ?? null;
+  }
+
   /**
    * 订阅 conversation.finish 本地回调。
    *
@@ -139,6 +153,7 @@ export class ConversationService {
   stop(conversationId: string): void {
     this.runtimes.get(conversationId)?.stop();
     this.runtimes.delete(conversationId);
+    this.commandSnapshots.delete(conversationId);
   }
 
   /**
@@ -186,6 +201,10 @@ export class ConversationService {
     });
     runtime.on('usage', (usage: ConversationUsage) => {
       this.events.emit('conversation.usage', usage);
+    });
+    runtime.on('commands', (snapshot: ConversationCommands) => {
+      this.commandSnapshots.set(conversation.id, snapshot);
+      this.events.emit('conversation.commands', snapshot);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
     runtime.on('status', (status, error) => {
