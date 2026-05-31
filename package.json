@@ -1,5 +1,5 @@
 {
-  "name": "haunting-souls",
+  "name": "haunting-things",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -30,6 +30,9 @@
     "jsonwebtoken": "^9.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "ws": "^8.18.3",
     "zod": "^3.25.76"
   },

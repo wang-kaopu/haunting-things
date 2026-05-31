@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AgentTurnPhase, ChatMessage } from '../../../shared/types';
 import { formatMessageRole, getMessageFallbackText } from '../utils/format';
 import { isWrappedTeamPrompt } from '../utils/guards';
+import { MarkdownMessage } from './MarkdownMessage';
 
 export type MessageBubbleProps = {
   message: ChatMessage;
@@ -15,15 +16,19 @@ export function MessageBubble({ message, activePhase }: MessageBubbleProps): Rea
   return (
     <article className={`message ${message.role} ${message.status === 'error' ? 'error' : ''}`}>
       <small>{formatMessageRole(message.role)}</small>
+
       {wrappedPrompt ? (
         <details className="debug-prompt-inline">
           <summary>历史包装 Prompt，已折叠</summary>
           <pre>{message.content}</pre>
         </details>
       ) : (
-        <div>{content}</div>
+        <MarkdownMessage content={content} />
       )}
-      {message.status === 'error' ? <p className="message-error">本轮回复失败，请查看通知详情。</p> : null}
+
+      {message.status === 'error' ? (
+        <p className="message-error">本轮回复失败，请查看通知详情。</p>
+      ) : null}
     </article>
   );
 }

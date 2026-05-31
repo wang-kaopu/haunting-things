@@ -324,11 +324,11 @@ label,
 
 .message {
   max-width: min(860px, 92%);
+  min-width: 0;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
@@ -346,6 +346,17 @@ label,
   display: block;
   margin-bottom: 6px;
   color: var(--muted);
+}
+
+.message img,
+.markdown-message img {
+  max-width: 100%;
+  height: auto;
+}
+
+.message table,
+.message pre {
+  max-width: 100%;
 }
 
 .message-error {
