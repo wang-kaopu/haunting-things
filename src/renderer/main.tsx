@@ -6,6 +6,7 @@ import type {
   AgentInfo,
   AgentTurnPhase,
   ChatMessage,
+  ChatRole,
   ConversationCommands,
   ConversationModels,
   ConversationMode,
@@ -85,6 +86,8 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>('');
   const [activeSlotId, setActiveSlotId] = useState<string>('');
+  const [createTeamOpen, setCreateTeamOpen] = useState(false);
+  const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('agents');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
@@ -370,20 +373,16 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           <strong>Haunting Souls</strong>
           <span>{user.username}</span>
         </div>
-        <button onClick={() => void createTeam()}>创建团队</button>
+        <button onClick={() => setCreateTeamOpen(true)}>创建团队</button>
         <div className="list">
           {teams.map((team) => (
-            <div key={team.id} className="team-row">
-              <button
-                className={team.id === activeTeam?.id ? 'selected team-select' : 'team-select'}
-                onClick={() => setActiveTeamId(team.id)}
-              >
-                {team.name}
-              </button>
-              <button className="team-delete" onClick={() => void deleteTeam(team.id)} title={`删除 ${team.name}`}>
-                删除
-              </button>
-            </div>
+            <TeamListItem
+              key={team.id}
+              team={team}
+              active={team.id === activeTeam?.id}
+              onSelect={() => setActiveTeamId(team.id)}
+              onDelete={() => void deleteTeam(team.id)}
+            />
           ))}
         </div>
         <button className="secondary" onClick={logout}>
@@ -404,14 +403,10 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                   {activeMode?.mode ? <span className="mode-badge">模式：{activeMode.mode}</span> : null}
                 </div>
               </div>
-              <button onClick={() => void addAgent(activeTeam.id)}>添加 Agent</button>
+              <button onClick={() => setAddAgentOpen(true)}>添加 Agent</button>
             </header>
             <MessageList messages={messages} activePhase={activePhase} />
-            <details className="prompt-preview panel">
-              <summary>查看发送给 {activeAgent?.name ?? '当前 Agent'} 的完整 Prompt</summary>
-              {activePrompt ? <pre>{activePrompt}</pre> : <p className="muted">当前没有可预览的 prompt。</p>}
-            </details>
-            <SendBox onSend={handleTeamSend} />
+            <SendBox disabled={!activeTeam} onSend={handleTeamSend} />
             {permission && (
               <PermissionDialog
                 permission={permission}
@@ -434,21 +429,41 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
       <aside className="inspector">
         <div className="inspector-tabs" role="tablist" aria-label="Inspector tabs">
-          <button className={inspectorTab === 'agents' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('agents')}>
+          <button
+            role="tab"
+            aria-selected={inspectorTab === 'agents'}
+            className={inspectorTab === 'agents' ? 'selected inspector-tab' : 'inspector-tab'}
+            onClick={() => setInspectorTab('agents')}
+          >
             团队
           </button>
-          <button className={inspectorTab === 'activity' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('activity')}>
+          <button
+            role="tab"
+            aria-selected={inspectorTab === 'activity'}
+            className={inspectorTab === 'activity' ? 'selected inspector-tab' : 'inspector-tab'}
+            onClick={() => setInspectorTab('activity')}
+          >
             活动
           </button>
-          <button className={inspectorTab === 'config' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('config')}>
+          <button
+            role="tab"
+            aria-selected={inspectorTab === 'config'}
+            className={inspectorTab === 'config' ? 'selected inspector-tab' : 'inspector-tab'}
+            onClick={() => setInspectorTab('config')}
+          >
             配置
           </button>
-          <button className={inspectorTab === 'debug' ? 'selected inspector-tab' : 'inspector-tab'} onClick={() => setInspectorTab('debug')}>
+          <button
+            role="tab"
+            aria-selected={inspectorTab === 'debug'}
+            className={inspectorTab === 'debug' ? 'selected inspector-tab' : 'inspector-tab'}
+            onClick={() => setInspectorTab('debug')}
+          >
             调试
           </button>
         </div>
 
-        <div className="inspector-body">
+        <div className="inspector-body" role="tabpanel">
           {inspectorTab === 'agents' ? (
             <>
               <section className="inspector-section">
@@ -512,6 +527,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
           {inspectorTab === 'config' ? (
             <>
+              <section className="inspector-section panel">
+                <h3>当前 Agent</h3>
+                <CurrentAgentSummary agent={activeAgent} phase={activePhase} mode={activeMode} />
+              </section>
+
               <section className="inspector-section panel model-panel">
                 <h3>模型</h3>
                 <AgentModelSelect
@@ -539,75 +559,63 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           ) : null}
 
           {inspectorTab === 'debug' ? (
-            <>
-              <section className="inspector-section">
-                <h3>时间线</h3>
-                <div className="timeline">
-                  {timeline.length === 0 ? (
-                    <p className="muted">暂无团队消息。</p>
-                  ) : (
-                    timeline.map((entry) => (
-                      <div key={entry.message.id} className="timeline-item">
-                        <div className="timeline-meta">
-                          <span>
-                            {entry.fromAgentName} → {entry.toAgentName}
-                          </span>
-                          <span className={entry.processed ? 'processed' : 'pending'}>
-                            {entry.processed ? '已处理' : '待处理'}
-                          </span>
-                        </div>
-                        <div className="timeline-content">{entry.message.content}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className="inspector-section">
-                <h3>服务</h3>
-                {serverInfo?.urls.length ? (
-                  serverInfo.urls.map((url) => (
-                    <p key={url} className="url">
-                      {url}
-                    </p>
-                  ))
-                ) : (
-                  <p className="muted">暂无服务地址。</p>
-                )}
-              </section>
-            </>
+            <DebugPanel
+              prompt={activePrompt}
+              mode={activeMode}
+              usage={activeUsage}
+              commands={activeCommands}
+              models={activeModels}
+              events={activeAgentEvents}
+              timeline={timeline}
+              serverInfo={serverInfo}
+            />
           ) : null}
         </div>
       </aside>
+
+      <CreateTeamDialog
+        open={createTeamOpen}
+        onClose={() => setCreateTeamOpen(false)}
+        onSubmit={async (input) => {
+          const team = await submitCreateTeam(input);
+          setCreateTeamOpen(false);
+          setActiveTeamId(team.id);
+        }}
+      />
+
+      <AddAgentDialog
+        open={addAgentOpen}
+        defaultBackend={activeAgent?.backend ?? 'claude'}
+        defaultModel={activeModels?.currentModelId ?? activeAgent?.model ?? ''}
+        onClose={() => setAddAgentOpen(false)}
+        onSubmit={async (input) => {
+          const teamId = activeTeam?.id;
+          if (!teamId) return;
+          await submitAddAgent(teamId, input);
+          setAddAgentOpen(false);
+        }}
+      />
     </main>
   );
 
-  async function createTeam(): Promise<void> {
-    const name = window.prompt('创建团队', 'New Team');
-    if (!name) return;
-    const backend = pickBackend();
-    const leaderModel = pickModel('Leader 模型（可选）', undefined);
-    const team = await bridge.invoke('team.create', { name, leaderBackend: backend, leaderModel });
+  async function submitCreateTeam(input: { name: string; leaderBackend: AgentBackend; leaderModel?: string }): Promise<Team> {
+    const team = await bridge.invoke('team.create', input);
     await refresh();
-    setActiveTeamId(team.id);
+    return team;
   }
 
-  async function addAgent(teamId: string): Promise<void> {
-    const name = window.prompt('Agent 名称', 'Teammate');
-    if (!name) return;
-    const activeAgentConversationId = activeAgent?.conversationId;
-    const model = activeAgentConversationId
-      ? modelsByConversation[activeAgentConversationId]?.currentModelId ?? ''
-      : '';
-    const agentModel = pickModel('Agent 模型（可选）', model || undefined);
-    await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend(), model: agentModel });
+  async function submitAddAgent(
+    teamId: string,
+    input: { name: string; backend: AgentBackend; model?: string }
+  ): Promise<void> {
+    await bridge.invoke('team.addAgent', { teamId, ...input });
     await refresh();
   }
 
   async function deleteTeam(teamId: string): Promise<void> {
     const team = teams.find((item) => item.id === teamId);
     if (!team) return;
-    const confirmed = window.confirm(`Delete Team "${team.name}"? This will remove the workspace and all members.`);
+    const confirmed = window.confirm(`删除团队“${team.name}”？这会移除工作区和所有成员。`);
     if (!confirmed) return;
     await bridge.invoke('team.delete', { teamId });
     await refresh();
@@ -660,31 +668,106 @@ function MessageList({
   activePhase?: AgentTurnPhase;
 }): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const lastLengthRef = useRef(messages.length);
+  const [pinnedToBottom, setPinnedToBottom] = useState(true);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const lastMessage = messages[messages.length - 1];
 
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
+    const element = listRef.current;
+    if (!element) return;
 
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: 'smooth',
-    });
-  }, [messages.length, lastMessage?.content, lastMessage?.status]);
+    const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+    const nearBottom = distance < 80;
+    const delta = messages.length - lastLengthRef.current;
+    lastLengthRef.current = messages.length;
+
+    if (pinnedToBottom || nearBottom) {
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: 'smooth',
+      });
+      setPinnedToBottom(true);
+      setNewMessageCount(0);
+      return;
+    }
+
+    if (delta > 0) {
+      setNewMessageCount((count) => count + delta);
+    }
+  }, [messages.length, lastMessage?.content, lastMessage?.status, pinnedToBottom]);
 
   return (
-    <div className="messages" ref={listRef}>
-      {messages.map((message) => (
-        <article key={message.id} className={`message ${message.role} ${message.status === 'error' ? 'error' : ''}`}>
-          <small>{message.role}</small>
-          <div>{message.content || (message.status === 'streaming' ? phaseMessage(activePhase) : '')}</div>
-          {message.status === 'error' ? (
-            <p className="message-error">本轮回复失败，请查看右侧活动面板。</p>
-          ) : null}
-        </article>
-      ))}
+    <div className="messages-wrap">
+      <div
+        ref={listRef}
+        className="messages"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+          const nearBottom = distance < 80;
+          setPinnedToBottom(nearBottom);
+          if (nearBottom) {
+            setNewMessageCount(0);
+          }
+        }}
+      >
+        {messages.map((message) => (
+          <MessageBubble key={message.id} message={message} activePhase={activePhase} />
+        ))}
+      </div>
+
+      {!pinnedToBottom && newMessageCount > 0 ? (
+        <button
+          type="button"
+          className="jump-bottom"
+          onClick={() => {
+            const element = listRef.current;
+            if (!element) return;
+            element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+            setPinnedToBottom(true);
+            setNewMessageCount(0);
+          }}
+        >
+          有 {newMessageCount} 条新消息，回到底部
+        </button>
+      ) : null}
     </div>
   );
+}
+
+function MessageBubble({
+  message,
+  activePhase,
+}: {
+  message: ChatMessage;
+  activePhase?: AgentTurnPhase;
+}): React.ReactElement {
+  const content =
+    message.content ||
+    (message.status === 'streaming'
+      ? phaseMessage(activePhase)
+      : message.status === 'error'
+        ? '消息发送失败。'
+        : '');
+
+  return (
+    <article className={`message ${message.role} ${message.status === 'error' ? 'error' : ''}`}>
+      <small>{formatMessageRole(message.role)}</small>
+      <div>{content}</div>
+      {message.status === 'error' ? <p className="message-error">本轮回复失败，请查看右侧活动面板。</p> : null}
+    </article>
+  );
+}
+
+function formatMessageRole(role: ChatRole): string {
+  const labels: Record<ChatRole, string> = {
+    user: '用户',
+    assistant: '助手',
+    system: '系统',
+    tool: '工具',
+  };
+  return labels[role];
 }
 
 function phaseMessage(phase?: AgentTurnPhase): string {
@@ -924,31 +1007,407 @@ function AgentCommandsPanel({
   );
 }
 
-function pickModel(label: string, defaultValue?: string): string | undefined {
-  const value = window.prompt(label, defaultValue ?? '');
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function SendBox({ onSend }: { onSend: (content: string) => Promise<unknown> }): React.ReactElement {
-  const [content, setContent] = useState('');
-  async function submit(event: React.FormEvent): Promise<void> {
-    event.preventDefault();
-    const trimmed = content.trim();
-    if (!trimmed) return;
-    setContent('');
-    await onSend(trimmed);
-  }
+function DebugPanel({
+  prompt,
+  mode,
+  usage,
+  commands,
+  models,
+  events,
+  timeline,
+  serverInfo,
+}: {
+  prompt?: string;
+  mode?: ConversationMode | null;
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  events: AgentEvent[];
+  timeline: TeamMailboxEntry[];
+  serverInfo: ServerInfo | null;
+}): React.ReactElement {
   return (
-    <form className="sendbox" onSubmit={submit}>
-      <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="给团队发送消息" />
-      <button type="submit">发送</button>
-    </form>
+    <div className="debug-panel">
+      <section className="panel-section">
+        <h4>完整 Prompt</h4>
+        {prompt ? <pre className="debug-pre">{prompt}</pre> : <p className="muted">暂无 Prompt。</p>}
+      </section>
+
+      <section className="panel-section">
+        <h4>运行快照</h4>
+        <pre className="debug-pre">
+          {JSON.stringify(
+            {
+              mode,
+              usage,
+              commandsCount: commands?.commands.length ?? 0,
+              modelsCount: models?.models.length ?? 0,
+              timelineCount: timeline.length,
+              urls: serverInfo?.urls ?? [],
+            },
+            null,
+            2
+          )}
+        </pre>
+      </section>
+
+      <section className="panel-section">
+        <h4>最近 Agent Events</h4>
+        {events.length > 0 ? (
+          <pre className="debug-pre">{JSON.stringify(events.slice(-20), null, 2)}</pre>
+        ) : (
+          <p className="muted">暂无事件。</p>
+        )}
+      </section>
+
+      <section className="panel-section">
+        <h4>时间线</h4>
+        <div className="timeline">
+          {timeline.length === 0 ? (
+            <p className="muted">暂无团队消息。</p>
+          ) : (
+            timeline.slice(-10).map((entry) => (
+              <div key={entry.message.id} className="timeline-item">
+                <div className="timeline-meta">
+                  <span>
+                    {entry.fromAgentName} → {entry.toAgentName}
+                  </span>
+                  <span className={entry.processed ? 'processed' : 'pending'}>
+                    {entry.processed ? '已处理' : '待处理'}
+                  </span>
+                </div>
+                <div className="timeline-content">{entry.message.content}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="panel-section">
+        <h4>服务</h4>
+        {serverInfo?.urls.length ? (
+          serverInfo.urls.map((url) => (
+            <p key={url} className="url">
+              {url}
+            </p>
+          ))
+        ) : (
+          <p className="muted">暂无服务地址。</p>
+        )}
+      </section>
+    </div>
   );
 }
 
-function pickBackend(): AgentBackend {
-  return window.confirm('使用 Codex？取消则选择 Claude。') ? 'codex' : 'claude';
+function CurrentAgentSummary({
+  agent,
+  phase,
+  mode,
+}: {
+  agent?: TeamAgent;
+  phase?: AgentTurnPhase;
+  mode?: ConversationMode | null;
+}): React.ReactElement {
+  if (!agent) {
+    return <p className="muted">请选择一个 Agent。</p>;
+  }
+
+  return (
+    <section className="current-agent-summary">
+      <div>
+        <strong>{agent.name}</strong>
+        <p>
+          {agent.backend}
+          {agent.model ? ` · ${agent.model}` : ' · 默认模型'}
+        </p>
+      </div>
+
+      <div className="summary-badges">
+        {phase ? <AgentPhaseBadge phase={phase} /> : null}
+        {mode ? <span className="mode-badge">{mode.mode}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function TeamListItem({
+  team,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  team: Team;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}): React.ReactElement {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setMenuOpen(false);
+    }
+  }, [active]);
+
+  return (
+    <div className={`team-row${active ? ' active' : ''}`}>
+      <button className={`team-main${active ? ' selected' : ''}`} onClick={onSelect}>
+        <span>{team.name}</span>
+      </button>
+      <div className="team-menu-wrap">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`更多操作：${team.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMenuOpen((value) => !value);
+          }}
+        >
+          ⋯
+        </button>
+        {menuOpen ? (
+          <div className="menu-popover">
+            <button
+              type="button"
+              className="danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen(false);
+                onDelete();
+              }}
+            >
+              删除团队
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CreateTeamDialog({
+  open,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (input: { name: string; leaderBackend: AgentBackend; leaderModel?: string }) => Promise<void>;
+}): React.ReactElement | null {
+  const [name, setName] = useState('');
+  const [leaderBackend, setLeaderBackend] = useState<AgentBackend>('codex');
+  const [leaderModel, setLeaderModel] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <form
+        className="modal panel"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const trimmedName = name.trim();
+          if (!trimmedName) {
+            setError('请输入团队名称。');
+            return;
+          }
+          try {
+            setSubmitting(true);
+            setError('');
+            await onSubmit({
+              name: trimmedName,
+              leaderBackend,
+              leaderModel: leaderModel.trim() || undefined,
+            });
+            setName('');
+            setLeaderModel('');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      >
+        <h3>创建团队</h3>
+        <label className="field">
+          <span>团队名称</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+        </label>
+        <label className="field">
+          <span>Leader 后端</span>
+          <select value={leaderBackend} onChange={(event) => setLeaderBackend(event.target.value as AgentBackend)}>
+            <option value="codex">Codex</option>
+            <option value="claude">Claude Code</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>模型 ID，可选</span>
+          <input value={leaderModel} placeholder="默认" onChange={(event) => setLeaderModel(event.target.value)} />
+        </label>
+        {error ? <p className="error-text">{error}</p> : null}
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onClose} disabled={submitting}>
+            取消
+          </button>
+          <button type="submit" disabled={submitting}>
+            {submitting ? '创建中...' : '创建'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AddAgentDialog({
+  open,
+  defaultBackend,
+  defaultModel,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  defaultBackend: AgentBackend;
+  defaultModel?: string;
+  onClose: () => void;
+  onSubmit: (input: { name: string; backend: AgentBackend; model?: string }) => Promise<void>;
+}): React.ReactElement | null {
+  const [name, setName] = useState('');
+  const [backend, setBackend] = useState<AgentBackend>(defaultBackend);
+  const [model, setModel] = useState(defaultModel ?? '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setBackend(defaultBackend);
+    setModel(defaultModel ?? '');
+    setName('');
+    setError('');
+    setSubmitting(false);
+  }, [open, defaultBackend, defaultModel]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <form
+        className="modal panel"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const trimmedName = name.trim();
+          if (!trimmedName) {
+            setError('请输入 Agent 名称。');
+            return;
+          }
+          try {
+            setSubmitting(true);
+            setError('');
+            await onSubmit({
+              name: trimmedName,
+              backend,
+              model: model.trim() || undefined,
+            });
+            setName('');
+            setModel(defaultModel ?? '');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      >
+        <h3>添加 Agent</h3>
+        <label className="field">
+          <span>Agent 名称</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+        </label>
+        <label className="field">
+          <span>后端</span>
+          <select value={backend} onChange={(event) => setBackend(event.target.value as AgentBackend)}>
+            <option value="claude">Claude Code</option>
+            <option value="codex">Codex</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>模型 ID，可选</span>
+          <input value={model} placeholder={defaultModel || '默认'} onChange={(event) => setModel(event.target.value)} />
+        </label>
+        {error ? <p className="error-text">{error}</p> : null}
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onClose} disabled={submitting}>
+            取消
+          </button>
+          <button type="submit" disabled={submitting}>
+            {submitting ? '添加中...' : '添加'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SendBox({
+  disabled,
+  onSend,
+}: {
+  disabled?: boolean;
+  onSend: (content: string) => Promise<void>;
+}): React.ReactElement {
+  const [content, setContent] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(): Promise<void> {
+    const trimmed = content.trim();
+    if (!trimmed || disabled || sending) return;
+
+    try {
+      setSending(true);
+      setError('');
+      await onSend(trimmed);
+      setContent('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="send-box-wrap">
+      <div className="send-box">
+        <textarea
+          value={content}
+          disabled={disabled || sending}
+          placeholder={disabled ? '请选择团队' : '给团队发送消息'}
+          onChange={(event) => setContent(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        <button type="button" disabled={disabled || sending || !content.trim()} onClick={() => void submit()}>
+          {sending ? '发送中...' : '发送'}
+        </button>
+      </div>
+      {error ? <p className="send-error">{error}</p> : null}
+    </div>
+  );
 }
 
 function PermissionDialog({

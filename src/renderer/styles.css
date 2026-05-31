@@ -106,7 +106,7 @@ textarea {
   height: 100dvh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 240px minmax(360px, 1fr) 300px;
+  grid-template-columns: 260px minmax(520px, 1fr) minmax(340px, 420px);
 }
 
 .sidebar,
@@ -126,6 +126,27 @@ textarea {
 .inspector {
   border-right: 0;
   border-left: 1px solid #dce2ea;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  width: min(460px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
 }
 
 .brand {
@@ -164,6 +185,12 @@ header p,
 
 .inline-form button {
   width: 100%;
+}
+
+.messages-wrap {
+  position: relative;
+  min-height: 0;
+  display: grid;
 }
 
 .usage-badge {
@@ -229,6 +256,32 @@ header p,
   padding: 12px;
   display: grid;
   gap: 8px;
+}
+
+.debug-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.debug-pre {
+  margin: 0;
+  padding: 12px;
+  max-height: 220px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #344054;
+  font-size: 12px;
 }
 
 .activity-list {
@@ -354,11 +407,22 @@ header p,
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: stretch;
+  position: relative;
 }
 
-.team-select {
+.team-main {
   min-width: 0;
   text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-row.active .team-main,
+.team-main.selected {
+  background: #eef4ff;
+  border-color: #7fa3e8;
 }
 
 .team-delete {
@@ -374,6 +438,35 @@ header p,
   opacity: 1;
   background: #fff5f4;
   border-color: #f3c2bc;
+}
+
+.team-menu-wrap {
+  position: relative;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  line-height: 1;
+}
+
+.menu-popover {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 20;
+  min-width: 120px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  padding: 6px;
+}
+
+.menu-popover button {
+  width: 100%;
+  text-align: left;
 }
 
 .secondary {
@@ -407,6 +500,7 @@ p {
 }
 
 .messages {
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -415,6 +509,15 @@ p {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.jump-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
 }
 
 .message {
@@ -459,6 +562,27 @@ p {
 .sendbox textarea {
   min-height: 74px;
   resize: vertical;
+}
+
+.send-box-wrap {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid #dce2ea;
+  background: #fff;
+}
+
+.send-box {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
+.send-error,
+.error-text {
+  color: #b42318;
+  font-size: 12px;
+  padding: 0 14px 14px;
 }
 
 .agent {
@@ -537,6 +661,28 @@ p {
 .agent-badge.stopped {
   color: #344054;
   background: #eaecf0;
+}
+
+.current-agent-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.summary-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.debug-panel .timeline {
+  max-height: 220px;
+  overflow: auto;
 }
 
 select {
@@ -620,20 +766,48 @@ select {
   min-width: 0;
 }
 
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.modal .field input,
+.modal .field select {
+  width: 100%;
+}
+
+.modal .secondary {
+  margin-top: 0;
+}
+
 code {
   color: #475467;
 }
 
 @media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    overflow: auto;
+  }
+
   .app {
     grid-template-columns: 1fr;
-    height: auto;
     min-height: 100vh;
   }
 
   .sidebar,
+  .chat,
   .inspector {
     border: 0;
     border-bottom: 1px solid #dce2ea;
+    height: auto;
+    overflow: visible;
+  }
+
+  .inspector-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
