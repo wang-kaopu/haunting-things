@@ -190,6 +190,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('message', this.assistantMessage);
 
     this.activePrompt = true;
+    this.logger.info('prompt_start', {
+      conversationId: this.input.conversationId,
+      turnId: this.activeTurnId,
+      contentLength: content.length,
+    });
     try {
       await this.runConnectionRequest(() =>
         this.connection!.prompt({
@@ -201,14 +206,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       const message = err instanceof Error ? err.message : String(err);
 
       if (!this.turnFinalized) {
+        const turnId = this.activeTurnId;
         if (this.assistantMessage) {
           this.assistantMessage = { ...this.assistantMessage, status: 'error' };
           this.emit('message', this.assistantMessage);
         }
-        this.logger.error('runtime_error', {
-          conversationId: this.input.conversationId,
-          error: message,
-        });
         this.turnPhase = 'failed';
         this.emitAgentEvent({
           type: 'agent.error',
@@ -221,6 +223,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         this.turnFinalized = true;
         this.turnPhase = 'done';
         this.activeTurnId = null;
+        this.logger.error('prompt_failed', {
+          conversationId: this.input.conversationId,
+          turnId,
+          error: message,
+        });
         this.emit('finish', 'failed');
       }
       return;
@@ -241,6 +248,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('status', 'idle');
     this.emitAgentEvent({ type: 'agent.done', status: 'idle' });
     this.turnFinalized = true;
+    this.logger.info('prompt_done', {
+      conversationId: this.input.conversationId,
+      turnId: this.activeTurnId,
+      status: 'idle',
+      replyLength: this.assistantMessage?.content.length ?? 0,
+    });
     this.activeTurnId = null;
     this.emit('finish', 'idle');
   }
@@ -305,6 +318,14 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     const bridgePackage = getBridgePackageVersioned(this.input.backend);
     const cwd = path.resolve(this.input.workspace || process.cwd());
+    this.logger.info('bridge_start', {
+      conversationId: this.input.conversationId,
+      backend: this.input.backend,
+      bridgePackage,
+      cwd,
+      model: this.input.model,
+      mcpServerCount: this.input.mcpServers?.length ?? 0,
+    });
 
     const child = spawn('npx', ['-y', bridgePackage], {
       cwd,
@@ -420,6 +441,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       })
     );
     this.sessionId = sessionResult.sessionId;
+    this.logger.info('session_new_done', {
+      conversationId: this.input.conversationId,
+      sessionId: this.sessionId,
+    });
     this.handleNewSessionModels(sessionResult);
     if (this.input.model?.trim()) {
       await this.setSessionModel(this.input.model.trim());

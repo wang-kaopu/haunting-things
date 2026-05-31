@@ -79,6 +79,13 @@ export class ConversationService {
       updatedAt: now,
     });
     if (input.mcpServers) this.mcpServers.set(conversation.id, input.mcpServers);
+    this.logger.info('conversation_create', {
+      conversationId: conversation.id,
+      backend: conversation.backend,
+      model: conversation.model,
+      workspace: conversation.workspace,
+      hasMcpServers: Boolean(input.mcpServers?.length),
+    });
     return conversation;
   }
 
@@ -149,8 +156,16 @@ export class ConversationService {
    * Runtime 的流式响应通过事件回调持续推送。
    */
   async sendMessage(input: { conversationId: string; content: string; files?: string[] }): Promise<void> {
+    const startedAt = Date.now();
     const conversation = this.repo.getConversation(input.conversationId);
     if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+    this.logger.info('conversation_send_start', {
+      conversationId: conversation.id,
+      backend: conversation.backend,
+      model: conversation.model,
+      contentLength: input.content.length,
+      filesCount: input.files?.length ?? 0,
+    });
 
     const userMessage = this.repo.addMessage({
       id: crypto.randomUUID(),
@@ -162,8 +177,21 @@ export class ConversationService {
     });
     this.events.emit('conversation.stream', { conversationId: conversation.id, message: userMessage });
 
-    const runtime = this.getRuntime(conversation);
-    await runtime.send(input.content);
+    try {
+      const runtime = this.getRuntime(conversation);
+      await runtime.send(input.content);
+      this.logger.info('conversation_send_done', {
+        conversationId: conversation.id,
+        ms: Date.now() - startedAt,
+      });
+    } catch (error) {
+      this.logger.warn('conversation_send_failed', {
+        conversationId: conversation.id,
+        ms: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
@@ -177,6 +205,10 @@ export class ConversationService {
    * 停止指定 Conversation 的 ACP 进程并释放 runtime。
    */
   stop(conversationId: string): void {
+    this.logger.info('conversation_stop', {
+      conversationId,
+      hadRuntime: this.runtimes.has(conversationId),
+    });
     this.runtimes.get(conversationId)?.stop();
     this.runtimes.delete(conversationId);
     this.commandSnapshots.delete(conversationId);
@@ -203,6 +235,11 @@ export class ConversationService {
     if (!model) throw new Error('model is required');
     if (conversation.model === model) return conversation;
 
+    this.logger.info('conversation_model_set', {
+      conversationId: conversation.id,
+      previousModel: conversation.model,
+      model,
+    });
     this.repo.updateConversationModel(conversation.id, model);
     this.restart(conversation.id);
     const now = Date.now();
@@ -240,6 +277,13 @@ export class ConversationService {
     const existing = this.runtimes.get(conversation.id);
     if (existing) return existing;
 
+    this.logger.info('runtime_create', {
+      conversationId: conversation.id,
+      backend: conversation.backend,
+      model: conversation.model,
+      workspace: conversation.workspace,
+      mcpServerCount: this.mcpServers.get(conversation.id)?.length ?? 0,
+    });
     const runtime = new AcpRuntime({
       conversationId: conversation.id,
       backend: conversation.backend,

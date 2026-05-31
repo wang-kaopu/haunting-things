@@ -11,6 +11,7 @@ import type {
 import type { Repository } from './db';
 import type { ConversationService } from './conversations';
 import type { EventBus } from './events';
+import { createLogger } from './logger';
 import { TeamMcpServer } from './teamMcpServer';
 
 /** 运行时 Team 会话：持有 Team 快照和对应的 MCP TCP 服务。 */
@@ -31,6 +32,7 @@ type TeamSession = {
  * 读取未读消息 → `ConversationService.sendMessage`（触发 ACP prompt）
  */
 export class TeamService {
+  private readonly logger = createLogger('team');
   /** teamId → 当前运行时会话。 */
   private readonly sessions = new Map<string, TeamSession>();
   /** 已排队等待唤醒的 teamId:slotId。 */
@@ -76,6 +78,12 @@ export class TeamService {
     leaderBackend: AgentBackend;
     leaderModel?: string;
   }): Promise<Team> {
+    this.logger.info('team_create_start', {
+      name: input.name,
+      leaderBackend: input.leaderBackend,
+      leaderModel: input.leaderModel,
+      hasWorkspace: Boolean(input.workspace),
+    });
     const leaderConversation = this.conversations.create({
       backend: input.leaderBackend,
       model: input.leaderModel,
@@ -102,6 +110,11 @@ export class TeamService {
       updatedAt: now,
     });
     await this.ensureSession(team.id);
+    this.logger.info('team_create_done', {
+      teamId: team.id,
+      leaderSlotId: leader.slotId,
+      workspace: team.workspace,
+    });
     return team;
   }
 
@@ -147,6 +160,12 @@ export class TeamService {
     backend: AgentBackend;
     model?: string;
   }): Promise<TeamAgent> {
+    this.logger.info('agent_add_start', {
+      teamId: input.teamId,
+      name: input.name,
+      backend: input.backend,
+      model: input.model,
+    });
     const team = this.requireTeam(input.teamId);
     const conversation = this.conversations.create({
       backend: input.backend,
@@ -168,6 +187,13 @@ export class TeamService {
     const session = await this.ensureSession(updated.id);
     this.injectConversationMcpConfig(session.mcpServer, conversation.id, agent.slotId);
     this.events.emit('team.agent.added', { teamId: updated.id, agent });
+    this.logger.info('agent_add_done', {
+      teamId: updated.id,
+      slotId: agent.slotId,
+      conversationId: agent.conversationId,
+      backend: agent.backend,
+      model: agent.model,
+    });
     return agent;
   }
 
@@ -367,14 +393,36 @@ export class TeamService {
 
     // 检查本轮是否已显式回传
     const alreadyReplied = this.explicitRepliedTurns.get(event.conversationId) ?? false;
-    if (alreadyReplied) return;
+    if (alreadyReplied) {
+      this.logger.debug('auto_reply_skip_explicit_reply', {
+        teamId: team.id,
+        slotId: agent.slotId,
+        conversationId: event.conversationId,
+        messageId: event.messageId,
+      });
+      return;
+    }
 
     const content = event.content.trim();
     if (!content) return;
 
-    if (this.autoRepliedAssistantMessages.get(event.conversationId) === event.messageId) return;
+    if (this.autoRepliedAssistantMessages.get(event.conversationId) === event.messageId) {
+      this.logger.debug('auto_reply_skip_duplicate', {
+        teamId: team.id,
+        slotId: agent.slotId,
+        messageId: event.messageId,
+      });
+      return;
+    }
     this.autoRepliedAssistantMessages.set(event.conversationId, event.messageId);
 
+    this.logger.info('auto_reply_to_leader', {
+      teamId: team.id,
+      fromSlotId: agent.slotId,
+      toSlotId: team.leaderSlotId,
+      messageId: event.messageId,
+      contentLength: content.length,
+    });
     await this.deliver({
       id: crypto.randomUUID(),
       teamId: team.id,
@@ -390,6 +438,10 @@ export class TeamService {
    * 停止 Team：关闭 MCP server，并停止所有成员的 ACP 进程。
    */
   async stop(teamId: string): Promise<void> {
+    this.logger.info('team_stop', {
+      teamId,
+      hadSession: this.sessions.has(teamId),
+    });
     const session = this.sessions.get(teamId);
     if (session) {
       await session.mcpServer.stop();
@@ -417,6 +469,13 @@ export class TeamService {
   private async deliver(message: MailboxMessage): Promise<void> {
     const team = this.requireTeam(message.teamId);
     await this.ensureSession(team.id);
+    this.logger.info('mailbox_deliver', {
+      teamId: message.teamId,
+      messageId: message.id,
+      fromAgentId: message.fromAgentId,
+      toAgentId: message.toAgentId,
+      contentLength: message.content.length,
+    });
     const fromAgent = team.agents.find((agent) => agent.slotId === message.fromAgentId);
 
     if (
@@ -440,7 +499,11 @@ export class TeamService {
    */
   private scheduleWakeAgent(teamId: string, slotId: string): void {
     const key = `${teamId}:${slotId}`;
-    if (this.pendingWakeups.has(key) || this.activeWakeups.has(key)) return;
+    if (this.pendingWakeups.has(key) || this.activeWakeups.has(key)) {
+      this.logger.debug('wake_skip_already_queued', { teamId, slotId });
+      return;
+    }
+    this.logger.debug('wake_scheduled', { teamId, slotId });
     this.pendingWakeups.add(key);
     setTimeout(() => {
       this.pendingWakeups.delete(key);
@@ -453,11 +516,27 @@ export class TeamService {
    */
   private async runWakeCycle(teamId: string, slotId: string): Promise<void> {
     const key = `${teamId}:${slotId}`;
-    if (this.activeWakeups.has(key)) return;
+    if (this.activeWakeups.has(key)) {
+      this.logger.debug('wake_skip_active', { teamId, slotId });
+      return;
+    }
+    const startedAt = Date.now();
     this.activeWakeups.add(key);
     try {
+      this.logger.info('wake_start', { teamId, slotId });
       await this.wakeAgent(teamId, slotId);
-    } catch {
+      this.logger.info('wake_done', {
+        teamId,
+        slotId,
+        ms: Date.now() - startedAt,
+      });
+    } catch (error) {
+      this.logger.warn('wake_failed', {
+        teamId,
+        slotId,
+        ms: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // wakeAgent 已经发出失败状态，这里只负责收尾和补轮次。
     } finally {
       this.activeWakeups.delete(key);
@@ -488,6 +567,13 @@ export class TeamService {
       });
     }
     const content = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
+    this.logger.info('agent_prompt_send', {
+      teamId,
+      slotId,
+      conversationId: agent.conversationId,
+      unreadCount: messages.length,
+      promptLength: content.length,
+    });
     try {
       await this.conversations.sendMessage({ conversationId: agent.conversationId, content });
       this.events.emit('team.turn.finished', { teamId, slotId });
@@ -524,6 +610,11 @@ export class TeamService {
     options: { restartAgents?: boolean } = {}
   ): Promise<TeamSession> {
     const restartAgents = options.restartAgents ?? true;
+    this.logger.info('team_session_restart', {
+      teamId: team.id,
+      restartAgents,
+      memberCount: team.agents.length,
+    });
     await this.sessions.get(team.id)?.mcpServer.stop();
     const mcpServer = new TeamMcpServer(
       team.id,
