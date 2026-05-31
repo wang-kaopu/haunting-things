@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AgentBackend, MailboxMessage, Team, TeamAgent, TeamTask } from '../shared/types';
+import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgent, TeamTask } from '../shared/types';
 
 type TcpRequest = {
   authToken?: string;
@@ -19,7 +19,7 @@ export type StdioMcpConfig = {
 };
 
 type TeamCallbacks = {
-  addAgent: (input: { teamId: string; name: string; backend: AgentBackend }) => Promise<TeamAgent>;
+  addAgent: (input: { teamId: string; name: string; backend: AgentBackend; model?: string }) => Promise<TeamAgent>;
   taskCreate: (input: {
     teamId: string;
     title: string;
@@ -32,6 +32,7 @@ type TeamCallbacks = {
     finished: true;
   }>;
   sendMailboxMessage: (message: MailboxMessage) => Promise<void>;
+  getCommands?: (conversationId: string) => ConversationCommands | null;
 };
 
 export class TeamMcpServer {
@@ -118,7 +119,7 @@ export class TeamMcpServer {
   private async callTool(tool: string, args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     switch (tool) {
       case 'team_members':
-        return this.resolveTeam().agents.map(formatAgent).join('\n');
+        return this.resolveTeam().agents.map((agent) => this.formatAgent(agent)).join('\n');
       case 'team_send_message':
         return this.sendMessage(args, fromSlotId);
       case 'team_add_agent':
@@ -166,7 +167,12 @@ export class TeamMcpServer {
     if (!backend) throw new Error('backend is required');
 
     const team = this.resolveTeam();
-    const agent = await this.callbacks.addAgent({ teamId: team.id, name, backend: parseAgentBackend(backend) });
+    const agent = await this.callbacks.addAgent({
+      teamId: team.id,
+      name,
+      backend: parseAgentBackend(backend),
+      model: parseOptionalModel(args),
+    });
     return `Added teammate ${agent.name} (${agent.slotId})`;
   }
 
@@ -195,15 +201,23 @@ export class TeamMcpServer {
     const taskBody = String(args.task || '').trim();
     const summary = args.summary ? String(args.summary).trim() : '';
     const name = String(args.name || '').trim();
+    const model = parseOptionalModel(args);
     if (!taskBody) throw new Error('task is required');
 
-    let target = team.agents.find((agent) => agent.role === 'teammate' && agent.backend === backend) ?? null;
+    let target =
+      team.agents.find(
+        (agent) =>
+          agent.role === 'teammate' &&
+          agent.backend === backend &&
+          (!model || agent.model === model)
+      ) ?? null;
     let createdAgent = false;
     if (!target) {
       target = await this.callbacks.addAgent({
         teamId: team.id,
         name: name || defaultDelegateName(backend),
         backend,
+        model,
       });
       createdAgent = true;
     }
@@ -242,11 +256,19 @@ export class TeamMcpServer {
       ) ?? null
     );
   }
+
+  private formatAgent(agent: TeamAgent): string {
+    const modelPart = agent.model ? `, model=${agent.model}` : '';
+    const commands = this.callbacks.getCommands?.(agent.conversationId);
+    const commandNames = commands?.commands.slice(0, 8).map((command) => command.name).join(', ');
+    const commandsPart = commandNames ? `, commands=${commandNames}` : '';
+    return `- ${agent.name} (${agent.role}, ${agent.backend}${modelPart}, ${agent.status}${commandsPart})`;
+  }
 }
 
-function formatAgent(agent: TeamAgent): string {
-  const modelPart = agent.model ? `, model=${agent.model}` : '';
-  return `- ${agent.name} (${agent.role}, ${agent.backend}${modelPart}, ${agent.status})`;
+function parseOptionalModel(args: Record<string, unknown>): string | undefined {
+  const model = typeof args.model === 'string' ? args.model.trim() : '';
+  return model || undefined;
 }
 
 function parseAgentBackend(value: unknown): AgentBackend {

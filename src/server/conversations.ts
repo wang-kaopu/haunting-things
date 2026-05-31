@@ -193,7 +193,24 @@ export class ConversationService {
 
     this.repo.updateConversationModel(conversation.id, model);
     this.restart(conversation.id);
-    return this.repo.getConversation(conversation.id) ?? { ...conversation, model };
+    const now = Date.now();
+    this.commandSnapshots.delete(conversation.id);
+    this.modelSnapshots.delete(conversation.id);
+
+    this.events.emit('conversation.commands', {
+      conversationId: conversation.id,
+      commands: [],
+      updatedAt: now,
+    });
+
+    this.events.emit('conversation.models', {
+      conversationId: conversation.id,
+      currentModelId: model,
+      models: [],
+      updatedAt: now,
+    });
+
+    return this.repo.getConversation(conversation.id) ?? { ...conversation, model, updatedAt: now };
   }
 
   /**

@@ -90,12 +90,13 @@ describe('TeamMcpServer', () => {
     team = makeTeam();
     mailboxWrites = [];
     wakeAgent = vi.fn().mockResolvedValue(undefined);
-    addAgent = vi.fn(async ({ name, backend }: { teamId: string; name: string; backend: string }) => {
+    addAgent = vi.fn(async ({ name, backend, model }: { teamId: string; name: string; backend: string; model?: string }) => {
       const agent: TeamAgent = {
         slotId: `slot-${name.toLowerCase()}`,
         conversationId: `conv-${name.toLowerCase()}`,
         role: 'teammate',
         backend,
+        model,
         name,
         status: 'idle',
       };
@@ -204,6 +205,7 @@ describe('TeamMcpServer', () => {
       teamId: 'team-1',
       name: 'Researcher',
       backend: 'claude',
+      model: undefined,
     });
 
     const membersAfterAdd = await callTool(port, authToken, 'team_members');
@@ -235,6 +237,7 @@ describe('TeamMcpServer', () => {
       teamId: 'team-1',
       name: 'Researcher',
       backend: 'claude',
+      model: undefined,
     });
     expect(taskCreate).toHaveBeenCalledWith({
       teamId: 'team-1',
@@ -280,6 +283,39 @@ describe('TeamMcpServer', () => {
     expect(mailboxWrites[0]).toMatchObject({
       toAgentId: 'slot-claude',
       summary: 'Review the implementation for edge cases and regressions.',
+    });
+  });
+
+  it('passes model when adding an agent through team_add_agent', async () => {
+    const response = await callTool(port, authToken, 'team_add_agent', {
+      name: 'Claude Reviewer',
+      backend: 'claude',
+      model: 'sonnet',
+    });
+
+    expect(response.result).toContain('Claude Reviewer');
+    expect(addAgent).toHaveBeenCalledWith({
+      teamId: 'team-1',
+      name: 'Claude Reviewer',
+      backend: 'claude',
+      model: 'sonnet',
+    });
+  });
+
+  it('passes model when delegating a task to a new teammate', async () => {
+    const response = await callTool(port, authToken, 'team_delegate_task', {
+      backend: 'claude',
+      model: 'opus',
+      name: 'Claude Reviewer',
+      task: 'review code',
+    });
+
+    expect(response.result).toContain('Delegated task to Claude Reviewer');
+    expect(addAgent).toHaveBeenCalledWith({
+      teamId: 'team-1',
+      name: 'Claude Reviewer',
+      backend: 'claude',
+      model: 'opus',
     });
   });
 

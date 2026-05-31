@@ -534,6 +534,7 @@ export class TeamService {
         removeAgent: (input) => this.removeAgent(input),
         finishTask: (input) => this.finishTask(input),
         sendMailboxMessage: (message) => this.deliver(message),
+        getCommands: (conversationId) => this.conversations.commands(conversationId),
       }
     );
     await mcpServer.start();

@@ -63,6 +63,13 @@ describe('ConversationService model snapshots', () => {
       updatedAt: Date.now(),
     });
 
+    const emittedCommands: unknown[] = [];
+    const emittedModels: unknown[] = [];
+    const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+      if (name === 'conversation.commands') emittedCommands.push(data);
+      if (name === 'conversation.models') emittedModels.push(data);
+    });
+
     const restartSpy = vi.spyOn(conversations, 'restart');
     const updated = conversations.setModel({ conversationId: conversation.id, model: 'sonnet-4' });
 
@@ -70,5 +77,15 @@ describe('ConversationService model snapshots', () => {
     expect(restartSpy).toHaveBeenCalledWith(conversation.id);
     expect(conversations.commands(conversation.id)).toBeNull();
     expect(conversations.models(conversation.id)).toBeNull();
+    expect(emittedCommands.at(-1)).toMatchObject({
+      conversationId: conversation.id,
+      commands: [],
+    });
+    expect(emittedModels.at(-1)).toMatchObject({
+      conversationId: conversation.id,
+      currentModelId: 'sonnet-4',
+      models: [],
+    });
+    expect(emitSpy).toHaveBeenCalled();
   });
 });

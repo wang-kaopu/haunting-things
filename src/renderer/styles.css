@@ -152,6 +152,16 @@ header p,
   gap: 6px;
 }
 
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form input {
+  min-width: 0;
+  flex: 1;
+}
+
 .usage-badge {
   margin-top: 8px;
   display: inline-flex;

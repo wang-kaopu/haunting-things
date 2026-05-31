@@ -505,32 +505,60 @@ function AgentModelSelect({
   models?: ConversationModels;
   onChange: (model: string) => void;
 }): React.ReactElement {
+  const [customModel, setCustomModel] = useState('');
+
   if (!agent) {
-    return <p className="muted">Select an agent to change its model.</p>;
+    return <p className="muted">No active agent.</p>;
   }
 
-  const currentModelId = agent.model ?? models?.currentModelId ?? '';
   const options = models?.models ?? [];
-  const visibleOptions =
-    currentModelId && !options.some((item) => item.id === currentModelId)
-      ? [{ id: currentModelId, name: currentModelId }, ...options]
-      : options;
-
-  if (visibleOptions.length === 0) {
-    return <p className="muted">No model snapshot reported yet.</p>;
-  }
+  const current = agent.model ?? models?.currentModelId ?? '';
 
   return (
-    <label className="field">
-      <span>Active model</span>
-      <select value={currentModelId} onChange={(event) => onChange(event.target.value)}>
-        {visibleOptions.map((model) => (
-          <option key={model.id} value={model.id}>
-            {model.name ?? model.id}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="model-select">
+      <label className="field">
+        <span>Model</span>
+
+        {options.length > 0 ? (
+          <select
+            value={current}
+            onChange={(event) => {
+              const value = event.target.value.trim();
+              if (value) onChange(value);
+            }}
+          >
+            {!current && <option value="">Default</option>}
+            {current && !options.some((model) => model.id === current) ? <option value={current}>{current}</option> : null}
+            {options.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name || model.id}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="inline-form">
+            <input
+              value={customModel}
+              placeholder={current || 'Enter model id'}
+              onChange={(event) => setCustomModel(event.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const value = customModel.trim();
+                if (value) onChange(value);
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        )}
+      </label>
+
+      {options.length === 0 ? (
+        <p className="muted">No model snapshot reported yet. You can enter a model id manually.</p>
+      ) : null}
+    </div>
   );
 }
 
