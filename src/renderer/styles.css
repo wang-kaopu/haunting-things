@@ -181,6 +181,61 @@ header p,
   font-weight: 600;
 }
 
+.phase-badge,
+.agent-phase {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: var(--panel-muted);
+  color: var(--muted);
+}
+
+.phase-badge.failed,
+.agent-phase.failed {
+  color: #b42318;
+  background: #fee4e2;
+}
+
+.phase-badge.tool_calling,
+.agent-phase.tool_calling {
+  color: #175cd3;
+  background: #d1e9ff;
+}
+
+.activity-panel {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  background: var(--panel-muted);
+}
+
+.activity-time {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.activity-item.agent-error {
+  border-color: #fecdca;
+  background: #fffbfa;
+  color: #b42318;
+}
+
 .command-panel {
   padding: 12px;
   display: grid;
@@ -311,6 +366,10 @@ p {
   white-space: pre-wrap;
 }
 
+.message.error {
+  border-color: #fecdca;
+}
+
 .message.user {
   margin-left: auto;
   background: #e9f0ff;
@@ -320,6 +379,12 @@ p {
   display: block;
   margin-bottom: 6px;
   color: #667085;
+}
+
+.message-error {
+  margin-top: 8px;
+  color: #b42318;
+  font-size: 12px;
 }
 
 .sendbox {

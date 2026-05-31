@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client';
 import type {
   AgentBackend,
+  AgentEvent,
   AgentInfo,
+  AgentTurnPhase,
   ChatMessage,
   ConversationCommands,
   ConversationModels,
@@ -84,6 +86,8 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
+  const [agentEventsByConversation, setAgentEventsByConversation] = useState<Record<string, AgentEvent[]>>({});
+  const [phaseByConversation, setPhaseByConversation] = useState<Record<string, AgentTurnPhase>>({});
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
   const [modelsByConversation, setModelsByConversation] = useState<Record<string, ConversationModels>>({});
@@ -143,6 +147,21 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       setPermission(req);
     });
 
+    const unsubAgentEvent = bridge.on('conversation.agentEvent', (event) => {
+      setAgentEventsByConversation((prev) => {
+        const list = prev[event.conversationId] ?? [];
+        return {
+          ...prev,
+          [event.conversationId]: [...list, event].slice(-80),
+        };
+      });
+
+      setPhaseByConversation((prev) => ({
+        ...prev,
+        [event.conversationId]: phaseFromAgentEvent(event),
+      }));
+    });
+
     const unsubAgentStatus = bridge.on('team.agent.status', ({ slotId, status }) => {
       setAgentStatuses((prev) => ({ ...prev, [slotId]: status }));
     });
@@ -185,6 +204,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     return () => {
       unsubStream();
       unsubPermission();
+      unsubAgentEvent();
       unsubAgentStatus();
       unsubUsage();
       unsubCommands();
@@ -213,12 +233,56 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     const agent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
     if (!agent) {
       setMessages([]);
+      setAgentEventsByConversation((prev) => {
+        const next = { ...prev };
+        delete next[activeSlotId];
+        return next;
+      });
+      setPhaseByConversation((prev) => {
+        const next = { ...prev };
+        delete next[activeSlotId];
+        return next;
+      });
       return;
     }
     bridge
       .invoke('conversation.messages', { conversationId: agent.conversationId })
       .then(setMessages)
       .catch(() => setMessages([]));
+    bridge
+      .invoke('conversation.agentEvents', { conversationId: agent.conversationId })
+      .then((events) => {
+        setAgentEventsByConversation((prev) => ({
+          ...prev,
+          [agent.conversationId]: events,
+        }));
+
+        const last = events.at(-1);
+        if (last) {
+          setPhaseByConversation((prev) => ({
+            ...prev,
+            [agent.conversationId]: phaseFromAgentEvent(last),
+          }));
+        } else {
+          setPhaseByConversation((prev) => {
+            const next = { ...prev };
+            delete next[agent.conversationId];
+            return next;
+          });
+        }
+      })
+      .catch(() => {
+        setAgentEventsByConversation((prev) => {
+          const next = { ...prev };
+          delete next[agent.conversationId];
+          return next;
+        });
+        setPhaseByConversation((prev) => {
+          const next = { ...prev };
+          delete next[agent.conversationId];
+          return next;
+        });
+      });
     bridge
       .invoke('conversation.commands', { conversationId: agent.conversationId })
       .then((snapshot) => {
@@ -253,8 +317,10 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
 
   const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
   const activeUsage = activeAgent ? usageByConversation[activeAgent.conversationId] : undefined;
+  const activePhase = activeAgent ? phaseByConversation[activeAgent.conversationId] : undefined;
   const activeCommands = activeAgent ? commandsByConversation[activeAgent.conversationId] : undefined;
   const activeModels = activeAgent ? modelsByConversation[activeAgent.conversationId] : undefined;
+  const activeAgentEvents = activeAgent ? agentEventsByConversation[activeAgent.conversationId] ?? [] : [];
   const handleTeamSend = useCallback(
     async (content: string) => {
       const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
@@ -300,10 +366,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                 <h2>{activeTeam.name}</h2>
                 <p className="muted">{activeAgent?.name ?? ''}</p>
                 {activeUsage && <UsageBadge usage={activeUsage} />}
+                {activePhase && <AgentPhaseBadge phase={activePhase} />}
               </div>
               <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
             </header>
-            <MessageList messages={messages} />
+            <MessageList messages={messages} activePhase={activePhase} />
             <SendBox onSend={handleTeamSend} />
             {permission && (
               <PermissionDialog
@@ -338,6 +405,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         {activeTeam?.agents.map((agent) => {
           const status = agentStatuses[agent.slotId] ?? agent.status;
           const isActive = agent.slotId === activeSlotId;
+          const phase = phaseByConversation[agent.conversationId];
           return (
             <button
               key={agent.slotId}
@@ -350,6 +418,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                 {agent.model ? ` · ${agent.model}` : ''}
               </span>
               <span className={`agent-badge ${status}`}>{status}</span>
+              {phase && phase !== 'done' ? <span className={`agent-phase ${phase}`}>{formatPhase(phase)}</span> : null}
             </button>
           );
         })}
@@ -366,6 +435,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         <section className="panel command-panel">
           <h3>Agent Commands</h3>
           <AgentCommandsPanel commands={activeCommands} />
+        </section>
+
+        <section className="panel activity-panel">
+          <h3>Agent Activity</h3>
+          <AgentActivityPanel events={activeAgentEvents} />
         </section>
 
         <h3>Timeline</h3>
@@ -459,7 +533,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   }
 }
 
-function MessageList({ messages }: { messages: ChatMessage[] }): React.ReactElement {
+function MessageList({
+  messages,
+  activePhase,
+}: {
+  messages: ChatMessage[];
+  activePhase?: AgentTurnPhase;
+}): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastMessage = messages[messages.length - 1];
 
@@ -476,13 +556,34 @@ function MessageList({ messages }: { messages: ChatMessage[] }): React.ReactElem
   return (
     <div className="messages" ref={listRef}>
       {messages.map((message) => (
-        <article key={message.id} className={`message ${message.role}`}>
+        <article key={message.id} className={`message ${message.role} ${message.status === 'error' ? 'error' : ''}`}>
           <small>{message.role}</small>
-          <div>{message.content || (message.status === 'streaming' ? '...' : '')}</div>
+          <div>{message.content || (message.status === 'streaming' ? phaseMessage(activePhase) : '')}</div>
+          {message.status === 'error' ? (
+            <p className="message-error">本轮回复失败，请查看右侧 Agent Activity。</p>
+          ) : null}
         </article>
       ))}
     </div>
   );
+}
+
+function phaseMessage(phase?: AgentTurnPhase): string {
+  switch (phase) {
+    case 'thinking':
+      return '正在思考...';
+    case 'tool_calling':
+      return '正在调用工具...';
+    case 'waiting_permission':
+      return '等待授权...';
+    case 'failed':
+      return '本轮出现错误...';
+    case 'done':
+    case 'queued':
+    case 'replying':
+    default:
+      return '正在回复...';
+  }
 }
 
 function UsageBadge({ usage }: { usage: ConversationUsage }): React.ReactElement {
@@ -494,6 +595,20 @@ function UsageBadge({ usage }: { usage: ConversationUsage }): React.ReactElement
       <span>{Math.round(usage.ratio * 100)}%</span>
     </div>
   );
+}
+
+function AgentPhaseBadge({ phase }: { phase: AgentTurnPhase }): React.ReactElement {
+  const label: Record<AgentTurnPhase, string> = {
+    queued: '排队中',
+    thinking: '正在思考',
+    replying: '正在回复',
+    tool_calling: '调用工具',
+    waiting_permission: '等待授权',
+    failed: '返回错误',
+    done: '已完成',
+  };
+
+  return <span className={`phase-badge ${phase}`}>{label[phase]}</span>;
 }
 
 function AgentModelSelect({
@@ -560,6 +675,85 @@ function AgentModelSelect({
       ) : null}
     </div>
   );
+}
+
+function AgentActivityPanel({ events }: { events: AgentEvent[] }): React.ReactElement {
+  const visible = events.filter((event) => event.type !== 'agent.reply.delta').slice(-30);
+
+  if (visible.length === 0) {
+    return <p className="muted">No activity yet.</p>;
+  }
+
+  return (
+    <div className="activity-list">
+      {visible.map((event) => (
+        <div key={event.id} className={`activity-item ${event.type.replaceAll('.', '-')}`}>
+          <span className="activity-time">{new Date(event.at).toLocaleTimeString()}</span>
+          <span className="activity-text">{formatAgentEvent(event)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatAgentEvent(event: AgentEvent): string {
+  switch (event.type) {
+    case 'agent.turn.started':
+      return '开始新一轮任务';
+    case 'agent.thinking':
+      return '正在思考';
+    case 'agent.reply.delta':
+      return '正在回复';
+    case 'agent.reply.done':
+      return '回复完成';
+    case 'agent.tool.call':
+      return `调用工具：${event.title || event.toolName}`;
+    case 'agent.tool.result':
+      return event.isError
+        ? `工具返回错误：${event.toolName ?? event.toolCallId}`
+        : `工具调用完成：${event.toolName ?? event.toolCallId}`;
+    case 'agent.permission.request':
+      return `等待授权：${event.title}`;
+    case 'agent.error':
+      return `返回错误：${event.message}`;
+    case 'agent.done':
+      return event.status === 'idle' ? '本轮完成' : `本轮结束：${event.status}`;
+  }
+}
+
+function phaseFromAgentEvent(event: AgentEvent): AgentTurnPhase {
+  switch (event.type) {
+    case 'agent.turn.started':
+    case 'agent.thinking':
+      return 'thinking';
+    case 'agent.reply.delta':
+    case 'agent.reply.done':
+      return 'replying';
+    case 'agent.tool.call':
+      return 'tool_calling';
+    case 'agent.tool.result':
+      return event.isError ? 'failed' : 'tool_calling';
+    case 'agent.permission.request':
+      return 'waiting_permission';
+    case 'agent.error':
+      return 'failed';
+    case 'agent.done':
+      return event.status === 'idle' ? 'done' : 'failed';
+  }
+  return 'queued';
+}
+
+function formatPhase(phase: AgentTurnPhase): string {
+  const labels: Record<AgentTurnPhase, string> = {
+    queued: '排队中',
+    thinking: '正在思考',
+    replying: '正在回复',
+    tool_calling: '调用工具',
+    waiting_permission: '等待授权',
+    failed: '返回错误',
+    done: '已完成',
+  };
+  return labels[phase];
 }
 
 function AgentCommandsPanel({
