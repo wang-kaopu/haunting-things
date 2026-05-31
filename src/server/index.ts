@@ -10,11 +10,13 @@ import { openDatabase, Repository } from './db';
 import { AuthService } from './auth';
 import { EventBus } from './events';
 import { ConversationService } from './conversations';
+import { createLogger } from './logger';
 import { TeamService } from './teamService';
 import { WebBridge } from './webBridge';
 import { healthAgent, listAgents } from './agentRegistry';
 
 const config = loadConfig();
+const logger = createLogger('server');
 const db = openDatabase(config.dbPath);
 const repo = new Repository(db);
 const auth = new AuthService(repo);
@@ -22,9 +24,10 @@ await auth.ensureAdmin();
 
 if (process.argv.includes('--reset-password')) {
   const password = await auth.resetAdminPassword();
-  console.log('Admin password reset:');
-  console.log('  username: admin');
-  console.log(`  password: ${password}`);
+  logger.info('admin_password_reset', {
+    username: 'admin',
+    password,
+  });
   db.close();
   process.exit(0);
 }
@@ -136,12 +139,16 @@ bridge.initialize(
 );
 
 server.listen(config.port, config.host, () => {
-  console.log(`Haunting Souls listening on http://${config.host}:${config.port}`);
-  for (const url of getServerUrls()) console.log(`  ${url}`);
+  logger.info('server_listening', {
+    host: config.host,
+    port: config.port,
+    urls: getServerUrls(),
+  });
   if (auth.state.initialPassword) {
-    console.log('Initial admin credentials:');
-    console.log('  username: admin');
-    console.log(`  password: ${auth.state.initialPassword}`);
+    logger.info('initial_admin_credentials', {
+      username: 'admin',
+      password: auth.state.initialPassword,
+    });
   }
 });
 

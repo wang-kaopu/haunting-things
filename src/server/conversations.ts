@@ -10,8 +10,10 @@ import type {
   ConversationMode,
   ConversationUsage,
 } from '../shared/types';
+import { classifyAgentEvent } from './agentEventPolicy';
 import type { Repository } from './db';
 import type { EventBus } from './events';
+import { createLogger } from './logger';
 import { AcpRuntime } from './acpRuntime';
 
 /**
@@ -24,6 +26,7 @@ import { AcpRuntime } from './acpRuntime';
  * 经由 `EventBus` 广播给所有 WebSocket 客户端。
  */
 export class ConversationService {
+  private readonly logger = createLogger('conversation');
   /** conversationId → 运行时实例（懒加载）。 */
   private readonly runtimes = new Map<string, AcpRuntime>();
   /** conversationId → 待注入的 MCP server 配置列表。 */
@@ -251,11 +254,23 @@ export class ConversationService {
       this.events.emit('conversation.stream', { conversationId: conversation.id, message });
     });
     runtime.on('agentEvent', (event: AgentEvent) => {
-      this.repo.addAgentEvent(event);
-      this.events.emit('conversation.agentEvent', event);
+      const policy = classifyAgentEvent(event);
+
+      if (policy.persist) {
+        this.repo.addAgentEvent(event);
+      }
+
+      if (policy.realtime) {
+        this.events.emit('conversation.agentEvent', event);
+      }
+
       for (const handler of this.agentEventHandlers) {
         Promise.resolve(handler(event)).catch((error) => {
-          console.warn(`[ConversationService] agentEvent handler failed for ${conversation.id}:`, error);
+          this.logger.warn('agent_event_handler_failed', {
+            conversationId: conversation.id,
+            eventType: event.type,
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
       }
     });
@@ -284,7 +299,11 @@ export class ConversationService {
       this.events.emit('conversation.finish', event);
       for (const handler of this.finishHandlers) {
         Promise.resolve(handler(event)).catch((error) => {
-          console.warn(`[ConversationService] finish handler failed for ${conversation.id}:`, error);
+          this.logger.warn('finish_handler_failed', {
+            conversationId: conversation.id,
+            status,
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
       }
     });

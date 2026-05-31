@@ -712,7 +712,7 @@ function AgentModelSelect({
 }
 
 function AgentActivityPanel({ events }: { events: AgentEvent[] }): React.ReactElement {
-  const visible = events.filter((event) => event.type !== 'agent.reply.delta').slice(-30);
+  const visible = events.filter(shouldShowInActivity).slice(-30);
 
   if (visible.length === 0) {
     return <p className="muted">No activity yet.</p>;
@@ -756,6 +756,16 @@ function formatAgentEvent(event: AgentEvent): string {
       return `返回错误：${event.message}`;
     case 'agent.done':
       return event.status === 'idle' ? '本轮完成' : `本轮结束：${event.status}`;
+  }
+}
+
+function shouldShowInActivity(event: AgentEvent): boolean {
+  switch (event.type) {
+    case 'agent.reply.delta':
+    case 'agent.reply.done':
+      return false;
+    default:
+      return true;
   }
 }
 

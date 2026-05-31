@@ -25,6 +25,7 @@ import type {
   PermissionRequest,
 } from '../shared/types';
 import { getBridgePackageVersioned } from './agentRegistry';
+import { createLogger } from './logger';
 import { ndjsonFromChildProcess } from './ndjsonTransport';
 
 type AcpRuntimeEvents = {
@@ -121,6 +122,7 @@ type PendingRequest = {
  * - `finish`     — 一轮 prompt 结束（idle）或异常终止（failed / stopped）
  */
 export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
+  private readonly logger: ReturnType<typeof createLogger>;
   private child: ChildProcessWithoutNullStreams | null = null;
   private connection: ClientSideConnection | null = null;
   private sessionId: string | null = null;
@@ -155,6 +157,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   ) {
     super();
+    this.logger = createLogger(`acp.${input.backend}`);
   }
 
   /**
@@ -202,6 +205,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
           this.assistantMessage = { ...this.assistantMessage, status: 'error' };
           this.emit('message', this.assistantMessage);
         }
+        this.logger.error('runtime_error', {
+          conversationId: this.input.conversationId,
+          error: message,
+        });
         this.turnPhase = 'failed';
         this.emitAgentEvent({
           type: 'agent.error',
@@ -309,7 +316,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     child.stderr.on('data', (chunk: Buffer) => {
       const text = chunk.toString().trim();
-      if (text) console.warn(`[ACP ${this.input.backend} stderr] ${text}`);
+      if (text) {
+        this.logger.warn('bridge_stderr', {
+          conversationId: this.input.conversationId,
+          text: text.slice(0, 2000),
+        });
+      }
     });
 
     // 启动失败监视器：initialize 完成前进程退出则 reject
@@ -392,6 +404,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       this.child?.kill();
       this.child = null;
       this.connection = null;
+      this.logger.error('runtime_error', {
+        conversationId: this.input.conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     }
 
@@ -455,7 +471,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         this.handleConfigOptionUpdate(update);
         return;
       default:
-        console.debug('[ACP sessionUpdate ignored]', updateType, update);
+        this.logger.debug('session_update_ignored', {
+          conversationId: this.input.conversationId,
+          updateType,
+          keys: Object.keys(update),
+        });
     }
   }
 
@@ -531,12 +551,6 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     if (this.isFailedToolUpdate(update)) {
       this.emitToolResult(update, true);
-      this.emitAgentEvent({
-        type: 'agent.error',
-        source: 'tool',
-        message: this.extractToolErrorMessage(update),
-        detail: update,
-      });
       return;
     }
 
@@ -861,7 +875,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     };
 
     if (typeof connection.unstable_setSessionModel !== 'function') {
-      console.warn(`[ACP ${this.input.backend}] session model selection is not supported`);
+      this.logger.warn('session_model_unsupported', {
+        conversationId: this.input.conversationId,
+        model: modelId,
+      });
       return;
     }
 
