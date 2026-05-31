@@ -9,6 +9,7 @@ export type SidebarProps = {
   onCreateTeamClick: () => void;
   onSelectTeam: (teamId: string) => void;
   onDeleteTeam: (teamId: string) => Promise<void>;
+  onSettingsClick: () => void;
   onLogout: () => void;
 };
 
@@ -19,6 +20,7 @@ export function Sidebar({
   onCreateTeamClick,
   onSelectTeam,
   onDeleteTeam,
+  onSettingsClick,
   onLogout,
 }: SidebarProps): React.ReactElement {
   return (
@@ -36,6 +38,9 @@ export function Sidebar({
         onSelectTeam={onSelectTeam}
         onDeleteTeam={onDeleteTeam}
       />
+      <button type="button" onClick={onSettingsClick}>
+        设置
+      </button>
       <button type="button" className="secondary" onClick={onLogout}>
         退出登录
       </button>

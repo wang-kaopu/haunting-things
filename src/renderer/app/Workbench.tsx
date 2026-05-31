@@ -12,8 +12,10 @@ import { useActiveTeam } from './hooks/useActiveTeam';
 import { useConversationStream } from './hooks/useConversationStream';
 import { useNotifications } from './hooks/useNotifications';
 import { useRuntimeSnapshots } from './hooks/useRuntimeSnapshots';
+import { useServerInfo } from './hooks/useServerInfo';
 import { useTeamDrawer } from './hooks/useTeamDrawer';
 import { useTeams } from './hooks/useTeams';
+import { RemoteAccessPanel } from './settings/RemoteAccessPanel';
 import type { AddAgentInput, CreateTeamInput } from './types/ui';
 
 export type WorkbenchProps = {
@@ -32,7 +34,15 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const snapshots = useRuntimeSnapshots({ activeAgent: active.activeAgent });
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
+
+  const {
+    serverInfo,
+    loading: serverInfoLoading,
+    error: serverInfoError,
+    refreshServerInfo,
+  } = useServerInfo();
 
   const activeAgentsByConversation = useMemo(() => {
     const map: Record<string, TeamAgent | undefined> = {};
@@ -96,6 +106,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onCreateTeamClick={() => setCreateTeamOpen(true)}
         onSelectTeam={active.selectTeam}
         onDeleteTeam={deleteTeam}
+        onSettingsClick={() => setSettingsOpen(true)}
         onLogout={() => void logout()}
       />
       <ChatLayout
@@ -144,6 +155,25 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
           }}
           onDismiss={() => setPermission(null)}
         />
+      ) : null}
+      {settingsOpen ? (
+        <div className="modal-backdrop">
+          <div className="modal settings-dialog">
+            <div className="modal-header">
+              <h2>设置</h2>
+              <button type="button" onClick={() => setSettingsOpen(false)}>
+                关闭
+              </button>
+            </div>
+
+            <RemoteAccessPanel
+              serverInfo={serverInfo}
+              loading={serverInfoLoading}
+              error={serverInfoError}
+              onRefresh={refreshServerInfo}
+            />
+          </div>
+        </div>
       ) : null}
       {teamsState.error ? (
         <div className="load-error" role="alert">
