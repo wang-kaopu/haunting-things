@@ -332,7 +332,7 @@ export type InvokeMap = {
   };
   'conversation.list': { params: void; result: Conversation[] };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
-  'conversation.agentEvents': { params: { conversationId: string }; result: AgentEvent[] };
+  'conversation.agentEvents': { params: { conversationId: string; limit?: number }; result: AgentEvent[] };
   'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
   'conversation.models': { params: { conversationId: string }; result: ConversationModels | null };
   'conversation.mode': { params: { conversationId: string }; result: ConversationMode | null };

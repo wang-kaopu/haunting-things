@@ -107,9 +107,9 @@ export class ConversationService {
     return this.repo.listMessages(conversationId);
   }
 
-  /** 返回指定 Conversation 的标准化 Agent 事件历史。 */
-  agentEvents(conversationId: string): AgentEvent[] {
-    return this.repo.listAgentEvents(conversationId);
+  /** 返回指定 Conversation 的标准化 Agent 事件历史，默认最近 200 条。 */
+  agentEvents(conversationId: string, limit = 200): AgentEvent[] {
+    return this.repo.listAgentEvents(conversationId, limit);
   }
 
   /** 返回指定 Conversation 的可用命令快照。 */

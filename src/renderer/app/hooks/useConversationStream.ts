@@ -88,7 +88,7 @@ export function useConversationStream({
       });
 
     bridge
-      .invoke('conversation.agentEvents', { conversationId })
+      .invoke('conversation.agentEvents', { conversationId, limit: 200 })
       .then((events) => {
         if (cancelled) return;
         setAgentEventsByConversation((prev) => ({

@@ -121,7 +121,9 @@ bridge.register('conversation.create', (params) => conversations.create(params))
 bridge.register('conversation.setModel', (params) => conversations.setModel(params));
 bridge.register('conversation.list', () => conversations.list());
 bridge.register('conversation.messages', ({ conversationId }) => conversations.messages(conversationId));
-bridge.register('conversation.agentEvents', ({ conversationId }) => conversations.agentEvents(conversationId));
+bridge.register('conversation.agentEvents', ({ conversationId, limit }) =>
+  conversations.agentEvents(conversationId, limit)
+);
 bridge.register('conversation.commands', ({ conversationId }) => conversations.commands(conversationId));
 bridge.register('conversation.models', ({ conversationId }) => conversations.models(conversationId));
 bridge.register('conversation.mode', ({ conversationId }) => conversations.mode(conversationId));

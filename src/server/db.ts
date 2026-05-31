@@ -209,11 +209,19 @@ export class Repository {
     return event;
   }
 
-  listAgentEvents(conversationId: string): AgentEvent[] {
+  listAgentEvents(conversationId: string, limit = 200): AgentEvent[] {
+    const safeLimit = Math.min(Math.max(limit, 1), 1000);
+
     const rows = this.db
-      .prepare('SELECT payload FROM agent_events WHERE conversation_id = ? ORDER BY created_at ASC')
-      .all(conversationId) as Array<{ payload: string }>;
-    return rows.map(rowToAgentEvent);
+      .prepare(
+        `SELECT payload FROM agent_events
+        WHERE conversation_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?`
+      )
+      .all(conversationId, safeLimit) as Array<{ payload: string }>;
+
+    return rows.reverse().map(rowToAgentEvent);
   }
 
   createTeam(team: Team): Team {
