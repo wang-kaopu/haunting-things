@@ -245,7 +245,8 @@ export class TeamMcpServer {
 }
 
 function formatAgent(agent: TeamAgent): string {
-  return `- ${agent.name} (${agent.role}, ${agent.backend}, ${agent.status})`;
+  const modelPart = agent.model ? `, model=${agent.model}` : '';
+  return `- ${agent.name} (${agent.role}, ${agent.backend}${modelPart}, ${agent.status})`;
 }
 
 function parseAgentBackend(value: unknown): AgentBackend {

@@ -30,6 +30,7 @@ export type Conversation = {
   backend: AgentBackend;
   name: string;
   workspace: string;
+  model?: string;
   status: ConversationStatus;
   createdAt: number;
   updatedAt: number;
@@ -174,6 +175,21 @@ export type ConversationCommands = {
   updatedAt: number;
 };
 
+/** Conversation 的实时模型快照。 */
+export type AcpModelInfo = {
+  id: string;
+  name?: string;
+  description?: string;
+};
+
+/** Conversation 的实时模型快照。 */
+export type ConversationModels = {
+  conversationId: string;
+  currentModelId?: string;
+  models: AcpModelInfo[];
+  updatedAt: number;
+};
+
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
 
@@ -183,6 +199,7 @@ export type TeamAgent = {
   conversationId: string;
   role: 'leader' | 'teammate';
   backend: AgentBackend;
+  model?: string;
   name: string;
   status: TeamAgentStatus;
 };
@@ -259,13 +276,18 @@ export type InvokeMap = {
   'agent.list': { params: void; result: AgentInfo[] };
   'agent.health': { params: { backend: AgentBackend }; result: AgentHealth };
   'conversation.create': {
-    params: { backend: AgentBackend; workspace?: string; name?: string };
+    params: { backend: AgentBackend; workspace?: string; name?: string; model?: string };
+    result: Conversation;
+  };
+  'conversation.setModel': {
+    params: { conversationId: string; model: string };
     result: Conversation;
   };
   'conversation.list': { params: void; result: Conversation[] };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
   'conversation.agentEvents': { params: { conversationId: string }; result: AgentEvent[] };
   'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
+  'conversation.models': { params: { conversationId: string }; result: ConversationModels | null };
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
@@ -275,12 +297,13 @@ export type InvokeMap = {
     result: { accepted: true };
   };
   'team.create': {
-    params: { name: string; workspace?: string; leaderBackend: AgentBackend };
+    params: { name: string; workspace?: string; leaderBackend: AgentBackend; leaderModel?: string };
     result: Team;
   };
   'team.delete': { params: { teamId: string }; result: { deleted: true } };
-  'team.addAgent': { params: { teamId: string; name: string; backend: AgentBackend }; result: TeamAgent };
+  'team.addAgent': { params: { teamId: string; name: string; backend: AgentBackend; model?: string }; result: TeamAgent };
   'team.removeAgent': { params: { teamId: string; slotId: string }; result: { removed: true } };
+  'team.setAgentModel': { params: { teamId: string; slotId: string; model: string }; result: TeamAgent };
   'team.finishTask': {
     params: { teamId: string; summary: string; taskId?: string };
     result: { finished: true };
@@ -317,6 +340,7 @@ export type EventMap = {
   'conversation.agentEvent': AgentEvent;
   'conversation.usage': ConversationUsage;
   'conversation.commands': ConversationCommands;
+  'conversation.models': ConversationModels;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

@@ -14,10 +14,12 @@ import type {
   AgentBackend,
   AgentEvent,
   AcpAvailableCommand,
+  AcpModelInfo,
   AgentTurnPhase,
   ChatMessage,
   ConversationStatus,
   ConversationCommands,
+  ConversationModels,
   ConversationUsage,
   PermissionRequest,
 } from '../shared/types';
@@ -29,6 +31,7 @@ type AcpRuntimeEvents = {
   agentEvent: [AgentEvent];
   usage: [ConversationUsage];
   commands: [ConversationCommands];
+  models: [ConversationModels];
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
@@ -108,6 +111,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private usageSnapshot: ConversationUsage | null = null;
   private lastUsageEmitAt = 0;
   private availableCommandsSnapshot: ConversationCommands | null = null;
+  private modelsSnapshot: ConversationModels | null = null;
   private readonly toolCalls = new Map<string, { toolName: string; title: string }>();
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
@@ -123,6 +127,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       conversationId: string;
       backend: AgentBackend;
       workspace: string;
+      model?: string;
       mcpServers?: McpServer[];
     }
   ) {
@@ -216,6 +221,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
   getAvailableCommandsSnapshot(): ConversationCommands | null {
     return this.availableCommandsSnapshot;
+  }
+
+  getModelsSnapshot(): ConversationModels | null {
+    return this.modelsSnapshot;
   }
 
   /**
@@ -368,6 +377,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       })
     );
     this.sessionId = sessionResult.sessionId;
+    this.handleNewSessionModels(sessionResult);
+    if (this.input.model?.trim()) {
+      await this.setSessionModel(this.input.model.trim());
+    }
   }
 
   /**
@@ -562,6 +575,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return null;
   }
 
+  private readString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  }
+
   private handleAvailableCommandsUpdate(update: Record<string, unknown>): void {
     const rawCommands = Array.isArray(update.availableCommands) ? update.availableCommands : [];
 
@@ -589,6 +606,79 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     this.availableCommandsSnapshot = snapshot;
     this.emit('commands', snapshot);
+  }
+
+  private handleNewSessionModels(sessionResult: unknown): void {
+    const raw = sessionResult as Record<string, unknown> | null;
+    const modelsState = raw?.models;
+    if (modelsState == null) return;
+
+    let rawModels: unknown[] = [];
+    let currentModelId: string | undefined;
+
+    if (Array.isArray(modelsState)) {
+      rawModels = modelsState;
+    } else if (modelsState && typeof modelsState === 'object') {
+      const state = modelsState as Record<string, unknown>;
+      rawModels = Array.isArray(state.availableModels) ? state.availableModels : [];
+      currentModelId = this.readString(state.currentModelId) ?? this.readString(state.modelId);
+    } else {
+      return;
+    }
+
+    const models = rawModels
+      .map((item): AcpModelInfo | null => {
+        if (!item || typeof item !== 'object') return null;
+        const rawModel = item as Record<string, unknown>;
+        const id = this.readString(rawModel.id) ?? this.readString(rawModel.modelId);
+        if (!id) return null;
+        return {
+          id,
+          name: this.readString(rawModel.name) ?? this.readString(rawModel.label),
+          description: this.readString(rawModel.description),
+        };
+      })
+      .filter((item): item is AcpModelInfo => item !== null);
+
+    const snapshot: ConversationModels = {
+      conversationId: this.input.conversationId,
+      currentModelId: currentModelId ?? this.input.model?.trim() ?? undefined,
+      models,
+      updatedAt: Date.now(),
+    };
+
+    this.modelsSnapshot = snapshot;
+    this.emit('models', snapshot);
+  }
+
+  private async setSessionModel(modelId: string): Promise<void> {
+    if (!this.connection || !this.sessionId) return;
+
+    const connection = this.connection as ClientSideConnection & {
+      unstable_setSessionModel?: (params: { sessionId: string; modelId: string }) => Promise<unknown>;
+    };
+
+    if (typeof connection.unstable_setSessionModel !== 'function') {
+      console.warn(`[ACP ${this.input.backend}] session model selection is not supported`);
+      return;
+    }
+
+    await this.runConnectionRequest(() =>
+      connection.unstable_setSessionModel!({
+        sessionId: this.sessionId!,
+        modelId,
+      })
+    );
+
+    const snapshot: ConversationModels = {
+      conversationId: this.input.conversationId,
+      currentModelId: modelId,
+      models: this.modelsSnapshot?.models ?? [],
+      updatedAt: Date.now(),
+    };
+
+    this.modelsSnapshot = snapshot;
+    this.emit('models', snapshot);
   }
 
   /**

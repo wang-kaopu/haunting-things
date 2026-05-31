@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../src/server/events';
-import type { ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
+import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
 
 const mockInstances: Array<{
   teamId: string;
@@ -133,20 +133,25 @@ describe('TeamService', () => {
   let conversations: {
     create: ReturnType<typeof vi.fn>;
     setMcpServers: ReturnType<typeof vi.fn>;
+    setModel: ReturnType<typeof vi.fn>;
     restart: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
     messages: ReturnType<typeof vi.fn>;
+    commands: ReturnType<typeof vi.fn>;
     onFinish: ReturnType<typeof vi.fn>;
+    onAgentEvent: ReturnType<typeof vi.fn>;
   };
   let events: EventBus;
   let finishHandler: ((event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) | null;
+  let agentEventHandler: ((event: AgentEvent) => void | Promise<void>) | null;
   let conversationMessages: Map<string, ChatMessage[]>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     repo = createFakeRepository();
     finishHandler = null;
+    agentEventHandler = null;
     conversationMessages = new Map();
     conversations = {
       create: vi.fn((input: { backend: string; workspace?: string; name?: string }): Conversation => ({
@@ -154,19 +159,37 @@ describe('TeamService', () => {
         backend: input.backend as Conversation['backend'],
         name: input.name ?? 'conversation',
         workspace: input.workspace ?? '/tmp/workspace',
+        model: undefined,
         status: 'idle',
         createdAt: Date.now(),
         updatedAt: Date.now(),
       })),
       setMcpServers: vi.fn(),
+      setModel: vi.fn((input: { conversationId: string; model: string }) => ({
+        id: input.conversationId,
+        backend: 'claude',
+        name: 'conversation',
+        workspace: '/tmp/workspace',
+        model: input.model,
+        status: 'idle',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })),
       restart: vi.fn(),
       stop: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue(undefined),
       messages: vi.fn((conversationId: string) => structuredClone(conversationMessages.get(conversationId) ?? [])),
+      commands: vi.fn(() => null),
       onFinish: vi.fn((handler: (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) => {
         finishHandler = handler;
         return () => {
           if (finishHandler === handler) finishHandler = null;
+        };
+      }),
+      onAgentEvent: vi.fn((handler: (event: AgentEvent) => void | Promise<void>) => {
+        agentEventHandler = handler;
+        return () => {
+          if (agentEventHandler === handler) agentEventHandler = null;
         };
       }),
     };
@@ -185,7 +208,7 @@ describe('TeamService', () => {
     expect(team.agents).toHaveLength(1);
     expect(conversations.create).toHaveBeenCalledTimes(1);
     expect(mockInstances).toHaveLength(1);
-    expect(conversations.restart).toHaveBeenCalledTimes(1);
+    expect(conversations.restart).not.toHaveBeenCalled();
 
     const emitSpy = vi.spyOn(events, 'emit');
 
@@ -195,13 +218,32 @@ describe('TeamService', () => {
     const refreshed = repo.getTeam(team.id);
     expect(refreshed?.agents).toHaveLength(2);
     expect(conversations.setMcpServers).toHaveBeenCalledWith('conv-2', expect.any(Array));
-    expect(conversations.restart).toHaveBeenCalledTimes(1);
+    expect(conversations.restart).not.toHaveBeenCalled();
     expect(emitSpy).toHaveBeenCalledWith('team.agent.added', {
       teamId: team.id,
       agent: expect.objectContaining({ name: 'Dev', role: 'teammate' }),
     });
     expect(mockInstances).toHaveLength(1);
     expect(mockInstances[0].stop).not.toHaveBeenCalled();
+  });
+
+  it('updates an agent model and synchronizes the conversation model', async () => {
+    const service = new TeamService(repo as any, conversations as any, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude', leaderModel: 'sonnet-4' });
+    const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex', model: 'haiku-3' });
+
+    const updated = await service.setAgentModel({
+      teamId: team.id,
+      slotId: teammate.slotId,
+      model: 'sonnet-4',
+    });
+
+    expect(updated.model).toBe('sonnet-4');
+    expect(repo.getTeam(team.id)?.agents.find((agent) => agent.slotId === teammate.slotId)?.model).toBe('sonnet-4');
+    expect(conversations.setModel).toHaveBeenCalledWith({
+      conversationId: teammate.conversationId,
+      model: 'sonnet-4',
+    });
   });
 
   it('deletes a team by stopping its runtimes and removing persisted state', async () => {
@@ -349,7 +391,15 @@ describe('TeamService', () => {
       },
     ]);
 
-    await finishHandler?.({ conversationId: teammate.conversationId, status: 'idle' });
+    await agentEventHandler?.({
+      id: 'event-1',
+      type: 'agent.reply.done',
+      conversationId: teammate.conversationId,
+      turnId: 'turn-1',
+      messageId: 'reply-1',
+      content: 'I fixed the bug and added coverage.',
+      at: Date.now(),
+    });
     await vi.runAllTimersAsync();
 
     const timeline = service.timeline(team.id);

@@ -5,8 +5,10 @@ import type {
   AgentInfo,
   ChatMessage,
   ConversationCommands,
+  ConversationModels,
   ConversationUsage,
   PermissionRequest,
+  TeamAgent,
   TeamMailboxEntry,
   ServerInfo,
   Team,
@@ -84,6 +86,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
+  const [modelsByConversation, setModelsByConversation] = useState<Record<string, ConversationModels>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
@@ -158,6 +161,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       }));
     });
 
+    const unsubModels = bridge.on('conversation.models', (snapshot) => {
+      setModelsByConversation((prev) => ({
+        ...prev,
+        [snapshot.conversationId]: snapshot,
+      }));
+    });
+
     const unsubAgentAdded = bridge.on('team.agent.added', () => {
       void refresh();
     });
@@ -178,6 +188,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       unsubAgentStatus();
       unsubUsage();
       unsubCommands();
+      unsubModels();
       unsubAgentAdded();
       unsubAgentRemoved();
       unsubTeamMessage();
@@ -218,6 +229,16 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         }));
       })
       .catch(() => {});
+    bridge
+      .invoke('conversation.models', { conversationId: agent.conversationId })
+      .then((snapshot) => {
+        if (!snapshot) return;
+        setModelsByConversation((prev) => ({
+          ...prev,
+          [agent.conversationId]: snapshot,
+        }));
+      })
+      .catch(() => {});
   }, [activeSlotId, activeTeam?.id]);
 
   useEffect(() => {
@@ -233,6 +254,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
   const activeUsage = activeAgent ? usageByConversation[activeAgent.conversationId] : undefined;
   const activeCommands = activeAgent ? commandsByConversation[activeAgent.conversationId] : undefined;
+  const activeModels = activeAgent ? modelsByConversation[activeAgent.conversationId] : undefined;
   const handleTeamSend = useCallback(
     async (content: string) => {
       const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
@@ -323,10 +345,23 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               onClick={() => setActiveSlotId(agent.slotId)}
             >
               <span className="agent-name">{agent.name}</span>
+              <span className="agent-meta">
+                {agent.backend}
+                {agent.model ? ` · ${agent.model}` : ''}
+              </span>
               <span className={`agent-badge ${status}`}>{status}</span>
             </button>
-            );
+          );
         })}
+
+        <section className="panel model-panel">
+          <h3>Model</h3>
+          <AgentModelSelect
+            agent={activeAgent}
+            models={activeModels}
+            onChange={(model) => void setAgentModel(model)}
+          />
+        </section>
 
         <section className="panel command-panel">
           <h3>Agent Commands</h3>
@@ -368,7 +403,8 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     const name = window.prompt('Create Team', 'New Team');
     if (!name) return;
     const backend = pickBackend();
-    const team = await bridge.invoke('team.create', { name, leaderBackend: backend });
+    const leaderModel = pickModel('Leader model (optional)', undefined);
+    const team = await bridge.invoke('team.create', { name, leaderBackend: backend, leaderModel });
     await refresh();
     setActiveTeamId(team.id);
   }
@@ -376,7 +412,12 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   async function addAgent(teamId: string): Promise<void> {
     const name = window.prompt('Agent name', 'Teammate');
     if (!name) return;
-    await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend() });
+    const activeAgentConversationId = activeAgent?.conversationId;
+    const model = activeAgentConversationId
+      ? modelsByConversation[activeAgentConversationId]?.currentModelId ?? ''
+      : '';
+    const agentModel = pickModel('Agent model (optional)', model || undefined);
+    await bridge.invoke('team.addAgent', { teamId, name, backend: pickBackend(), model: agentModel });
     await refresh();
   }
 
@@ -386,6 +427,34 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
     const confirmed = window.confirm(`Delete Team "${team.name}"? This will remove the workspace and all members.`);
     if (!confirmed) return;
     await bridge.invoke('team.delete', { teamId });
+    await refresh();
+  }
+
+  async function setAgentModel(model: string): Promise<void> {
+    const nextModel = model.trim();
+    if (!activeTeam || !activeAgent || !nextModel) return;
+    if (activeAgent.model === nextModel) return;
+    await bridge.invoke('team.setAgentModel', {
+      teamId: activeTeam.id,
+      slotId: activeAgent.slotId,
+      model: nextModel,
+    });
+    const conversationId = activeAgent.conversationId;
+    setUsageByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
+    setCommandsByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
+    setModelsByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
     await refresh();
   }
 }
@@ -427,6 +496,44 @@ function UsageBadge({ usage }: { usage: ConversationUsage }): React.ReactElement
   );
 }
 
+function AgentModelSelect({
+  agent,
+  models,
+  onChange,
+}: {
+  agent?: TeamAgent;
+  models?: ConversationModels;
+  onChange: (model: string) => void;
+}): React.ReactElement {
+  if (!agent) {
+    return <p className="muted">Select an agent to change its model.</p>;
+  }
+
+  const currentModelId = agent.model ?? models?.currentModelId ?? '';
+  const options = models?.models ?? [];
+  const visibleOptions =
+    currentModelId && !options.some((item) => item.id === currentModelId)
+      ? [{ id: currentModelId, name: currentModelId }, ...options]
+      : options;
+
+  if (visibleOptions.length === 0) {
+    return <p className="muted">No model snapshot reported yet.</p>;
+  }
+
+  return (
+    <label className="field">
+      <span>Active model</span>
+      <select value={currentModelId} onChange={(event) => onChange(event.target.value)}>
+        {visibleOptions.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.name ?? model.id}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function AgentCommandsPanel({
   commands,
 }: {
@@ -453,6 +560,12 @@ function AgentCommandsPanel({
       ))}
     </div>
   );
+}
+
+function pickModel(label: string, defaultValue?: string): string | undefined {
+  const value = window.prompt(label, defaultValue ?? '');
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function SendBox({ onSend }: { onSend: (content: string) => Promise<unknown> }): React.ReactElement {

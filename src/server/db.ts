@@ -93,7 +93,14 @@ export function openDatabase(dbPath: string): Db {
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
   `);
+  ensureColumn(db, 'conversations', 'model', 'TEXT');
   return db;
+}
+
+function ensureColumn(db: Db, table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (columns.some((item) => item.name === column)) return;
+  db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
 }
 
 export class Repository {
@@ -140,18 +147,23 @@ export class Repository {
   createConversation(conversation: Conversation): Conversation {
     this.db
       .prepare(
-        'INSERT INTO conversations (id, backend, name, workspace, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO conversations (id, backend, name, workspace, model, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       )
       .run(
         conversation.id,
         conversation.backend,
         conversation.name,
         conversation.workspace,
+        conversation.model ?? null,
         conversation.status,
         conversation.createdAt,
         conversation.updatedAt
       );
     return conversation;
+  }
+
+  updateConversationModel(id: string, model: string | undefined): void {
+    this.db.prepare('UPDATE conversations SET model = ?, updated_at = ? WHERE id = ?').run(model ?? null, Date.now(), id);
   }
 
   updateConversationStatus(id: string, status: Conversation['status']): void {
@@ -334,6 +346,7 @@ function rowToConversation(row: any): Conversation {
     backend: row.backend,
     name: row.name,
     workspace: row.workspace,
+    model: row.model ?? undefined,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

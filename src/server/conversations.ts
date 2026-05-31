@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationModels,
   ConversationUsage,
 } from '../shared/types';
 import type { Repository } from './db';
@@ -28,6 +29,8 @@ export class ConversationService {
   private readonly mcpServers = new Map<string, any[]>();
   /** conversationId → 可用命令快照。 */
   private readonly commandSnapshots = new Map<string, ConversationCommands>();
+  /** conversationId → 模型快照。 */
+  private readonly modelSnapshots = new Map<string, ConversationModels>();
   /** 本地 finish 监听器，用于 Team 协作回流等服务内逻辑。 */
   private readonly finishHandlers = new Set<
     (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
@@ -49,7 +52,13 @@ export class ConversationService {
    * @param input.name       - 显示名称，默认为 `<backend> conversation`
    * @param input.mcpServers - 可选的 MCP server 配置，会随 runtime 一同启动
    */
-  create(input: { backend: AgentBackend; workspace?: string; name?: string; mcpServers?: any[] }): Conversation {
+  create(input: {
+    backend: AgentBackend;
+    workspace?: string;
+    name?: string;
+    model?: string;
+    mcpServers?: any[];
+  }): Conversation {
     const now = Date.now();
     const workspace = input.workspace?.trim() || path.join(this.dataDir, 'workspaces', crypto.randomUUID());
     mkdirSync(workspace, { recursive: true });
@@ -58,6 +67,7 @@ export class ConversationService {
       backend: input.backend,
       name: input.name || `${input.backend} conversation`,
       workspace,
+      model: input.model?.trim() || undefined,
       status: 'idle',
       createdAt: now,
       updatedAt: now,
@@ -92,6 +102,11 @@ export class ConversationService {
   /** 返回指定 Conversation 的可用命令快照。 */
   commands(conversationId: string): ConversationCommands | null {
     return this.commandSnapshots.get(conversationId) ?? null;
+  }
+
+  /** 返回指定 Conversation 的模型快照。 */
+  models(conversationId: string): ConversationModels | null {
+    return this.modelSnapshots.get(conversationId) ?? null;
   }
 
   /**
@@ -154,6 +169,7 @@ export class ConversationService {
     this.runtimes.get(conversationId)?.stop();
     this.runtimes.delete(conversationId);
     this.commandSnapshots.delete(conversationId);
+    this.modelSnapshots.delete(conversationId);
   }
 
   /**
@@ -162,6 +178,22 @@ export class ConversationService {
    */
   restart(conversationId: string): void {
     this.stop(conversationId);
+  }
+
+  /**
+   * 更新指定 Conversation 的模型配置，并重启 runtime 以在下次发送消息时重新初始化。
+   */
+  setModel(input: { conversationId: string; model: string }): Conversation {
+    const conversation = this.repo.getConversation(input.conversationId);
+    if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+
+    const model = input.model.trim();
+    if (!model) throw new Error('model is required');
+    if (conversation.model === model) return conversation;
+
+    this.repo.updateConversationModel(conversation.id, model);
+    this.restart(conversation.id);
+    return this.repo.getConversation(conversation.id) ?? { ...conversation, model };
   }
 
   /**
@@ -182,6 +214,7 @@ export class ConversationService {
       conversationId: conversation.id,
       backend: conversation.backend,
       workspace: conversation.workspace,
+      model: conversation.model,
       mcpServers: this.mcpServers.get(conversation.id),
     });
     runtime.on('message', (message) => {
@@ -205,6 +238,10 @@ export class ConversationService {
     runtime.on('commands', (snapshot: ConversationCommands) => {
       this.commandSnapshots.set(conversation.id, snapshot);
       this.events.emit('conversation.commands', snapshot);
+    });
+    runtime.on('models', (snapshot: ConversationModels) => {
+      this.modelSnapshots.set(conversation.id, snapshot);
+      this.events.emit('conversation.models', snapshot);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
     runtime.on('status', (status, error) => {

@@ -2,6 +2,7 @@ import type {
   AgentBackend,
   AgentEvent,
   MailboxMessage,
+  ConversationCommands,
   Team,
   TeamAgent,
   TeamMailboxEntry,
@@ -69,9 +70,15 @@ export class TeamService {
    * @param input.workspace     - 工作目录（不传则由 ConversationService 自动创建）
    * @param input.leaderBackend - Leader Agent 使用的后端（claude / codex）
    */
-  async create(input: { name: string; workspace?: string; leaderBackend: AgentBackend }): Promise<Team> {
+  async create(input: {
+    name: string;
+    workspace?: string;
+    leaderBackend: AgentBackend;
+    leaderModel?: string;
+  }): Promise<Team> {
     const leaderConversation = this.conversations.create({
       backend: input.leaderBackend,
+      model: input.leaderModel,
       workspace: input.workspace,
       name: `${input.name} - Leader`,
     });
@@ -80,6 +87,7 @@ export class TeamService {
       conversationId: leaderConversation.id,
       role: 'leader',
       backend: input.leaderBackend,
+      model: input.leaderModel?.trim() || undefined,
       name: 'Leader',
       status: 'idle',
     };
@@ -133,10 +141,16 @@ export class TeamService {
   /**
    * 向 Team 添加新 Agent（Teammate），并为新 conversation 注入当前 Team MCP 配置。
    */
-  async addAgent(input: { teamId: string; name: string; backend: AgentBackend }): Promise<TeamAgent> {
+  async addAgent(input: {
+    teamId: string;
+    name: string;
+    backend: AgentBackend;
+    model?: string;
+  }): Promise<TeamAgent> {
     const team = this.requireTeam(input.teamId);
     const conversation = this.conversations.create({
       backend: input.backend,
+      model: input.model,
       workspace: team.workspace,
       name: `${team.name} - ${input.name}`,
     });
@@ -145,6 +159,7 @@ export class TeamService {
       conversationId: conversation.id,
       role: 'teammate',
       backend: input.backend,
+      model: input.model?.trim() || undefined,
       name: input.name,
       status: 'idle',
     };
@@ -154,6 +169,35 @@ export class TeamService {
     this.injectConversationMcpConfig(session.mcpServer, conversation.id, agent.slotId);
     this.events.emit('team.agent.added', { teamId: updated.id, agent });
     return agent;
+  }
+
+  /**
+   * 更新 Team 中某个 Agent 的模型，并同步到对应 Conversation。
+   */
+  async setAgentModel(input: { teamId: string; slotId: string; model: string }): Promise<TeamAgent> {
+    const team = this.requireTeam(input.teamId);
+    const agent = this.requireAgent(team, input.slotId);
+    const model = input.model.trim();
+    if (!model) throw new Error('model is required');
+
+    const updatedAgent: TeamAgent = { ...agent, model };
+    const updatedTeam: Team = {
+      ...team,
+      agents: team.agents.map((item) => (item.slotId === input.slotId ? updatedAgent : item)),
+      updatedAt: Date.now(),
+    };
+    this.repo.updateTeam(updatedTeam);
+
+    this.conversations.setModel({
+      conversationId: agent.conversationId,
+      model,
+    });
+
+    const session = this.sessions.get(team.id);
+    if (session) {
+      session.team = updatedTeam;
+    }
+    return updatedAgent;
   }
 
   /**
@@ -443,7 +487,7 @@ export class TeamService {
         entry: this.buildMailboxEntry(team, { ...message, read: true }),
       });
     }
-    const content = formatMailbox(messages, team, agent);
+    const content = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
     try {
       await this.conversations.sendMessage({ conversationId: agent.conversationId, content });
       this.events.emit('team.turn.finished', { teamId, slotId });
@@ -557,8 +601,22 @@ export class TeamService {
  *
  * 先给出当前团队身份、成员和可用工具，再附上 mailbox 内容。
  */
-function formatMailbox(messages: MailboxMessage[], team: Team, agent: TeamAgent): string {
-  const teamLines = team.agents.map((member) => `- ${member.name} (${member.role}, ${member.backend}, ${member.status})`);
+function formatMailbox(
+  messages: MailboxMessage[],
+  team: Team,
+  agent: TeamAgent,
+  getCommands?: (conversationId: string) => ConversationCommands | null
+): string {
+  const teamLines = team.agents.map((member) => {
+    const commands = getCommands?.(member.conversationId);
+    const commandNames = commands?.commands
+      .slice(0, 8)
+      .map((cmd) => cmd.name)
+      .join(', ');
+    const modelPart = member.model ? `, model=${member.model}` : '';
+    const commandsPart = commandNames ? `, commands=${commandNames}` : ', commands=unknown';
+    return `- ${member.name} (${member.role}, ${member.backend}${modelPart}, ${member.status}${commandsPart})`;
+  });
   const messageLines =
     messages.length === 0
       ? ['- No unread team messages.']
