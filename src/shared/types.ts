@@ -151,6 +151,15 @@ export type PermissionRequest = {
   options: PermissionOption[];
 };
 
+/** Conversation 的实时 usage 快照。 */
+export type ConversationUsage = {
+  conversationId: string;
+  size: number;
+  used: number;
+  ratio: number;
+  updatedAt: number;
+};
+
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
 
@@ -291,6 +300,7 @@ export type InvokeMap = {
 export type EventMap = {
   'conversation.stream': { conversationId: string; message: ChatMessage };
   'conversation.agentEvent': AgentEvent;
+  'conversation.usage': ConversationUsage;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

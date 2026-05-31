@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '../shared/types';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation, ConversationUsage } from '../shared/types';
 import type { Repository } from './db';
 import type { EventBus } from './events';
 import { AcpRuntime } from './acpRuntime';
@@ -183,6 +183,9 @@ export class ConversationService {
           console.warn(`[ConversationService] agentEvent handler failed for ${conversation.id}:`, error);
         });
       }
+    });
+    runtime.on('usage', (usage: ConversationUsage) => {
+      this.events.emit('conversation.usage', usage);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
     runtime.on('status', (status, error) => {

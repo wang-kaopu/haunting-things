@@ -143,6 +143,25 @@ header p,
   font-size: 12px;
 }
 
+.usage-badge {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid #dce2ea;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475467;
+  font-size: 12px;
+  width: fit-content;
+}
+
+.usage-badge span:last-child {
+  color: #027a48;
+  font-weight: 600;
+}
+
 .list {
   display: grid;
   gap: 8px;

@@ -4,6 +4,7 @@ import type {
   AgentBackend,
   AgentInfo,
   ChatMessage,
+  ConversationUsage,
   PermissionRequest,
   TeamMailboxEntry,
   ServerInfo,
@@ -80,6 +81,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TeamMailboxEntry[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, TeamAgentStatus>>({});
+  const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
@@ -140,6 +142,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       setAgentStatuses((prev) => ({ ...prev, [slotId]: status }));
     });
 
+    const unsubUsage = bridge.on('conversation.usage', (usage) => {
+      setUsageByConversation((prev) => ({
+        ...prev,
+        [usage.conversationId]: usage,
+      }));
+    });
+
     const unsubAgentAdded = bridge.on('team.agent.added', () => {
       void refresh();
     });
@@ -158,6 +167,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       unsubStream();
       unsubPermission();
       unsubAgentStatus();
+      unsubUsage();
       unsubAgentAdded();
       unsubAgentRemoved();
       unsubTeamMessage();
@@ -201,6 +211,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   }
 
   const activeAgent = activeTeam?.agents.find((a) => a.slotId === activeSlotId);
+  const activeUsage = activeAgent ? usageByConversation[activeAgent.conversationId] : undefined;
   const handleTeamSend = useCallback(
     async (content: string) => {
       const invocation = resolveTeamSendInvocation(activeTeam, activeSlotId, content);
@@ -245,6 +256,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               <div>
                 <h2>{activeTeam.name}</h2>
                 <p className="muted">{activeAgent?.name ?? ''}</p>
+                {activeUsage && <UsageBadge usage={activeUsage} />}
               </div>
               <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
             </header>
@@ -374,6 +386,17 @@ function MessageList({ messages }: { messages: ChatMessage[] }): React.ReactElem
           <div>{message.content || (message.status === 'streaming' ? '...' : '')}</div>
         </article>
       ))}
+    </div>
+  );
+}
+
+function UsageBadge({ usage }: { usage: ConversationUsage }): React.ReactElement {
+  return (
+    <div className="usage-badge" title={`Updated at ${new Date(usage.updatedAt).toLocaleTimeString()}`}>
+      <span>
+        {usage.used.toLocaleString()} / {usage.size.toLocaleString()}
+      </span>
+      <span>{Math.round(usage.ratio * 100)}%</span>
     </div>
   );
 }

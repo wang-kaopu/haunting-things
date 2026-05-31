@@ -16,6 +16,7 @@ import type {
   AgentTurnPhase,
   ChatMessage,
   ConversationStatus,
+  ConversationUsage,
   PermissionRequest,
 } from '../shared/types';
 import { getBridgePackageVersioned } from './agentRegistry';
@@ -24,6 +25,7 @@ import { ndjsonFromChildProcess } from './ndjsonTransport';
 type AcpRuntimeEvents = {
   message: [ChatMessage];
   agentEvent: [AgentEvent];
+  usage: [ConversationUsage];
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
@@ -100,6 +102,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private turnFinalized = false;
   private turnPhase: AgentTurnPhase = 'queued';
   private hasReplyStarted = false;
+  private usageSnapshot: ConversationUsage | null = null;
+  private lastUsageEmitAt = 0;
   private readonly toolCalls = new Map<string, { toolName: string; title: string }>();
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
@@ -200,6 +204,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.turnFinalized = true;
     this.activeTurnId = null;
     this.emit('finish', 'idle');
+  }
+
+  getUsageSnapshot(): ConversationUsage | null {
+    return this.usageSnapshot;
   }
 
   /**
@@ -383,6 +391,9 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       case 'tool_call_result':
         this.handleToolResultUpdate(update);
         return;
+      case 'usage_update':
+        this.handleUsageUpdate(update);
+        return;
       default:
         console.debug('[ACP sessionUpdate ignored]', updateType, update);
     }
@@ -503,6 +514,41 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     if (typeof error === 'string') return error;
     if (error instanceof Error) return error.message;
     return JSON.stringify(error);
+  }
+
+  private handleUsageUpdate(update: Record<string, unknown>): void {
+    const size = this.readUsageNumber(update.size);
+    const used = this.readUsageNumber(update.used);
+
+    if (size == null || used == null || size <= 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const snapshot: ConversationUsage = {
+      conversationId: this.input.conversationId,
+      size,
+      used,
+      ratio: used / size,
+      updatedAt: now,
+    };
+
+    this.usageSnapshot = snapshot;
+    if (now - this.lastUsageEmitAt < 1000) {
+      return;
+    }
+
+    this.lastUsageEmitAt = now;
+    this.emit('usage', snapshot);
+  }
+
+  private readUsageNumber(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
   }
 
   /**
