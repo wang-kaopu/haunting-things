@@ -91,6 +91,7 @@ bridge.register('conversation.messages', ({ conversationId }) => conversations.m
 bridge.register('conversation.agentEvents', ({ conversationId }) => conversations.agentEvents(conversationId));
 bridge.register('conversation.commands', ({ conversationId }) => conversations.commands(conversationId));
 bridge.register('conversation.models', ({ conversationId }) => conversations.models(conversationId));
+bridge.register('conversation.mode', ({ conversationId }) => conversations.mode(conversationId));
 bridge.register('conversation.sendMessage', async (params) => {
   await conversations.sendMessage(params);
   return { accepted: true };

@@ -22,7 +22,15 @@ export type AgentHealth = AgentInfo & {
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
 
 /** Agent 一轮运行过程中的标准阶段。 */
-export type AgentTurnPhase = 'queued' | 'thinking' | 'replying' | 'tool_calling' | 'waiting_permission' | 'failed' | 'done';
+export type AgentTurnPhase =
+  | 'queued'
+  | 'thinking'
+  | 'planning'
+  | 'replying'
+  | 'tool_calling'
+  | 'waiting_permission'
+  | 'failed'
+  | 'done';
 
 /** 单个 Conversation 的元数据。 */
 export type Conversation = {
@@ -82,6 +90,15 @@ export type AgentEvent =
     }
   | {
       id: string;
+      type: 'agent.plan';
+      conversationId: string;
+      turnId: string;
+      entries: string[];
+      raw?: unknown;
+      at: number;
+    }
+  | {
+      id: string;
       type: 'agent.reply.delta';
       conversationId: string;
       turnId: string;
@@ -106,7 +123,24 @@ export type AgentEvent =
       toolCallId: string;
       toolName: string;
       title?: string;
+      kind?: string;
+      status?: string;
       input?: unknown;
+      raw?: unknown;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.tool.update';
+      conversationId: string;
+      turnId: string;
+      toolCallId: string;
+      toolName?: string;
+      title?: string;
+      kind?: string;
+      status?: string;
+      content?: unknown;
+      raw?: unknown;
       at: number;
     }
   | {
@@ -116,8 +150,12 @@ export type AgentEvent =
       turnId: string;
       toolCallId: string;
       toolName?: string;
+      title?: string;
+      kind?: string;
+      status?: string;
       output?: unknown;
       isError?: boolean;
+      raw?: unknown;
       at: number;
     }
   | {
@@ -157,6 +195,8 @@ export type PermissionRequest = {
   title: string;
   body?: string;
   options: PermissionOption[];
+  toolCall?: unknown;
+  rawInput?: unknown;
 };
 
 /** Conversation 的实时 usage 快照。 */
@@ -172,6 +212,13 @@ export type ConversationUsage = {
 export type ConversationCommands = {
   conversationId: string;
   commands: AcpAvailableCommand[];
+  updatedAt: number;
+};
+
+/** Conversation 的实时模式快照。 */
+export type ConversationMode = {
+  conversationId: string;
+  mode: string;
   updatedAt: number;
 };
 
@@ -288,6 +335,7 @@ export type InvokeMap = {
   'conversation.agentEvents': { params: { conversationId: string }; result: AgentEvent[] };
   'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
   'conversation.models': { params: { conversationId: string }; result: ConversationModels | null };
+  'conversation.mode': { params: { conversationId: string }; result: ConversationMode | null };
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
@@ -341,6 +389,7 @@ export type EventMap = {
   'conversation.usage': ConversationUsage;
   'conversation.commands': ConversationCommands;
   'conversation.models': ConversationModels;
+  'conversation.mode': ConversationMode;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

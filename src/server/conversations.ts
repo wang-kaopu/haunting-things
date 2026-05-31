@@ -7,6 +7,7 @@ import type {
   Conversation,
   ConversationCommands,
   ConversationModels,
+  ConversationMode,
   ConversationUsage,
 } from '../shared/types';
 import type { Repository } from './db';
@@ -31,6 +32,8 @@ export class ConversationService {
   private readonly commandSnapshots = new Map<string, ConversationCommands>();
   /** conversationId → 模型快照。 */
   private readonly modelSnapshots = new Map<string, ConversationModels>();
+  /** conversationId → 模式快照。 */
+  private readonly modeSnapshots = new Map<string, ConversationMode>();
   /** 本地 finish 监听器，用于 Team 协作回流等服务内逻辑。 */
   private readonly finishHandlers = new Set<
     (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
@@ -109,6 +112,11 @@ export class ConversationService {
     return this.modelSnapshots.get(conversationId) ?? null;
   }
 
+  /** 返回指定 Conversation 的模式快照。 */
+  mode(conversationId: string): ConversationMode | null {
+    return this.modeSnapshots.get(conversationId) ?? null;
+  }
+
   /**
    * 订阅 conversation.finish 本地回调。
    *
@@ -170,6 +178,7 @@ export class ConversationService {
     this.runtimes.delete(conversationId);
     this.commandSnapshots.delete(conversationId);
     this.modelSnapshots.delete(conversationId);
+    this.modeSnapshots.delete(conversationId);
   }
 
   /**
@@ -196,6 +205,7 @@ export class ConversationService {
     const now = Date.now();
     this.commandSnapshots.delete(conversation.id);
     this.modelSnapshots.delete(conversation.id);
+    this.modeSnapshots.delete(conversation.id);
 
     this.events.emit('conversation.commands', {
       conversationId: conversation.id,
@@ -259,6 +269,10 @@ export class ConversationService {
     runtime.on('models', (snapshot: ConversationModels) => {
       this.modelSnapshots.set(conversation.id, snapshot);
       this.events.emit('conversation.models', snapshot);
+    });
+    runtime.on('mode', (snapshot: ConversationMode) => {
+      this.modeSnapshots.set(conversation.id, snapshot);
+      this.events.emit('conversation.mode', snapshot);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
     runtime.on('status', (status, error) => {

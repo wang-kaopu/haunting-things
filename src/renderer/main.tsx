@@ -8,6 +8,7 @@ import type {
   ChatMessage,
   ConversationCommands,
   ConversationModels,
+  ConversationMode,
   ConversationUsage,
   PermissionRequest,
   TeamAgent,
@@ -91,6 +92,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
   const [modelsByConversation, setModelsByConversation] = useState<Record<string, ConversationModels>>({});
+  const [modeByConversation, setModeByConversation] = useState<Record<string, ConversationMode>>({});
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
 
@@ -187,6 +189,13 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       }));
     });
 
+    const unsubMode = bridge.on('conversation.mode', (snapshot) => {
+      setModeByConversation((prev) => ({
+        ...prev,
+        [snapshot.conversationId]: snapshot,
+      }));
+    });
+
     const unsubAgentAdded = bridge.on('team.agent.added', () => {
       void refresh();
     });
@@ -209,6 +218,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       unsubUsage();
       unsubCommands();
       unsubModels();
+      unsubMode();
       unsubAgentAdded();
       unsubAgentRemoved();
       unsubTeamMessage();
@@ -303,6 +313,16 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         }));
       })
       .catch(() => {});
+    bridge
+      .invoke('conversation.mode', { conversationId: agent.conversationId })
+      .then((snapshot) => {
+        if (!snapshot) return;
+        setModeByConversation((prev) => ({
+          ...prev,
+          [agent.conversationId]: snapshot,
+        }));
+      })
+      .catch(() => {});
   }, [activeSlotId, activeTeam?.id]);
 
   useEffect(() => {
@@ -320,6 +340,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const activePhase = activeAgent ? phaseByConversation[activeAgent.conversationId] : undefined;
   const activeCommands = activeAgent ? commandsByConversation[activeAgent.conversationId] : undefined;
   const activeModels = activeAgent ? modelsByConversation[activeAgent.conversationId] : undefined;
+  const activeMode = activeAgent ? modeByConversation[activeAgent.conversationId] : undefined;
   const activeAgentEvents = activeAgent ? agentEventsByConversation[activeAgent.conversationId] ?? [] : [];
   const handleTeamSend = useCallback(
     async (content: string) => {
@@ -366,7 +387,10 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                 <h2>{activeTeam.name}</h2>
                 <p className="muted">{activeAgent?.name ?? ''}</p>
                 {activeUsage && <UsageBadge usage={activeUsage} />}
-                {activePhase && <AgentPhaseBadge phase={activePhase} />}
+                <div className="status-row">
+                  {activePhase && <AgentPhaseBadge phase={activePhase} />}
+                  {activeMode?.mode ? <span className="mode-badge">模式：{activeMode.mode}</span> : null}
+                </div>
               </div>
               <button onClick={() => void addAgent(activeTeam.id)}>Add Agent</button>
             </header>
@@ -406,6 +430,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           const status = agentStatuses[agent.slotId] ?? agent.status;
           const isActive = agent.slotId === activeSlotId;
           const phase = phaseByConversation[agent.conversationId];
+          const mode = modeByConversation[agent.conversationId];
           return (
             <button
               key={agent.slotId}
@@ -419,6 +444,7 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               </span>
               <span className={`agent-badge ${status}`}>{status}</span>
               {phase && phase !== 'done' ? <span className={`agent-phase ${phase}`}>{formatPhase(phase)}</span> : null}
+              {mode?.mode ? <span className="mode-badge">{mode.mode}</span> : null}
             </button>
           );
         })}
@@ -529,6 +555,11 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       delete next[conversationId];
       return next;
     });
+    setModeByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
     await refresh();
   }
 }
@@ -572,6 +603,8 @@ function phaseMessage(phase?: AgentTurnPhase): string {
   switch (phase) {
     case 'thinking':
       return '正在思考...';
+    case 'planning':
+      return '正在规划...';
     case 'tool_calling':
       return '正在调用工具...';
     case 'waiting_permission':
@@ -601,6 +634,7 @@ function AgentPhaseBadge({ phase }: { phase: AgentTurnPhase }): React.ReactEleme
   const label: Record<AgentTurnPhase, string> = {
     queued: '排队中',
     thinking: '正在思考',
+    planning: '正在规划',
     replying: '正在回复',
     tool_calling: '调用工具',
     waiting_permission: '等待授权',
@@ -702,16 +736,20 @@ function formatAgentEvent(event: AgentEvent): string {
       return '开始新一轮任务';
     case 'agent.thinking':
       return '正在思考';
+    case 'agent.plan':
+      return event.entries.length ? `正在规划：${event.entries.join(' / ')}` : '正在规划';
     case 'agent.reply.delta':
       return '正在回复';
     case 'agent.reply.done':
       return '回复完成';
     case 'agent.tool.call':
-      return `调用工具：${event.title || event.toolName}`;
+      return `调用工具：${event.title || event.toolName || event.toolCallId}`;
+    case 'agent.tool.update':
+      return `工具运行中：${event.title || event.toolName || event.toolCallId}${event.status ? ` (${event.status})` : ''}`;
     case 'agent.tool.result':
       return event.isError
-        ? `工具返回错误：${event.toolName ?? event.toolCallId}`
-        : `工具调用完成：${event.toolName ?? event.toolCallId}`;
+        ? `工具返回错误：${event.title || event.toolName || event.toolCallId}`
+        : `工具调用完成：${event.title || event.toolName || event.toolCallId}`;
     case 'agent.permission.request':
       return `等待授权：${event.title}`;
     case 'agent.error':
@@ -726,10 +764,13 @@ function phaseFromAgentEvent(event: AgentEvent): AgentTurnPhase {
     case 'agent.turn.started':
     case 'agent.thinking':
       return 'thinking';
+    case 'agent.plan':
+      return 'planning';
     case 'agent.reply.delta':
     case 'agent.reply.done':
       return 'replying';
     case 'agent.tool.call':
+    case 'agent.tool.update':
       return 'tool_calling';
     case 'agent.tool.result':
       return event.isError ? 'failed' : 'tool_calling';
@@ -747,6 +788,7 @@ function formatPhase(phase: AgentTurnPhase): string {
   const labels: Record<AgentTurnPhase, string> = {
     queued: '排队中',
     thinking: '正在思考',
+    planning: '正在规划',
     replying: '正在回复',
     tool_calling: '调用工具',
     waiting_permission: '等待授权',

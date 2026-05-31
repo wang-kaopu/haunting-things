@@ -204,6 +204,23 @@ header p,
   background: #d1e9ff;
 }
 
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #ecfdf3;
+  color: #027a48;
+}
+
 .activity-panel {
   padding: 12px;
   display: grid;

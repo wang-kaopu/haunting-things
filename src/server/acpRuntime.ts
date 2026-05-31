@@ -20,6 +20,7 @@ import type {
   ConversationStatus,
   ConversationCommands,
   ConversationModels,
+  ConversationMode,
   ConversationUsage,
   PermissionRequest,
 } from '../shared/types';
@@ -32,6 +33,7 @@ type AcpRuntimeEvents = {
   usage: [ConversationUsage];
   commands: [ConversationCommands];
   models: [ConversationModels];
+  mode: [ConversationMode];
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
@@ -40,6 +42,7 @@ type AcpRuntimeEvents = {
 type AcpRuntimeAgentEventInput =
   | { type: 'agent.turn.started'; backend: AgentBackend }
   | { type: 'agent.thinking' }
+  | { type: 'agent.plan'; entries: string[]; raw?: unknown }
   | { type: 'agent.reply.delta'; messageId: string; delta: string }
   | { type: 'agent.reply.done'; messageId: string; content: string }
   | {
@@ -47,14 +50,31 @@ type AcpRuntimeAgentEventInput =
       toolCallId: string;
       toolName: string;
       title?: string;
+      kind?: string;
+      status?: string;
       input?: unknown;
+      raw?: unknown;
+    }
+  | {
+      type: 'agent.tool.update';
+      toolCallId: string;
+      toolName?: string;
+      title?: string;
+      kind?: string;
+      status?: string;
+      content?: unknown;
+      raw?: unknown;
     }
   | {
       type: 'agent.tool.result';
       toolCallId: string;
       toolName?: string;
+      title?: string;
+      kind?: string;
+      status?: string;
       output?: unknown;
       isError?: boolean;
+      raw?: unknown;
     }
   | {
       type: 'agent.permission.request';
@@ -62,6 +82,8 @@ type AcpRuntimeAgentEventInput =
       title: string;
       body?: string;
       options: PermissionRequest['options'];
+      toolCall?: unknown;
+      rawInput?: unknown;
     }
   | {
       type: 'agent.error';
@@ -112,7 +134,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private lastUsageEmitAt = 0;
   private availableCommandsSnapshot: ConversationCommands | null = null;
   private modelsSnapshot: ConversationModels | null = null;
-  private readonly toolCalls = new Map<string, { toolName: string; title: string }>();
+  private modeSnapshot: ConversationMode | null = null;
+  private readonly toolCalls = new Map<string, { toolName: string; title?: string; kind?: string }>();
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
   private readonly pendingRequests = new Set<PendingRequest>();
@@ -225,6 +248,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
   getModelsSnapshot(): ConversationModels | null {
     return this.modelsSnapshot;
+  }
+
+  getModeSnapshot(): ConversationMode | null {
+    return this.modeSnapshot;
   }
 
   /**
@@ -397,6 +424,9 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       case 'agent_message_chunk':
         this.handleAgentMessageChunk(update);
         return;
+      case 'plan':
+        this.handlePlanUpdate(update);
+        return;
       case 'agent_thought_chunk':
       case 'thinking':
       case 'reasoning':
@@ -410,13 +440,19 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       case 'tool_call_update':
       case 'tool_call_completed':
       case 'tool_call_result':
-        this.handleToolResultUpdate(update);
+        this.handleToolCallProgressUpdate(update);
         return;
       case 'usage_update':
         this.handleUsageUpdate(update);
         return;
       case 'available_commands_update':
         this.handleAvailableCommandsUpdate(update);
+        return;
+      case 'current_mode_update':
+        this.handleCurrentModeUpdate(update);
+        return;
+      case 'config_option_update':
+        this.handleConfigOptionUpdate(update);
         return;
       default:
         console.debug('[ACP sessionUpdate ignored]', updateType, update);
@@ -449,49 +485,109 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
-  private handleToolCallUpdate(update: Record<string, unknown>): void {
-    const toolCallId = this.getToolCallId(update);
-    const toolName = this.getToolName(update);
-    const title = this.getToolTitle(update, toolName);
-    const input = this.getToolInput(update);
+  private handlePlanUpdate(update: Record<string, unknown>): void {
+    const entries = this.extractPlanEntries(update);
+    this.turnPhase = 'planning';
+    this.emitAgentEvent({
+      type: 'agent.plan',
+      entries,
+      raw: update,
+    });
+  }
 
-    this.toolCalls.set(toolCallId, { toolName, title });
+  private handleToolCallUpdate(update: Record<string, unknown>): void {
+    const toolCallId = this.readToolCallId(update);
+    const title = this.readToolTitle(update);
+    const kind = this.readToolKind(update);
+    const status = this.readToolStatus(update);
+    const toolName =
+      this.readString(update.toolName) ??
+      this.readString(update.tool_name) ??
+      this.readString(update.name) ??
+      kind ??
+      title ??
+      'unknown_tool';
+    const input = update.input ?? update.rawInput ?? update.args ?? update.content;
+
+    this.toolCalls.set(toolCallId, { toolName, title, kind });
     this.turnPhase = 'tool_calling';
     this.emitAgentEvent({
       type: 'agent.tool.call',
       toolCallId,
       toolName,
       title,
+      kind,
+      status,
       input,
+      raw: update,
     });
   }
 
-  private handleToolResultUpdate(update: Record<string, unknown>): void {
-    const toolCallId = this.getToolCallId(update);
+  private handleToolCallProgressUpdate(update: Record<string, unknown>): void {
+    if (this.isCompletedToolUpdate(update)) {
+      this.emitToolResult(update, false);
+      return;
+    }
+
+    if (this.isFailedToolUpdate(update)) {
+      this.emitToolResult(update, true);
+      this.emitAgentEvent({
+        type: 'agent.error',
+        source: 'tool',
+        message: this.extractToolErrorMessage(update),
+        detail: update,
+      });
+      return;
+    }
+
+    const toolCallId = this.readToolCallId(update);
     const known = this.toolCalls.get(toolCallId);
-    const output = this.getToolOutput(update);
-    const isError = this.getToolIsError(update);
+
+    this.turnPhase = 'tool_calling';
+    this.emitAgentEvent({
+      type: 'agent.tool.update',
+      toolCallId,
+      toolName:
+        this.readString(update.toolName) ??
+        this.readString(update.tool_name) ??
+        this.readString(update.name) ??
+        known?.toolName,
+      title: this.readToolTitle(update) ?? known?.title,
+      kind: this.readToolKind(update) ?? known?.kind,
+      status: this.readToolStatus(update),
+      content: update.content ?? update.output ?? update.result,
+      raw: update,
+    });
+  }
+
+  private emitToolResult(update: Record<string, unknown>, isError: boolean): void {
+    const toolCallId = this.readToolCallId(update);
+    const known = this.toolCalls.get(toolCallId);
+    const toolName =
+      this.readString(update.toolName) ??
+      this.readString(update.tool_name) ??
+      this.readString(update.name) ??
+      known?.toolName;
 
     this.turnPhase = isError ? 'failed' : 'tool_calling';
     this.emitAgentEvent({
       type: 'agent.tool.result',
       toolCallId,
-      toolName: known?.toolName ?? this.getToolName(update),
-      output,
+      toolName,
+      title: this.readToolTitle(update) ?? known?.title,
+      kind: this.readToolKind(update) ?? known?.kind,
+      status: this.readToolStatus(update),
+      output: update.output ?? update.result ?? update.content,
       isError,
+      raw: update,
     });
 
     if (isError) {
-      this.emitAgentEvent({
-        type: 'agent.error',
-        source: 'tool',
-        message: this.getToolErrorMessage(update),
-        detail: update,
-      });
+      this.emitAgentEvent({ type: 'agent.error', source: 'tool', message: this.extractToolErrorMessage(update), detail: update });
     }
   }
 
-  private getToolCallId(update: Record<string, unknown>): string {
+  private readToolCallId(update: Record<string, unknown>): string {
     const candidate =
       update.toolCallId ??
       update.tool_call_id ??
@@ -502,42 +598,148 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return String(candidate);
   }
 
-  private getToolName(update: Record<string, unknown>): string {
-    const candidate =
-      update.toolName ??
-      update.tool_name ??
-      update.name ??
-      update.title ??
-      'unknown_tool';
-    return String(candidate);
+  private readToolTitle(update: Record<string, unknown>): string | undefined {
+    return (
+      this.readString(update.title) ??
+      this.readString(update.name) ??
+      this.readString(update.toolName) ??
+      this.readString(update.tool_name) ??
+      this.readString(update.kind)
+    );
   }
 
-  private getToolTitle(update: Record<string, unknown>, toolName: string): string {
-    const candidate = update.title ?? toolName;
-    return String(candidate);
+  private readToolKind(update: Record<string, unknown>): string | undefined {
+    return this.readString(update.kind) ?? this.readString(update.toolKind);
   }
 
-  private getToolInput(update: Record<string, unknown>): unknown {
-    return update.rawInput ?? update.input ?? update.args ?? update.content ?? undefined;
+  private readToolStatus(update: Record<string, unknown>): string | undefined {
+    return this.readString(update.status)?.toLowerCase();
   }
 
-  private getToolOutput(update: Record<string, unknown>): unknown {
-    return update.rawOutput ?? update.output ?? update.result ?? update.content ?? undefined;
+  private isCompletedToolUpdate(update: Record<string, unknown>): boolean {
+    const status = this.readToolStatus(update);
+    return (
+      status === 'completed' ||
+      status === 'complete' ||
+      status === 'succeeded' ||
+      status === 'success' ||
+      status === 'done' ||
+      update.done === true
+    );
   }
 
-  private getToolIsError(update: Record<string, unknown>): boolean {
+  private isFailedToolUpdate(update: Record<string, unknown>): boolean {
     const status = update.status;
+    const normalized = this.readToolStatus(update);
+    if (normalized === 'failed') return true;
+    if (normalized === 'error') return true;
+    if (normalized === 'errored') return true;
+    if (normalized === 'cancelled') return true;
+    if (normalized === 'canceled') return true;
     if (status === 'failed') return true;
     if (update.isError === true) return true;
     if (update.error != null) return true;
     return false;
   }
 
-  private getToolErrorMessage(update: Record<string, unknown>): string {
+  private extractToolErrorMessage(update: Record<string, unknown>): string {
     const error = update.error ?? update.rawOutput ?? update.output ?? update.result ?? 'Tool call failed';
     if (typeof error === 'string') return error;
     if (error instanceof Error) return error.message;
+    if (error && typeof error === 'object') {
+      const raw = error as Record<string, unknown>;
+      if (typeof raw.message === 'string') return raw.message;
+    }
+    const title = this.readToolTitle(update);
+    if (title) return `Tool failed: ${title}`;
     return JSON.stringify(error);
+  }
+
+  private handleCurrentModeUpdate(update: Record<string, unknown>): void {
+    const mode =
+      this.readString(update.mode) ??
+      this.readString(update.currentMode) ??
+      this.readString(update.current_mode) ??
+      this.readString(update.name);
+
+    if (!mode) return;
+
+    const snapshot: ConversationMode = {
+      conversationId: this.input.conversationId,
+      mode,
+      updatedAt: Date.now(),
+    };
+
+    this.modeSnapshot = snapshot;
+    this.emit('mode', snapshot);
+  }
+
+  private handleConfigOptionUpdate(update: Record<string, unknown>): void {
+    const configId =
+      this.readString(update.configId) ??
+      this.readString(update.config_id) ??
+      this.readString(update.id) ??
+      this.readString(update.name);
+
+    if (configId !== 'model') return;
+
+    const modelId =
+      this.readString(update.value) ??
+      this.readString(update.modelId) ??
+      this.readString(update.model_id) ??
+      this.readString(update.currentModelId);
+
+    if (!modelId) return;
+
+    const previous = this.modelsSnapshot;
+    const snapshot: ConversationModels = {
+      conversationId: this.input.conversationId,
+      currentModelId: modelId,
+      models: previous?.models ?? [],
+      updatedAt: Date.now(),
+    };
+
+    this.modelsSnapshot = snapshot;
+    this.emit('models', snapshot);
+  }
+
+  private extractPlanEntries(update: Record<string, unknown>): string[] {
+    const entries: string[] = [];
+    const push = (value: unknown): void => {
+      const text = this.planEntryToText(value);
+      if (text) entries.push(text);
+    };
+
+    if (Array.isArray(update.entries)) {
+      update.entries.forEach(push);
+    } else if (Array.isArray(update.steps)) {
+      update.steps.forEach(push);
+    } else if (Array.isArray(update.plan)) {
+      update.plan.forEach(push);
+    } else {
+      push(update.content);
+      push(update.text);
+      push(update.message);
+    }
+
+    return entries;
+  }
+
+  private planEntryToText(item: unknown): string {
+    if (typeof item === 'string') return item.trim();
+
+    if (item && typeof item === 'object') {
+      const raw = item as Record<string, unknown>;
+      const text =
+        this.readString(raw.text) ??
+        this.readString(raw.content) ??
+        this.readString(raw.title) ??
+        this.readString(raw.label) ??
+        this.readString(raw.name);
+      if (text) return text;
+    }
+
+    return '';
   }
 
   private handleUsageUpdate(update: Record<string, unknown>): void {
@@ -694,11 +896,13 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       conversationId: this.input.conversationId,
       callId,
       title: params.toolCall?.title ?? 'Permission requested',
-      body: params.toolCall?.rawInput != null ? JSON.stringify(params.toolCall.rawInput) : undefined,
+      body: params.toolCall?.rawInput != null ? JSON.stringify(params.toolCall.rawInput, null, 2) : undefined,
       options: params.options.map((opt) => ({
         id: opt.optionId,
         label: opt.name,
       })),
+      toolCall: params.toolCall,
+      rawInput: params.toolCall?.rawInput,
     };
     this.turnPhase = 'waiting_permission';
     this.emitAgentEvent({
