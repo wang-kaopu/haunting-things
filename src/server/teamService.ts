@@ -46,7 +46,12 @@ export class TeamService {
     private readonly conversations: ConversationService,
     private readonly events: EventBus
   ) {
-    this.conversations.onAgentEvent((event) => this.handleConversationAgentEvent(event));
+    const onAgentEvent = (this.conversations as ConversationService & {
+      onAgentEvent?: (handler: (event: AgentEvent) => void | Promise<void>) => () => void;
+    }).onAgentEvent;
+    if (onAgentEvent) {
+      onAgentEvent.call(this.conversations, (event) => this.handleConversationAgentEvent(event));
+    }
   }
 
   /**
@@ -367,6 +372,7 @@ export class TeamService {
    */
   private async deliver(message: MailboxMessage): Promise<void> {
     const team = this.requireTeam(message.teamId);
+    await this.ensureSession(team.id);
     const fromAgent = team.agents.find((agent) => agent.slotId === message.fromAgentId);
 
     if (
@@ -460,7 +466,7 @@ export class TeamService {
     const existing = this.sessions.get(teamId);
     if (existing) return existing;
     const team = this.requireTeam(teamId);
-    return this.restartSession(team);
+    return this.restartSession(team, { restartAgents: false });
   }
 
   /**
@@ -469,7 +475,11 @@ export class TeamService {
    *
    * env 在此处从 `Record<string,string>` 转换为 SDK 要求的 `{name,value}[]`。
    */
-  private async restartSession(team: Team): Promise<TeamSession> {
+  private async restartSession(
+    team: Team,
+    options: { restartAgents?: boolean } = {}
+  ): Promise<TeamSession> {
+    const restartAgents = options.restartAgents ?? true;
     await this.sessions.get(team.id)?.mcpServer.stop();
     const mcpServer = new TeamMcpServer(
       team.id,
@@ -485,7 +495,9 @@ export class TeamService {
     await mcpServer.start();
     for (const agent of team.agents) {
       this.injectConversationMcpConfig(mcpServer, agent.conversationId, agent.slotId);
-      this.conversations.restart(agent.conversationId);
+      if (restartAgents) {
+        this.conversations.restart(agent.conversationId);
+      }
     }
     const session = { team, mcpServer };
     this.sessions.set(team.id, session);

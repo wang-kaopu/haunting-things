@@ -33,13 +33,6 @@ const events = new EventBus();
 const conversations = new ConversationService(repo, events, config.dataDir);
 const teams = new TeamService(repo, conversations, events);
 
-// 服务重启后恢复所有已有 Team 的 MCP session（sessions Map 是内存态，重启清空）
-for (const team of repo.listTeams()) {
-  teams.restoreSession(team.id).catch((err: unknown) =>
-    console.warn(`[Team] Failed to restore session for ${team.id}:`, err)
-  );
-}
-
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());

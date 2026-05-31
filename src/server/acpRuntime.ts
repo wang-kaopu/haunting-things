@@ -13,6 +13,7 @@ import {
 import type {
   AgentBackend,
   AgentEvent,
+  AcpAvailableCommand,
   AgentTurnPhase,
   ChatMessage,
   ConversationStatus,
@@ -565,7 +566,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     const rawCommands = Array.isArray(update.availableCommands) ? update.availableCommands : [];
 
     const commands = rawCommands
-      .map((item): ConversationCommands['commands'][number] | null => {
+      .map((item): AcpAvailableCommand | null => {
         if (!item || typeof item !== 'object') return null;
 
         const raw = item as Record<string, unknown>;
@@ -575,10 +576,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         return {
           name,
           description: typeof raw.description === 'string' ? raw.description : undefined,
-          input: raw.input,
+          input: raw.input ?? null,
         };
       })
-      .filter((item): item is ConversationCommands['commands'][number] => item != null);
+      .filter((item): item is AcpAvailableCommand => item !== null);
 
     const snapshot: ConversationCommands = {
       conversationId: this.input.conversationId,

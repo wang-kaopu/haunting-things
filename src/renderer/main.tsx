@@ -328,8 +328,10 @@ function Workbench({ user, onLogout }: { user: AuthUser; onLogout: () => void })
             );
         })}
 
-        <h3>Agent Commands</h3>
-        <AgentCommandsPanel commands={activeCommands} />
+        <section className="panel command-panel">
+          <h3>Agent Commands</h3>
+          <AgentCommandsPanel commands={activeCommands} />
+        </section>
 
         <h3>Timeline</h3>
         <div className="timeline">
