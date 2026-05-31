@@ -29,7 +29,7 @@ type TeamSession = {
  *
  * 消息投递流程：
  * `sendMessage` → `deliver` → mailbox 写库 → `wakeAgent` →
- * 读取未读消息 → `ConversationService.sendMessage`（触发 ACP prompt）
+ * 读取未读消息 → `ConversationService.sendRuntimePrompt`（触发 ACP prompt）
  */
 export class TeamService {
   private readonly logger = createLogger('team');
@@ -607,22 +607,28 @@ export class TeamService {
         entry: this.buildMailboxEntry(team, { ...message, read: true }),
       });
     }
-    const content = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
+    const prompt = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
+    const displayMessage = formatMailboxDisplay(messages, team);
     this.events.emit('team.agent.prompt', {
       teamId,
       slotId,
       conversationId: agent.conversationId,
-      prompt: content,
+      prompt,
     });
     this.logger.info('agent_prompt_send', {
       teamId,
       slotId,
       conversationId: agent.conversationId,
       unreadCount: messages.length,
-      promptLength: content.length,
+      promptLength: prompt.length,
+      displayMessageLength: displayMessage.length,
     });
     try {
-      await this.conversations.sendMessage({ conversationId: agent.conversationId, content });
+      await this.conversations.sendRuntimePrompt({
+        conversationId: agent.conversationId,
+        prompt,
+        displayMessage,
+      });
       this.events.emit('team.turn.finished', { teamId, slotId });
       this.events.emit('team.agent.status', { teamId, slotId, status: 'idle' });
     } catch (error) {
@@ -787,4 +793,19 @@ function formatMailbox(
     'Unread team messages:',
     ...messageLines,
   ].join('\n');
+}
+
+function formatMailboxDisplay(messages: MailboxMessage[], team: Team): string {
+  if (messages.length === 0) {
+    return '无新的团队消息。';
+  }
+
+  return messages
+    .map((message) => `${formatMailboxSender(message.fromAgentId, team)}: ${message.content}`)
+    .join('\n');
+}
+
+function formatMailboxSender(agentId: string, team: Team): string {
+  if (agentId === 'user') return 'user';
+  return team.agents.find((item) => item.slotId === agentId)?.name ?? agentId;
 }

@@ -137,6 +137,7 @@ describe('TeamService', () => {
     restart: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
+    sendRuntimePrompt: ReturnType<typeof vi.fn>;
     messages: ReturnType<typeof vi.fn>;
     commands: ReturnType<typeof vi.fn>;
     onFinish: ReturnType<typeof vi.fn>;
@@ -178,6 +179,7 @@ describe('TeamService', () => {
       restart: vi.fn(),
       stop: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue(undefined),
+      sendRuntimePrompt: vi.fn().mockResolvedValue(undefined),
       messages: vi.fn((conversationId: string) => structuredClone(conversationMessages.get(conversationId) ?? [])),
       commands: vi.fn(() => null),
       onFinish: vi.fn((handler: (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) => {
@@ -278,21 +280,25 @@ describe('TeamService', () => {
         read: true,
       },
     });
-    expect(conversations.sendMessage).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      content: expect.stringContaining('You are Leader, a member of team Alpha.'),
+      prompt: expect.stringContaining('You are Leader, a member of team Alpha.'),
+      displayMessage: 'user: Hello leader',
     });
-    expect(conversations.sendMessage).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      content: expect.stringContaining('Current teammates:'),
+      prompt: expect.stringContaining('Current teammates:'),
+      displayMessage: 'user: Hello leader',
     });
-    expect(conversations.sendMessage).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      content: expect.stringContaining('Available team RPC tools:'),
+      prompt: expect.stringContaining('Available team RPC tools:'),
+      displayMessage: 'user: Hello leader',
     });
-    expect(conversations.sendMessage).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      content: expect.stringContaining('team_delegate_task: create a task and assign it in one step'),
+      prompt: expect.stringContaining('team_delegate_task: create a task and assign it in one step'),
+      displayMessage: 'user: Hello leader',
     });
   });
 
@@ -301,7 +307,7 @@ describe('TeamService', () => {
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
 
     let resolveFirstWake: (() => void) | null = null;
-    conversations.sendMessage.mockImplementationOnce(
+    conversations.sendRuntimePrompt.mockImplementationOnce(
       () =>
         new Promise<void>((resolve) => {
           resolveFirstWake = resolve;
@@ -309,19 +315,19 @@ describe('TeamService', () => {
     );
 
     await service.sendMessage({ teamId: team.id, content: 'First message' });
-    expect(conversations.sendMessage).not.toHaveBeenCalled();
+    expect(conversations.sendRuntimePrompt).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(0);
-    expect(conversations.sendMessage).toHaveBeenCalledTimes(1);
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledTimes(1);
 
     await service.sendMessage({ teamId: team.id, content: 'Second message' });
-    expect(conversations.sendMessage).toHaveBeenCalledTimes(1);
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledTimes(1);
 
     resolveFirstWake?.();
     await Promise.resolve();
 
     await vi.advanceTimersByTimeAsync(0);
-    expect(conversations.sendMessage).toHaveBeenCalledTimes(2);
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledTimes(2);
   });
 
   it('creates explicit tasks through taskCreate', async () => {
@@ -372,7 +378,7 @@ describe('TeamService', () => {
       toAgentName: 'Leader',
       processed: true,
     });
-    expect(conversations.sendMessage).toHaveBeenCalled();
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalled();
   });
 
   it('auto-returns the teammate final assistant reply to the leader mailbox on conversation finish', async () => {
@@ -412,9 +418,10 @@ describe('TeamService', () => {
         content: expect.stringContaining('Reply from Dev:'),
       },
     });
-    expect(conversations.sendMessage).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      content: expect.stringContaining('Reply from Dev:'),
+      prompt: expect.stringContaining('Reply from Dev:'),
+      displayMessage: 'Dev: Reply from Dev:\nI fixed the bug and added coverage.',
     });
   });
 });

@@ -11,6 +11,7 @@ import { openDatabase, Repository } from '../src/server/db';
 import { EventBus } from '../src/server/events';
 import type {
   AgentBackend,
+  AgentEvent,
   ChatMessage,
   Conversation,
   ConversationStatus,
@@ -141,6 +142,7 @@ class FakeConversationService {
   conversations = new Map<string, Conversation>();
   mcpServers = new Map<string, any[]>();
   sentMessages: Array<{ conversationId: string; content: string }> = [];
+  runtimePrompts: Array<{ conversationId: string; prompt: string; displayMessage?: string }> = [];
   restarted: string[] = [];
   stopped: string[] = [];
   messagesMap = new Map<string, ChatMessage[]>();
@@ -148,6 +150,9 @@ class FakeConversationService {
   private nextConversationIndex = 0;
   private finishHandler:
     | ((event: { conversationId: string; status: ConversationStatus }) => void | Promise<void>)
+    | null = null;
+  private agentEventHandler:
+    | ((event: AgentEvent) => void | Promise<void>)
     | null = null;
 
   create(input: { backend: AgentBackend; workspace?: string; name?: string }): Conversation {
@@ -181,6 +186,31 @@ class FakeConversationService {
     this.sentMessages.push(input);
   }
 
+  async sendRuntimePrompt(input: { conversationId: string; prompt: string; displayMessage?: string }): Promise<void> {
+    this.runtimePrompts.push(input);
+    if (input.displayMessage?.trim()) {
+      this.sentMessages.push({
+        conversationId: input.conversationId,
+        content: input.displayMessage,
+      });
+    }
+  }
+
+  onAgentEvent(
+    handler: (event: AgentEvent) => void | Promise<void>
+  ): () => void {
+    this.agentEventHandler = handler;
+    return () => {
+      if (this.agentEventHandler === handler) {
+        this.agentEventHandler = null;
+      }
+    };
+  }
+
+  commands(_conversationId: string) {
+    return null;
+  }
+
   messages(conversationId: string) {
     return this.messagesMap.get(conversationId) || [];
   }
@@ -212,6 +242,12 @@ class FakeConversationService {
     }
   }
 
+  triggerAgentEvent(event: AgentEvent): void {
+    if (this.agentEventHandler) {
+      void this.agentEventHandler(event);
+    }
+  }
+
   onFinish(
     handler: (event: { conversationId: string; status: ConversationStatus }) => void | Promise<void>
   ): () => void {
@@ -224,6 +260,7 @@ class FakeConversationService {
   /** 清空所有追踪记录，保留已创建的 conversations。 */
   clearTracking(): void {
     this.sentMessages = [];
+    this.runtimePrompts = [];
     this.restarted = [];
     this.stopped = [];
     this.messagesMap.clear();
@@ -401,21 +438,27 @@ describe('team integration flow', () => {
     expect(claude.name).toBe('Claude Reviewer');
 
     // Claude 收到任务消息
-    const claudeMessages = conversations.sentMessages.filter(
+    const claudeMessages = conversations.runtimePrompts.filter(
       (m) => m.conversationId === claude.conversationId
     );
     expect(claudeMessages.length).toBeGreaterThanOrEqual(1);
 
     // Claude 收到的 prompt 包含关键信息
-    const claudePrompt = claudeMessages[claudeMessages.length - 1].content;
+    const claudePrompt = claudeMessages[claudeMessages.length - 1].prompt;
     expect(claudePrompt).toContain(`You are ${claude.name}`);
     expect(claudePrompt).toContain('Current teammates:');
     expect(claudePrompt).toContain('Unread team messages:');
     expect(claudePrompt).toContain('请回答你当前使用的模型是什么');
+    expect(
+      conversations.sentMessages.find((m) => m.conversationId === claude.conversationId)?.content
+    ).toContain('Leader: Task: 询问 Claude 当前模型');
+    expect(
+      conversations.sentMessages.find((m) => m.conversationId === claude.conversationId)?.content
+    ).toContain('请回答你当前使用的模型是什么');
 
     // Leader 没有被同步阻塞 — sendMessage 是异步的，无同步等待
     // Leader 的 conversation 不应被唤醒（只有 Claude 被唤醒）
-    const leaderMessages = conversations.sentMessages.filter(
+    const leaderMessages = conversations.runtimePrompts.filter(
       (m) => m.conversationId === leader.conversationId
     );
     expect(leaderMessages).toHaveLength(0);
@@ -467,7 +510,7 @@ describe('team integration flow', () => {
     expect(claudeCountAfterSecond).toBe(claudeCountAfterFirst);
 
     // 任务消息发送给已有 Claude
-    const claudeMessages = conversations.sentMessages.filter(
+    const claudeMessages = conversations.runtimePrompts.filter(
       (m) => m.conversationId === claude.conversationId
     );
     expect(claudeMessages.length).toBeGreaterThanOrEqual(2);
@@ -523,15 +566,18 @@ describe('team integration flow', () => {
     expect(resultMessage!.toAgentName).toBe('Leader');
 
     // Leader 的 conversation 被 sendMessage 唤醒
-    const leaderMessages = conversations.sentMessages.filter(
+    const leaderMessages = conversations.runtimePrompts.filter(
       (m) => m.conversationId === leader.conversationId
     );
     expect(leaderMessages.length).toBeGreaterThanOrEqual(1);
 
     // Leader 收到的 prompt 能看到 Claude 的结果
-    const leaderPrompt = leaderMessages[leaderMessages.length - 1].content;
+    const leaderPrompt = leaderMessages[leaderMessages.length - 1].prompt;
     expect(leaderPrompt).toContain('Claude 当前模型是 claude-4-opus');
     expect(leaderPrompt).toContain('You are Leader');
+    expect(
+      conversations.sentMessages.find((m) => m.conversationId === leader.conversationId)?.content
+    ).toContain('Claude Reviewer: Task finished: Claude 当前模型是 claude-4-opus');
 
     // 任务记录已完成
     const tasks = teamService.tasks(team.id);
@@ -593,13 +639,16 @@ describe('team integration flow', () => {
     expect(directMessage!.message.toAgentId).toBe(leader.slotId);
 
     // Leader conversation 被调用一次
-    const leaderMessages = conversations.sentMessages.filter(
+    const leaderMessages = conversations.runtimePrompts.filter(
       (m) => m.conversationId === leader.conversationId
     );
     expect(leaderMessages).toHaveLength(1);
 
     // Leader prompt 包含消息内容
-    expect(leaderMessages[0].content).toContain('我当前使用的是 Claude 模型。');
+    expect(leaderMessages[0].prompt).toContain('我当前使用的是 Claude 模型。');
+    expect(
+      conversations.sentMessages.find((m) => m.conversationId === leader.conversationId)?.content
+    ).toContain('Claude Reviewer: 我当前使用的是 Claude 模型。');
 
     // 事件已发射
     expect(emitSpy).toHaveBeenCalledWith(
@@ -841,11 +890,17 @@ describe('team integration flow', () => {
     });
     await flushWakeups();
 
-    // 往 claude 对应的 conversation 里塞一条 assistant 消息
-    conversations.addDummyMessage(claude.conversationId, 'assistant', '这是自然语言文本回复');
-
-    // 触发 finish 到 idle 的回调
-    conversations.triggerFinish(claude.conversationId, 'idle');
+    // 往 claude 对应的 conversation 里塞一条 assistant 消息，并注入真正的 reply.done
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '这是自然语言文本回复', Date.now(), 'reply-1');
+    conversations.triggerAgentEvent({
+      id: 'event-1',
+      type: 'agent.reply.done',
+      conversationId: claude.conversationId,
+      turnId: 'turn-1',
+      messageId: 'reply-1',
+      content: '这是自然语言文本回复',
+      at: Date.now(),
+    });
     await flushWakeups();
 
     // 再次检查，mailbox 中关于 leader 的 timeline 里不应存在 "Reply from ..." 消息
@@ -970,8 +1025,16 @@ describe('team integration flow', () => {
     const msgId = 'fixed-assistant-msg-id';
     conversations.addDummyMessage(claude.conversationId, 'assistant', '测试排重', Date.now(), msgId);
 
-    // 第一次触发 idle
-    conversations.triggerFinish(claude.conversationId, 'idle');
+    // 第一次注入 reply.done
+    conversations.triggerAgentEvent({
+      id: 'event-1',
+      type: 'agent.reply.done',
+      conversationId: claude.conversationId,
+      turnId: 'turn-1',
+      messageId: msgId,
+      content: '测试排重',
+      at: Date.now(),
+    });
     await flushWakeups();
 
     const timelineFirst = teamService.timeline(team.id);
@@ -980,8 +1043,16 @@ describe('team integration flow', () => {
     );
     expect(repliesFirst).toHaveLength(1);
 
-    // 第二次触发 idle
-    conversations.triggerFinish(claude.conversationId, 'idle');
+    // 第二次注入同一条 reply.done
+    conversations.triggerAgentEvent({
+      id: 'event-2',
+      type: 'agent.reply.done',
+      conversationId: claude.conversationId,
+      turnId: 'turn-1',
+      messageId: msgId,
+      content: '测试排重',
+      at: Date.now(),
+    });
     await flushWakeups();
 
     const timelineSecond = teamService.timeline(team.id);
@@ -1013,8 +1084,16 @@ describe('team integration flow', () => {
     await flushWakeups();
 
     const firstTime = Date.now();
-    conversations.addDummyMessage(claude.conversationId, 'assistant', '第一轮回答', firstTime);
-    conversations.triggerFinish(claude.conversationId, 'idle');
+    conversations.addDummyMessage(claude.conversationId, 'assistant', '第一轮回答', firstTime, 'first-reply');
+    conversations.triggerAgentEvent({
+      id: 'event-1',
+      type: 'agent.reply.done',
+      conversationId: claude.conversationId,
+      turnId: 'turn-1',
+      messageId: 'first-reply',
+      content: '第一轮回答',
+      at: firstTime,
+    });
     await flushWakeups();
 
     // 此时第一轮已被自动回流
@@ -1034,8 +1113,16 @@ describe('team integration flow', () => {
     });
     await flushWakeups();
 
-    // 不添加任何新 message，直接触发 finish 到 idle
-    conversations.triggerFinish(claude.conversationId, 'idle');
+    // 不添加任何新 message，直接再次注入同一条 reply.done
+    conversations.triggerAgentEvent({
+      id: 'event-2',
+      type: 'agent.reply.done',
+      conversationId: claude.conversationId,
+      turnId: 'turn-2',
+      messageId: 'first-reply',
+      content: '第一轮回答',
+      at: Date.now(),
+    });
     await flushWakeups();
 
     // 此时信箱中不应再次自动回流第一轮的旧消息，即相关消息依然只有最开始的那 1 条

@@ -195,6 +195,60 @@ export class ConversationService {
   }
 
   /**
+   * 向指定 Conversation 发送运行时包装 prompt。
+   *
+   * `prompt` 是发给模型的完整内容，`displayMessage` 是写入消息历史并广播给前端的可见文本。
+   */
+  async sendRuntimePrompt(input: {
+    conversationId: string;
+    prompt: string;
+    displayMessage?: string;
+    files?: string[];
+  }): Promise<void> {
+    const startedAt = Date.now();
+    const conversation = this.repo.getConversation(input.conversationId);
+    if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+
+    this.logger.info('runtime_prompt_send_start', {
+      conversationId: conversation.id,
+      backend: conversation.backend,
+      model: conversation.model,
+      prompt: summarizeLogText(input.prompt),
+      displayMessage: input.displayMessage ? summarizeLogText(input.displayMessage) : undefined,
+      filesCount: input.files?.length ?? 0,
+    });
+
+    const visibleMessage = input.displayMessage?.trim();
+    if (visibleMessage) {
+      const userMessage = this.repo.addMessage({
+        id: crypto.randomUUID(),
+        conversationId: conversation.id,
+        role: 'user',
+        content: visibleMessage,
+        createdAt: Date.now(),
+        status: 'done',
+      });
+      this.events.emit('conversation.stream', { conversationId: conversation.id, message: userMessage });
+    }
+
+    try {
+      const runtime = this.getRuntime(conversation);
+      await runtime.send(input.prompt);
+      this.logger.info('runtime_prompt_send_done', {
+        conversationId: conversation.id,
+        ms: Date.now() - startedAt,
+      });
+    } catch (error) {
+      this.logger.warn('runtime_prompt_send_failed', {
+        conversationId: conversation.id,
+        ms: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 响应挂起的权限请求，转发给对应 runtime 的 `confirmPermission`。
    */
   confirmPermission(input: { conversationId: string; callId: string; optionId: string }): void {
@@ -354,4 +408,10 @@ export class ConversationService {
     this.runtimes.set(conversation.id, runtime);
     return runtime;
   }
+}
+
+function summarizeLogText(text: string, maxLength = 240): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength - 3)}...`;
 }

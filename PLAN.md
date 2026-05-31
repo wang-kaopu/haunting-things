@@ -1,755 +1,1293 @@
-检查当前代码后，这两个问题都成立：
-
-`logger.ts` 现在固定输出 `JSON.stringify(payload)`，所以日志天然是单行 JSON，可读性差。
-`index.ts` 只在 `server_listening`、重置密码、初始密码等少数地方打日志，WebBridge 注册的大量业务 API 没有统一入口日志。
-`WebBridge.handleMessage()` 现在只负责调用 handler 和返回结果，成功/失败都没有记录调用名、耗时、错误。
-`TeamService` 里创建 Team、添加 Agent、投递消息、唤醒 Agent、停止 Team 等关键业务流程也没有 logger。   
-
-## 总体改法
-
-不要把日志改回零散 `console.log`，而是把现有 logger 升级成：
-
-```text
-开发环境：默认输出易读 pretty log
-生产环境：可切换 JSON log
-业务调用：统一在 WebBridge 入口记录 invoke start / success / error
-核心异步流程：在 TeamService / ConversationService / AcpRuntime 内补少量关键日志
-```
-
-这样既解决可读性，也解决业务调用不可追踪。
+下面是一版更细的**文件级 TypeScript 接口定义 + 组件 Props 设计 + 按文件重构 TODO 清单**。目标是把当前前端从“大型 `main.tsx`”整理成一个清晰的聊天工作台结构。
 
 ---
 
-## 1. 改造 `logger.ts`：支持 pretty / json 两种格式
-
-当前 logger 只有 JSON 输出。建议增加 `LOG_FORMAT`：
+# 一、推荐目录结构
 
 ```text
-LOG_FORMAT=pretty  本地开发默认，易读
-LOG_FORMAT=json    生产/采集系统使用
-```
+src/renderer/
+  main.tsx
+  styles.css
 
-改 `src/server/logger.ts`：
+  app/
+    App.tsx
+    Workbench.tsx
 
-```ts
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-type LogFields = Record<string, unknown>;
-type LogFormat = 'pretty' | 'json';
+    types/
+      ui.ts
 
-class Logger {
-  constructor(private readonly scope: string) {}
+    utils/
+      format.ts
+      guards.ts
 
-  debug(event: string, fields: LogFields = {}): void {
-    this.write('debug', event, fields);
-  }
+    layout/
+      Sidebar.tsx
+      ChatLayout.tsx
+      TeamDrawer.tsx
 
-  info(event: string, fields: LogFields = {}): void {
-    this.write('info', event, fields);
-  }
+    team/
+      TeamList.tsx
+      TeamListItem.tsx
+      TeamMemberList.tsx
+      TeamMemberCard.tsx
 
-  warn(event: string, fields: LogFields = {}): void {
-    this.write('warn', event, fields);
-  }
+    chat/
+      ChatHeader.tsx
+      MessageList.tsx
+      MessageBubble.tsx
+      SendBox.tsx
+      ComposerTools.tsx
+      ModelPicker.tsx
+      UsageChip.tsx
+      AgentCommandsMenu.tsx
 
-  error(event: string, fields: LogFields = {}): void {
-    this.write('error', event, fields);
-  }
+    dialogs/
+      CreateTeamDialog.tsx
+      AddAgentDialog.tsx
 
-  private write(level: LogLevel, event: string, fields: LogFields): void {
-    if (level === 'debug' && process.env.LOG_LEVEL !== 'debug') return;
+    notifications/
+      NotificationCenter.tsx
+      ToastItem.tsx
 
-    const payload = {
-      time: new Date().toISOString(),
-      level,
-      scope: this.scope,
-      event,
-      ...sanitizeLogFields(fields),
-    };
-
-    const format = getLogFormat();
-    const line = format === 'json' ? JSON.stringify(payload) : formatPrettyLog(payload);
-
-    if (level === 'error') console.error(line);
-    else if (level === 'warn') console.warn(line);
-    else if (level === 'debug') console.debug(line);
-    else console.log(line);
-  }
-}
-
-function getLogFormat(): LogFormat {
-  if (process.env.LOG_FORMAT === 'json') return 'json';
-  if (process.env.LOG_FORMAT === 'pretty') return 'pretty';
-
-  // 本地开发默认 pretty，生产可以显式 LOG_FORMAT=json
-  return process.env.NODE_ENV === 'production' ? 'json' : 'pretty';
-}
-
-function formatPrettyLog(payload: Record<string, unknown>): string {
-  const time = String(payload.time ?? '').slice(11, 19);
-  const level = String(payload.level ?? 'info').toUpperCase().padEnd(5);
-  const scope = String(payload.scope ?? 'app');
-  const event = String(payload.event ?? 'event');
-
-  const fields = Object.entries(payload)
-    .filter(([key]) => !['time', 'level', 'scope', 'event'].includes(key))
-    .map(([key, value]) => `${key}=${formatValue(value)}`)
-    .join(' ');
-
-  return fields
-    ? `[${time}] ${level} ${scope} ${event} ${fields}`
-    : `[${time}] ${level} ${scope} ${event}`;
-}
-
-function formatValue(value: unknown): string {
-  if (value == null) return String(value);
-
-  if (typeof value === 'string') {
-    if (value.length > 160) return JSON.stringify(`${value.slice(0, 157)}...`);
-    return JSON.stringify(value);
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  try {
-    const text = JSON.stringify(value);
-    return text.length > 220 ? `${text.slice(0, 217)}...` : text;
-  } catch {
-    return '[unserializable]';
-  }
-}
-```
-
-效果从：
-
-```json
-{"time":"2026-05-31T10:12:33.100Z","level":"info","scope":"server","event":"server_listening","host":"127.0.0.1","port":14567}
-```
-
-变成：
-
-```text
-[10:12:33] INFO  server server_listening host="127.0.0.1" port=14567
-```
-
-需要机器解析时再用：
-
-```bash
-LOG_FORMAT=json npm start
+    hooks/
+      useTeams.ts
+      useActiveTeam.ts
+      useConversationStream.ts
+      useRuntimeSnapshots.ts
+      useNotifications.ts
+      useTeamDrawer.ts
 ```
 
 ---
 
-## 2. 给 `WebBridge` 加统一业务调用日志
+# 二、通用 UI 类型定义
 
-这是最划算的改动。因为大部分前端业务调用都会经过 `bridge.register(...)`。现在 `WebBridge` 只调用 handler，不记录成功、失败、耗时。
-
-改 `src/server/webBridge.ts`：
+## `src/renderer/app/types/ui.ts`
 
 ```ts
-import { createLogger } from './logger';
+import type {
+  AgentBackend,
+  AgentEvent,
+  AgentTurnPhase,
+  BackendStatus,
+  ChatMessage,
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  Team,
+  TeamAgent,
+} from '../../shared/types';
 
-export class WebBridge {
-  private readonly handlers = new Map<string, BridgeHandler<any>>();
-  private readonly logger = createLogger('bridge');
+export type ActiveTeamState = {
+  team: Team | null;
+  activeSlotId: string | null;
+  activeAgent: TeamAgent | null;
+};
 
-  // existing...
+export type RuntimeSnapshots = {
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+};
+
+export type ComposerRuntimeTools = {
+  agent?: TeamAgent | null;
+  snapshots: RuntimeSnapshots;
+  onSetModel: (model: string) => Promise<void>;
+};
+
+export type AppNotificationLevel = 'info' | 'success' | 'warning' | 'error';
+
+export type AppNotification = {
+  id: string;
+  title: string;
+  message: string;
+  level: AppNotificationLevel;
+  createdAt: number;
+  expiresAt: number;
+};
+
+export type TeamDrawerState = {
+  open: boolean;
+};
+
+export type CreateTeamInput = {
+  name: string;
+  leaderBackend: AgentBackend;
+  leaderModel?: string;
+};
+
+export type AddAgentInput = {
+  name: string;
+  backend: AgentBackend;
+  model?: string;
+};
+
+export type ConversationViewState = {
+  messages: ChatMessage[];
+  activePhase?: AgentTurnPhase;
+};
+
+export type BackendAvailability = {
+  backends: BackendStatus[];
+};
+```
+
+说明：
+`ui.ts` 只放前端组合类型，不要污染 `shared/types.ts`。后端协议类型仍然从 `../../shared/types` 引入。
+
+---
+
+# 三、工具函数设计
+
+## `src/renderer/app/utils/format.ts`
+
+```ts
+import type {
+  AgentEvent,
+  AgentTurnPhase,
+  ChatMessage,
+  ConversationUsage,
+  TeamAgent,
+} from '../../shared/types';
+
+export function formatAgentStatus(status: TeamAgent['status']): string {
+  const map: Record<TeamAgent['status'], string> = {
+    idle: '空闲',
+    active: '运行中',
+    failed: '错误',
+    stopped: '已停止',
+  };
+
+  return map[status] ?? status;
+}
+
+export function formatPhase(phase?: AgentTurnPhase): string {
+  if (!phase) return '';
+
+  const map: Record<AgentTurnPhase, string> = {
+    queued: '排队中',
+    thinking: '正在思考',
+    planning: '正在规划',
+    replying: '正在回复',
+    tool_calling: '调用工具',
+    waiting_permission: '等待授权',
+    failed: '返回错误',
+    done: '已完成',
+  };
+
+  return map[phase] ?? phase;
+}
+
+export function formatUsagePercent(usage?: ConversationUsage | null): string {
+  if (!usage || usage.size <= 0) return '';
+
+  const percent = Math.round((usage.used / usage.size) * 100);
+  return `${percent}%`;
+}
+
+export function formatUsageShort(usage?: ConversationUsage | null): string {
+  if (!usage) return 'Usage';
+
+  return `${usage.used.toLocaleString()} / ${usage.size.toLocaleString()}`;
+}
+
+export function formatAgentEvent(event: AgentEvent): string {
+  switch (event.type) {
+    case 'agent.turn.started':
+      return '开始新一轮任务';
+    case 'agent.thinking':
+      return '正在思考';
+    case 'agent.plan':
+      return event.entries.length ? `正在规划：${event.entries.join(' / ')}` : '正在规划';
+    case 'agent.tool.call':
+      return `调用工具：${event.title || event.toolName || event.toolCallId}`;
+    case 'agent.tool.update':
+      return `工具运行中：${event.title || event.toolCallId}`;
+    case 'agent.tool.result':
+      return event.isError
+        ? `工具返回错误：${event.title || event.toolName || event.toolCallId}`
+        : `工具调用完成：${event.title || event.toolName || event.toolCallId}`;
+    case 'agent.permission.request':
+      return `等待授权：${event.title}`;
+    case 'agent.error':
+      return `返回错误：${event.message}`;
+    case 'agent.done':
+      return event.status === 'idle' ? '本轮完成' : `本轮结束：${event.status}`;
+    case 'agent.reply.delta':
+      return '正在回复';
+    case 'agent.reply.done':
+      return '回复完成';
+  }
+}
+
+export function getMessageFallbackText(
+  message: ChatMessage,
+  activePhase?: AgentTurnPhase
+): string {
+  if (message.content) return message.content;
+
+  if (message.status !== 'streaming') return '';
+
+  if (activePhase === 'thinking') return '正在思考...';
+  if (activePhase === 'planning') return '正在规划...';
+  if (activePhase === 'tool_calling') return '正在调用工具...';
+
+  return '正在回复...';
 }
 ```
 
-在 `handleMessage()` 中加调用日志：
+---
+
+## `src/renderer/app/utils/guards.ts`
 
 ```ts
-private async handleMessage(socket: WebSocket, raw: string): Promise<void> {
-  let message: BridgeClientMessage;
-
-  try {
-    message = JSON.parse(raw);
-  } catch {
-    this.logger.warn('invalid_message_json', {
-      size: raw.length,
-    });
-    return;
-  }
-
-  if (message.type !== 'invoke') return;
-
-  const handler = this.handlers.get(message.name);
-  if (!handler) {
-    this.logger.warn('invoke_unknown', {
-      invokeId: message.id,
-      name: message.name,
-    });
-
-    this.send(socket, {
-      id: message.id,
-      type: 'result',
-      name: message.name,
-      error: `Unknown API: ${message.name}`,
-    });
-    return;
-  }
-
-  const startedAt = Date.now();
-
-  this.logger.info('invoke_start', {
-    invokeId: message.id,
-    name: message.name,
-    params: summarizeInvokeParams(message.name, message.data),
-  });
-
-  try {
-    const data = await handler(message.data as never);
-    this.logger.info('invoke_success', {
-      invokeId: message.id,
-      name: message.name,
-      ms: Date.now() - startedAt,
-      result: summarizeInvokeResult(message.name, data),
-    });
-
-    this.send(socket, {
-      id: message.id,
-      type: 'result',
-      name: message.name,
-      data,
-    } as BridgeResultMessage);
-  } catch (error) {
-    this.logger.warn('invoke_error', {
-      invokeId: message.id,
-      name: message.name,
-      ms: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    this.send(socket, {
-      id: message.id,
-      type: 'result',
-      name: message.name,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-```
-
-再加摘要函数，避免把 prompt、密码、完整消息刷到日志里：
-
-```ts
-function summarizeInvokeParams(name: string, data: unknown): unknown {
-  if (!data || typeof data !== 'object') return data;
-
-  const input = data as Record<string, unknown>;
-
-  switch (name) {
-    case 'conversation.sendMessage':
-    case 'team.sendMessage':
-    case 'team.sendMessageToAgent':
-      return {
-        ...pick(input, ['conversationId', 'teamId', 'slotId']),
-        contentLength: typeof input.content === 'string' ? input.content.length : undefined,
-        filesCount: Array.isArray(input.files) ? input.files.length : 0,
-      };
-
-    case 'conversation.setModel':
-    case 'team.setAgentModel':
-      return pick(input, ['conversationId', 'teamId', 'slotId', 'model']);
-
-    case 'conversation.confirmPermission':
-      return pick(input, ['conversationId', 'callId', 'optionId']);
-
-    case 'team.create':
-      return pick(input, ['name', 'workspace', 'leaderBackend', 'leaderModel']);
-
-    case 'team.addAgent':
-      return pick(input, ['teamId', 'name', 'backend', 'model']);
-
-    default:
-      return redactObject(input);
-  }
-}
-
-function summarizeInvokeResult(name: string, result: unknown): unknown {
-  if (!result || typeof result !== 'object') return result;
-
-  if (Array.isArray(result)) {
-    return { count: result.length };
-  }
-
-  const output = result as Record<string, unknown>;
-
-  switch (name) {
-    case 'conversation.create':
-      return pick(output, ['id', 'backend', 'model', 'status']);
-
-    case 'team.create':
-      return pick(output, ['id', 'name', 'leaderSlotId']);
-
-    case 'team.addAgent':
-      return pick(output, ['slotId', 'conversationId', 'backend', 'model', 'status']);
-
-    default:
-      return summarizeObject(output);
-  }
-}
-
-function pick(input: Record<string, unknown>, keys: string[]): Record<string, unknown> {
-  return Object.fromEntries(keys.filter((key) => key in input).map((key) => [key, input[key]]));
-}
-
-function summarizeObject(input: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => {
-      if (typeof value === 'string' && value.length > 160) {
-        return [key, `${value.slice(0, 157)}...`];
-      }
-      if (Array.isArray(value)) {
-        return [key, { count: value.length }];
-      }
-      return [key, value];
-    })
+export function isWrappedTeamPrompt(content: string): boolean {
+  return (
+    content.startsWith('You are ') &&
+    content.includes('Current teammates:') &&
+    content.includes('Available team RPC tools:')
   );
 }
 
-function redactObject(input: Record<string, unknown>): Record<string, unknown> {
-  const blocked = new Set(['password', 'currentPassword', 'newPassword', 'token', 'authorization']);
-  return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [
-      key,
-      blocked.has(key) ? '***' : value,
-    ])
-  );
+export function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }
-```
-
-这样无需在每个 `bridge.register(...)` 外层手写日志，就能覆盖 `conversation.sendMessage`、`team.create`、`team.addAgent`、`team.sendMessage` 等大多数业务调用。
-
----
-
-## 3. 给 `TeamService` 补关键异步流程日志
-
-WebBridge 只能记录“前端调用”。但 Team 内部还有很多异步动作，不会从 WebBridge 触发，比如：
-
-```text
-deliver → scheduleWakeAgent → runWakeCycle → wakeAgent
-teammate reply.done 自动回流 leader
-MCP session start/stop/restart
-```
-
-这些现在基本没有日志。`TeamService` 当前也没有引入 logger。
-
-加：
-
-```ts
-import { createLogger } from './logger';
-```
-
-类字段：
-
-```ts
-private readonly logger = createLogger('team');
-```
-
-### 3.1 Team 创建 / 添加 / 删除
-
-```ts
-async create(input: {...}): Promise<Team> {
-  this.logger.info('team_create_start', {
-    name: input.name,
-    leaderBackend: input.leaderBackend,
-    leaderModel: input.leaderModel,
-    hasWorkspace: Boolean(input.workspace),
-  });
-
-  const team = this.repo.createTeam(...);
-
-  await this.ensureSession(team.id);
-
-  this.logger.info('team_create_done', {
-    teamId: team.id,
-    leaderSlotId: leader.slotId,
-    workspace: team.workspace,
-  });
-
-  return team;
-}
-```
-
-`addAgent()` 里：
-
-```ts
-this.logger.info('agent_add_start', {
-  teamId: input.teamId,
-  name: input.name,
-  backend: input.backend,
-  model: input.model,
-});
-
-this.logger.info('agent_add_done', {
-  teamId: updated.id,
-  slotId: agent.slotId,
-  conversationId: agent.conversationId,
-});
-```
-
-### 3.2 deliver / wake 日志
-
-`deliver()` 是 Team 消息流关键点。现在只写 mailbox、emit 前端、排队唤醒。
-
-补：
-
-```ts
-private async deliver(message: MailboxMessage): Promise<void> {
-  const team = this.requireTeam(message.teamId);
-  await this.ensureSession(team.id);
-
-  this.logger.info('mailbox_deliver', {
-    teamId: message.teamId,
-    messageId: message.id,
-    fromAgentId: message.fromAgentId,
-    toAgentId: message.toAgentId,
-    contentLength: message.content.length,
-  });
-
-  // existing...
-}
-```
-
-`scheduleWakeAgent()`：
-
-```ts
-private scheduleWakeAgent(teamId: string, slotId: string): void {
-  const key = `${teamId}:${slotId}`;
-
-  if (this.pendingWakeups.has(key) || this.activeWakeups.has(key)) {
-    this.logger.debug('wake_skip_already_queued', { teamId, slotId });
-    return;
-  }
-
-  this.logger.debug('wake_scheduled', { teamId, slotId });
-
-  // existing...
-}
-```
-
-`runWakeCycle()`：
-
-```ts
-private async runWakeCycle(teamId: string, slotId: string): Promise<void> {
-  const startedAt = Date.now();
-  const key = `${teamId}:${slotId}`;
-
-  if (this.activeWakeups.has(key)) {
-    this.logger.debug('wake_skip_active', { teamId, slotId });
-    return;
-  }
-
-  this.activeWakeups.add(key);
-
-  try {
-    this.logger.info('wake_start', { teamId, slotId });
-    await this.wakeAgent(teamId, slotId);
-    this.logger.info('wake_done', {
-      teamId,
-      slotId,
-      ms: Date.now() - startedAt,
-    });
-  } catch (error) {
-    this.logger.warn('wake_failed', {
-      teamId,
-      slotId,
-      ms: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    // existing...
-  }
-}
-```
-
-`wakeAgent()` 里记录 unread 数量。当前它会读未读消息后发送给 conversation。
-
-```ts
-const messages = this.repo.readUnreadAndMark(teamId, slotId);
-
-this.logger.info('agent_prompt_send', {
-  teamId,
-  slotId,
-  conversationId: agent.conversationId,
-  unreadCount: messages.length,
-  promptLength: content.length,
-});
-```
-
-### 3.3 自动回流日志
-
-`handleConversationAgentEvent()` 现在自动把 teammate 的 `agent.reply.done` 回流给 leader。
-
-加日志：
-
-```ts
-if (alreadyReplied) {
-  this.logger.debug('auto_reply_skip_explicit_reply', {
-    teamId: team.id,
-    slotId: agent.slotId,
-    conversationId: event.conversationId,
-    messageId: event.messageId,
-  });
-  return;
-}
-
-if (this.autoRepliedAssistantMessages.get(event.conversationId) === event.messageId) {
-  this.logger.debug('auto_reply_skip_duplicate', {
-    teamId: team.id,
-    slotId: agent.slotId,
-    messageId: event.messageId,
-  });
-  return;
-}
-
-this.logger.info('auto_reply_to_leader', {
-  teamId: team.id,
-  fromSlotId: agent.slotId,
-  toSlotId: team.leaderSlotId,
-  messageId: event.messageId,
-  contentLength: content.length,
-});
 ```
 
 ---
 
-## 4. 给 `ConversationService` 补业务日志
+# 四、顶层组件 Props 设计
 
-`ConversationService` 现在只在 handler 失败时打日志。
+## `src/renderer/main.tsx`
 
-补关键入口：
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './app/App';
+import './styles.css';
 
-### 4.1 create
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+```
+
+---
+
+## `src/renderer/app/App.tsx`
 
 ```ts
-create(input: {...}): Conversation {
-  const conversation = this.repo.createConversation(...);
+export type AppProps = {};
+```
 
-  this.logger.info('conversation_create', {
-    conversationId: conversation.id,
-    backend: conversation.backend,
-    model: conversation.model,
-    workspace: conversation.workspace,
-    hasMcpServers: Boolean(input.mcpServers?.length),
-  });
-
-  return conversation;
+```tsx
+export function App(_props: AppProps): React.ReactElement {
+  // 登录态、LoginView、Workbench
 }
 ```
 
-### 4.2 sendMessage
+如果你已有登录组件，可以保留原逻辑，只把登录后的部分交给 `Workbench`。
 
-`sendMessage()` 当前写用户消息、emit stream、启动 runtime。
+---
+
+## `src/renderer/app/Workbench.tsx`
 
 ```ts
-async sendMessage(input: { conversationId: string; content: string; files?: string[] }): Promise<void> {
-  const startedAt = Date.now();
-  const conversation = this.repo.getConversation(input.conversationId);
-  if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+import type {
+  AgentBackend,
+  ChatMessage,
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  Team,
+  TeamAgent,
+} from '../shared/types';
+import type { AddAgentInput, CreateTeamInput } from './types/ui';
 
-  this.logger.info('conversation_send_start', {
-    conversationId: conversation.id,
-    backend: conversation.backend,
-    model: conversation.model,
-    contentLength: input.content.length,
-    filesCount: input.files?.length ?? 0,
-  });
+export type WorkbenchProps = {
+  onLogout: () => void;
+};
 
-  // existing...
+export type WorkbenchData = {
+  teams: Team[];
+  activeTeam: Team | null;
+  activeAgent: TeamAgent | null;
+  messages: ChatMessage[];
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+};
 
-  try {
-    const runtime = this.getRuntime(conversation);
-    await runtime.send(input.content);
-
-    this.logger.info('conversation_send_done', {
-      conversationId: conversation.id,
-      ms: Date.now() - startedAt,
-    });
-  } catch (error) {
-    this.logger.warn('conversation_send_failed', {
-      conversationId: conversation.id,
-      ms: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
-}
+export type WorkbenchActions = {
+  onCreateTeam: (input: CreateTeamInput) => Promise<void>;
+  onDeleteTeam: (teamId: string) => Promise<void>;
+  onSelectTeam: (teamId: string) => void;
+  onSelectAgent: (slotId: string) => void;
+  onAddAgent: (input: AddAgentInput) => Promise<void>;
+  onSendTeamMessage: (content: string) => Promise<void>;
+  onSetAgentModel: (model: string) => Promise<void>;
+};
 ```
 
-### 4.3 runtime 创建
+`Workbench` 内部组合：
 
-`getRuntime()` 首次创建 `AcpRuntime` 时打：
-
-```ts
-this.logger.info('runtime_create', {
-  conversationId: conversation.id,
-  backend: conversation.backend,
-  model: conversation.model,
-  workspace: conversation.workspace,
-  mcpServerCount: this.mcpServers.get(conversation.id)?.length ?? 0,
-});
-```
-
-### 4.4 setModel / stop
-
-```ts
-this.logger.info('conversation_model_set', {
-  conversationId: conversation.id,
-  previousModel: conversation.model,
-  model,
-});
-```
-
-`stop()`：
-
-```ts
-this.logger.info('conversation_stop', {
-  conversationId,
-  hadRuntime: this.runtimes.has(conversationId),
-});
+```tsx
+<main className={drawerOpen ? 'app-shell drawer-open' : 'app-shell drawer-collapsed'}>
+  <Sidebar ... />
+  <ChatLayout ... />
+  <TeamDrawer ... />
+  <NotificationCenter />
+</main>
 ```
 
 ---
 
-## 5. `AcpRuntime` 日志再补生命周期点
+# 五、左侧 Sidebar 组件
 
-现在 `AcpRuntime` 已经有 `bridge_stderr`、`runtime_error`、未知 sessionUpdate 等日志。 
-
-再补这些：
-
-### 5.1 bridge 启动
-
-在 `spawn` 后：
+## `src/renderer/app/layout/Sidebar.tsx`
 
 ```ts
-this.logger.info('bridge_start', {
-  conversationId: this.input.conversationId,
-  backend: this.input.backend,
-  bridgePackage,
-  cwd,
-  model: this.input.model,
-  mcpServerCount: this.input.mcpServers?.length ?? 0,
-});
+import type { Team } from '../../../shared/types';
+
+export type SidebarProps = {
+  username?: string;
+  teams: Team[];
+  activeTeamId: string | null;
+  onCreateTeamClick: () => void;
+  onSelectTeam: (teamId: string) => void;
+  onDeleteTeam: (teamId: string) => Promise<void>;
+  onLogout: () => void;
+};
 ```
 
-### 5.2 session 创建完成
+职责：
 
-`newSession` 后：
-
-```ts
-this.logger.info('session_new_done', {
-  conversationId: this.input.conversationId,
-  sessionId: this.sessionId,
-});
-```
-
-### 5.3 prompt 开始 / 结束
-
-在 `send()` 开始生成 `activeTurnId` 后：
-
-```ts
-this.logger.info('prompt_start', {
-  conversationId: this.input.conversationId,
-  turnId: this.activeTurnId,
-  contentLength: content.length,
-});
-```
-
-成功结束：
-
-```ts
-this.logger.info('prompt_done', {
-  conversationId: this.input.conversationId,
-  turnId: this.activeTurnId,
-  status: 'idle',
-  replyLength: this.assistantMessage?.content.length ?? 0,
-});
-```
-
-失败 catch 已有 `runtime_error`，可以加 `turnId`：
-
-```ts
-this.logger.error('prompt_failed', {
-  conversationId: this.input.conversationId,
-  turnId: this.activeTurnId,
-  error: message,
-});
+```text
+1. 展示 Haunting Souls / admin
+2. 创建团队按钮
+3. TeamList
+4. 退出登录
 ```
 
 ---
 
-## 6. 避免业务日志刷屏：只记“边界事件”
+## `src/renderer/app/team/TeamList.tsx`
 
-这次不要给每个 `agent.reply.delta` 打日志，也不要给每个 WebSocket 广播打日志。原则是：
+```ts
+import type { Team } from '../../../shared/types';
 
-```text
-记录：入口、出口、错误、状态转折、异步调度、外部进程生命周期
-不记录：token delta、每条 WebSocket emit、每个 usage_update
-```
-
-推荐日志事件命名规范：
-
-```text
-模块_动作_阶段
-```
-
-例如：
-
-```text
-conversation_send_start
-conversation_send_done
-conversation_send_failed
-team_create_start
-team_create_done
-agent_add_start
-agent_add_done
-mailbox_deliver
-wake_scheduled
-wake_start
-wake_done
-wake_failed
-bridge_start
-session_new_done
-prompt_start
-prompt_done
-prompt_failed
-invoke_start
-invoke_success
-invoke_error
+export type TeamListProps = {
+  teams: Team[];
+  activeTeamId: string | null;
+  onSelectTeam: (teamId: string) => void;
+  onDeleteTeam: (teamId: string) => Promise<void>;
+};
 ```
 
 ---
 
-## 7. 最小落地顺序
+## `src/renderer/app/team/TeamListItem.tsx`
 
-一次性改动按这个顺序做：
+```ts
+import type { Team } from '../../../shared/types';
+
+export type TeamListItemProps = {
+  team: Team;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => Promise<void>;
+};
+```
+
+内部状态：
+
+```ts
+const [menuOpen, setMenuOpen] = useState(false);
+const [deleting, setDeleting] = useState(false);
+```
+
+展示：
 
 ```text
-1. logger.ts 支持 LOG_FORMAT=pretty/json。
-2. WebBridge 加统一 invoke_start / invoke_success / invoke_error。
-3. ConversationService 补 create/sendMessage/getRuntime/setModel/stop 日志。
-4. TeamService 补 create/addAgent/deliver/wake/autoReply/restartSession/stop 日志。
-5. AcpRuntime 补 bridge_start/session_new_done/prompt_start/prompt_done。
-6. 确认敏感字段不直接输出：password、token、完整 content、rawInput。
+Team6       ⋯
+```
+
+删除放入 popover，不常驻红色按钮。
+
+---
+
+# 六、中间 Chat 组件
+
+## `src/renderer/app/layout/ChatLayout.tsx`
+
+```ts
+import type {
+  AgentTurnPhase,
+  ChatMessage,
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  Team,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type ChatLayoutProps = {
+  team: Team | null;
+  activeAgent: TeamAgent | null;
+  messages: ChatMessage[];
+  activePhase?: AgentTurnPhase;
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+  onAddAgentClick: () => void;
+  onSendMessage: (content: string) => Promise<void>;
+  onSetModel: (model: string) => Promise<void>;
+};
+```
+
+组合：
+
+```tsx
+<section className="chat-layout">
+  <ChatHeader ... />
+  <MessageList ... />
+  <SendBox ... />
+</section>
 ```
 
 ---
 
-## 推荐提交信息
+## `src/renderer/app/chat/ChatHeader.tsx`
 
-```text
-feat(logs): 增加可读日志格式与业务调用埋点
+```ts
+import type {
+  AgentTurnPhase,
+  ConversationUsage,
+  Team,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type ChatHeaderProps = {
+  team: Team | null;
+  activeAgent: TeamAgent | null;
+  activePhase?: AgentTurnPhase;
+  usage?: ConversationUsage | null;
+  onAddAgentClick: () => void;
+};
 ```
 
-或者拆成两个提交：
+展示内容：
 
 ```text
-feat(logs): 支持 pretty/json 双日志格式
-feat(logs): 增加桥接调用与 Team 业务日志
+Team6
+Leader
+16,902 / 258,400 7%
+已完成
+[添加 Agent]
 ```
 
-核心思路一句话：**logger 继续保留结构化能力，但本地默认 pretty；业务调用不要靠每个 handler 手写，先在 WebBridge 统一埋入口日志，再在 TeamService / ConversationService / AcpRuntime 补异步链路关键节点日志。**
+---
+
+## `src/renderer/app/chat/MessageList.tsx`
+
+```ts
+import type { AgentTurnPhase, ChatMessage } from '../../../shared/types';
+
+export type MessageListProps = {
+  messages: ChatMessage[];
+  activePhase?: AgentTurnPhase;
+};
+```
+
+内部状态：
+
+```ts
+const [pinnedToBottom, setPinnedToBottom] = useState(true);
+const [newMessageCount, setNewMessageCount] = useState(0);
+```
+
+方法：
+
+```ts
+function isNearBottom(element: HTMLDivElement): boolean;
+function jumpToBottom(): void;
+```
+
+---
+
+## `src/renderer/app/chat/MessageBubble.tsx`
+
+```ts
+import type { AgentTurnPhase, ChatMessage } from '../../../shared/types';
+
+export type MessageBubbleProps = {
+  message: ChatMessage;
+  activePhase?: AgentTurnPhase;
+};
+```
+
+职责：
+
+```text
+1. 普通 user / assistant 消息展示
+2. streaming 空消息 fallback
+3. error 状态展示
+4. 历史 wrapped prompt 折叠兼容
+```
+
+---
+
+## `src/renderer/app/chat/SendBox.tsx`
+
+```ts
+import type {
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type SendBoxProps = {
+  disabled?: boolean;
+  activeAgent?: TeamAgent | null;
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+  onSend: (content: string) => Promise<void>;
+  onSetModel: (model: string) => Promise<void>;
+};
+```
+
+内部状态：
+
+```ts
+const [content, setContent] = useState('');
+const [sending, setSending] = useState(false);
+const [error, setError] = useState('');
+```
+
+结构：
+
+```tsx
+<div className="composer">
+  <textarea />
+  <div className="composer-footer">
+    <ComposerTools ... />
+    <button>发送</button>
+  </div>
+</div>
+```
+
+---
+
+## `src/renderer/app/chat/ComposerTools.tsx`
+
+```ts
+import type {
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type ComposerToolsProps = {
+  activeAgent?: TeamAgent | null;
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+  onSetModel: (model: string) => Promise<void>;
+};
+```
+
+组合：
+
+```tsx
+<div className="composer-tools">
+  <ModelPicker ... />
+  <UsageChip usage={usage} />
+  <AgentCommandsMenu commands={commands} />
+</div>
+```
+
+---
+
+## `src/renderer/app/chat/ModelPicker.tsx`
+
+```ts
+import type { ConversationModels, TeamAgent } from '../../../shared/types';
+
+export type ModelPickerProps = {
+  agent?: TeamAgent | null;
+  models?: ConversationModels | null;
+  onSetModel: (model: string) => Promise<void>;
+};
+```
+
+内部状态：
+
+```ts
+const [open, setOpen] = useState(false);
+const [customModel, setCustomModel] = useState('');
+const [submitting, setSubmitting] = useState(false);
+const [error, setError] = useState('');
+```
+
+展示：
+
+```text
+模型：gpt-xxx ▼
+```
+
+没有模型快照时：
+
+```text
+模型：手动输入
+```
+
+---
+
+## `src/renderer/app/chat/UsageChip.tsx`
+
+```ts
+import type { ConversationUsage } from '../../../shared/types';
+
+export type UsageChipProps = {
+  usage?: ConversationUsage | null;
+};
+```
+
+展示：
+
+```text
+16,902 / 258,400 · 7%
+```
+
+---
+
+## `src/renderer/app/chat/AgentCommandsMenu.tsx`
+
+```ts
+import type { ConversationCommands } from '../../../shared/types';
+
+export type AgentCommandsMenuProps = {
+  commands?: ConversationCommands | null;
+};
+```
+
+内部状态：
+
+```ts
+const [open, setOpen] = useState(false);
+```
+
+展示：
+
+```text
+命令 11
+```
+
+点击后 popover：
+
+```text
+review
+review-branch
+review-commit
+...
+```
+
+---
+
+# 七、右侧团队抽屉
+
+## `src/renderer/app/layout/TeamDrawer.tsx`
+
+```ts
+import type { Team, TeamAgent } from '../../../shared/types';
+
+export type TeamDrawerProps = {
+  open: boolean;
+  team: Team | null;
+  activeSlotId: string | null;
+  onToggle: () => void;
+  onSelectAgent: (slotId: string) => void;
+};
+```
+
+结构：
+
+```tsx
+<aside className={open ? 'team-drawer open' : 'team-drawer collapsed'}>
+  <button className="drawer-toggle" onClick={onToggle}>
+    {open ? '›' : '‹'}
+  </button>
+
+  {open ? (
+    <>
+      <h2>团队</h2>
+      <TeamMemberList ... />
+    </>
+  ) : null}
+</aside>
+```
+
+---
+
+## `src/renderer/app/team/TeamMemberList.tsx`
+
+```ts
+import type { TeamAgent } from '../../../shared/types';
+
+export type TeamMemberListProps = {
+  agents: TeamAgent[];
+  activeSlotId: string | null;
+  onSelectAgent: (slotId: string) => void;
+};
+```
+
+---
+
+## `src/renderer/app/team/TeamMemberCard.tsx`
+
+```ts
+import type {
+  AgentTurnPhase,
+  ConversationCommands,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type TeamMemberCardProps = {
+  agent: TeamAgent;
+  active: boolean;
+  phase?: AgentTurnPhase;
+  commands?: ConversationCommands | null;
+  onSelect: () => void;
+};
+```
+
+压缩显示：
+
+```text
+Leader                         空闲
+codex · 11 命令
+```
+
+不要再做大卡片。
+
+---
+
+# 八、弹窗组件
+
+## `src/renderer/app/dialogs/CreateTeamDialog.tsx`
+
+```ts
+import type { AgentBackend } from '../../../shared/types';
+import type { CreateTeamInput } from '../types/ui';
+
+export type CreateTeamDialogProps = {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (input: CreateTeamInput) => Promise<void>;
+};
+
+export type CreateTeamFormState = {
+  name: string;
+  leaderBackend: AgentBackend;
+  leaderModel: string;
+};
+```
+
+内部状态：
+
+```ts
+const [form, setForm] = useState<CreateTeamFormState>({
+  name: '',
+  leaderBackend: 'codex',
+  leaderModel: '',
+});
+const [submitting, setSubmitting] = useState(false);
+const [error, setError] = useState('');
+```
+
+---
+
+## `src/renderer/app/dialogs/AddAgentDialog.tsx`
+
+```ts
+import type { AgentBackend } from '../../../shared/types';
+import type { AddAgentInput } from '../types/ui';
+
+export type AddAgentDialogProps = {
+  open: boolean;
+  disabled?: boolean;
+  onClose: () => void;
+  onSubmit: (input: AddAgentInput) => Promise<void>;
+};
+
+export type AddAgentFormState = {
+  name: string;
+  backend: AgentBackend;
+  model: string;
+};
+```
+
+---
+
+# 九、通知中心组件
+
+## `src/renderer/app/notifications/NotificationCenter.tsx`
+
+```ts
+import type { AppNotification } from '../types/ui';
+
+export type NotificationCenterProps = {
+  items: AppNotification[];
+  onRemove: (id: string) => void;
+};
+```
+
+职责：
+
+```text
+1. 右下角展示 toast
+2. 每秒清理过期通知
+3. 不保存历史
+```
+
+---
+
+## `src/renderer/app/notifications/ToastItem.tsx`
+
+```ts
+import type { AppNotification } from '../types/ui';
+
+export type ToastItemProps = {
+  item: AppNotification;
+  onClose: () => void;
+};
+```
+
+展示：
+
+```text
+[Agent 错误] xxx
+[任务完成] Leader 已完成当前轮任务
+```
+
+---
+
+# 十、Hooks 设计
+
+## `src/renderer/app/hooks/useTeams.ts`
+
+```ts
+import type { Team, TeamAgent } from '../../../shared/types';
+import type { AddAgentInput, CreateTeamInput } from '../types/ui';
+
+export type UseTeamsResult = {
+  teams: Team[];
+  loading: boolean;
+  error: string;
+  refreshTeams: () => Promise<void>;
+  createTeam: (input: CreateTeamInput) => Promise<Team>;
+  deleteTeam: (teamId: string) => Promise<void>;
+  addAgent: (teamId: string, input: AddAgentInput) => Promise<TeamAgent>;
+  updateTeam: (team: Team) => void;
+};
+```
+
+职责：
+
+```text
+team.list
+team.create
+team.delete
+team.addAgent
+维护 teams state
+```
+
+---
+
+## `src/renderer/app/hooks/useActiveTeam.ts`
+
+```ts
+import type { Team, TeamAgent } from '../../../shared/types';
+
+export type UseActiveTeamInput = {
+  teams: Team[];
+};
+
+export type UseActiveTeamResult = {
+  activeTeamId: string | null;
+  activeSlotId: string | null;
+  activeTeam: Team | null;
+  activeAgent: TeamAgent | null;
+  setActiveTeamId: (teamId: string | null) => void;
+  setActiveSlotId: (slotId: string | null) => void;
+  selectTeam: (teamId: string) => void;
+  selectAgent: (slotId: string) => void;
+};
+```
+
+职责：
+
+```text
+当前选中的 team / agent 选择逻辑
+```
+
+---
+
+## `src/renderer/app/hooks/useConversationStream.ts`
+
+```ts
+import type {
+  AgentEvent,
+  AgentTurnPhase,
+  ChatMessage,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type UseConversationStreamInput = {
+  activeAgent: TeamAgent | null;
+};
+
+export type UseConversationStreamResult = {
+  messages: ChatMessage[];
+  activePhase?: AgentTurnPhase;
+  agentEvents: AgentEvent[];
+  loading: boolean;
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  sendTeamMessage: (teamId: string, content: string) => Promise<void>;
+};
+```
+
+职责：
+
+```text
+1. activeAgent 变化时加载 conversation.messages / agentEvents
+2. 监听 conversation.stream
+3. 监听 conversation.agentEvent
+4. 计算 activePhase
+```
+
+---
+
+## `src/renderer/app/hooks/useRuntimeSnapshots.ts`
+
+```ts
+import type {
+  ConversationCommands,
+  ConversationMode,
+  ConversationModels,
+  ConversationUsage,
+  TeamAgent,
+} from '../../../shared/types';
+
+export type UseRuntimeSnapshotsInput = {
+  activeAgent: TeamAgent | null;
+};
+
+export type UseRuntimeSnapshotsResult = {
+  usage?: ConversationUsage | null;
+  commands?: ConversationCommands | null;
+  models?: ConversationModels | null;
+  mode?: ConversationMode | null;
+  setModel: (teamId: string, slotId: string, model: string) => Promise<void>;
+};
+```
+
+职责：
+
+```text
+1. activeAgent 变化时拉 conversation.usage / commands / models / mode
+2. 监听 conversation.usage / commands / models / mode
+3. 提供 setModel
+```
+
+---
+
+## `src/renderer/app/hooks/useNotifications.ts`
+
+```ts
+import type { AgentEvent, TeamAgent } from '../../../shared/types';
+import type { AppNotification, AppNotificationLevel } from '../types/ui';
+
+export type PushNotificationInput = {
+  title: string;
+  message: string;
+  level?: AppNotificationLevel;
+};
+
+export type UseNotificationsInput = {
+  activeAgentsByConversation?: Record<string, TeamAgent | undefined>;
+};
+
+export type UseNotificationsResult = {
+  items: AppNotification[];
+  push: (input: PushNotificationInput) => void;
+  remove: (id: string) => void;
+  clear: () => void;
+};
+```
+
+职责：
+
+```text
+1. 提供 toast state
+2. 监听关键事件并转 toast
+3. 10 秒自动消失
+```
+
+事件映射建议：
+
+```ts
+agent.error              → error toast
+agent.done(status=idle)  → success toast
+agent.permission.request → warning toast
+team.agent.message       → info toast
+```
+
+---
+
+## `src/renderer/app/hooks/useTeamDrawer.ts`
+
+```ts
+export type UseTeamDrawerResult = {
+  open: boolean;
+  toggle: () => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+};
+```
+
+---
+
+# 十一、按文件分段重构 TODO 清单
+
+## 阶段 1：只拆文件，不改功能
+
+### `main.tsx`
+
+* [x] 保留 ReactDOM 挂载
+* [x] 移除 Workbench 业务代码
+* [x] 引入 `App`
+
+### 新增 `app/App.tsx`
+
+* [x] 接管登录态
+* [x] 登录后渲染 `Workbench`
+
+### 新增 `app/Workbench.tsx`
+
+* [x] 临时搬迁原 `main.tsx` 的主要状态
+* [x] 先保证功能不变
+* [x] 渲染 `Sidebar / ChatLayout / TeamDrawer / NotificationCenter`
+
+---
+
+## 阶段 2：拆左侧 Sidebar
+
+### 新增 `layout/Sidebar.tsx`
+
+* [x] 迁移品牌、用户名、创建团队、退出登录
+* [x] 使用 `TeamList`
+
+### 新增 `team/TeamList.tsx`
+
+* [x] 迁移 teams 列表渲染
+
+### 新增 `team/TeamListItem.tsx`
+
+* [x] 把 Delete 改成 `⋯` 菜单
+* [x] 删除动作放进 popover
+
+---
+
+## 阶段 3：拆中间 Chat
+
+### 新增 `layout/ChatLayout.tsx`
+
+* [x] 迁移中间主区域布局
+* [x] 组合 `ChatHeader / MessageList / SendBox`
+
+### 新增 `chat/ChatHeader.tsx`
+
+* [x] 迁移团队标题、activeAgent、UsageBadge、添加 Agent 按钮
+
+### 新增 `chat/MessageList.tsx`
+
+* [x] 迁移消息列表
+* [x] 保留智能滚动逻辑
+
+### 新增 `chat/MessageBubble.tsx`
+
+* [x] 迁移单条消息渲染
+* [x] 支持旧 wrapper prompt 折叠
+
+### 新增 `chat/SendBox.tsx`
+
+* [x] 迁移输入框
+* [x] 加入 sending/error 状态
+* [x] 嵌入 `ComposerTools`
+
+---
+
+## 阶段 4：迁移配置到输入框
+
+### 新增 `chat/ComposerTools.tsx`
+
+* [x] 接收 activeAgent、usage、models、commands、mode
+* [x] 组合模型、Usage、命令入口
+
+### 新增 `chat/ModelPicker.tsx`
+
+* [x] 支持 snapshot model list
+* [x] 支持手动输入 model
+* [x] 调用 `onSetModel`
+
+### 新增 `chat/UsageChip.tsx`
+
+* [x] 紧凑显示 token usage
+
+### 新增 `chat/AgentCommandsMenu.tsx`
+
+* [x] 显示命令数量
+* [x] popover 展示命令列表
+* [x] 不再使用右侧大块 Agent Commands panel
+
+---
+
+## 阶段 5：右侧只保留团队抽屉
+
+### 新增 `layout/TeamDrawer.tsx`
+
+* [x] 支持 open/collapsed
+* [x] 只显示 TeamMemberList
+* [x] 增加小箭头 toggle
+
+### 新增 `team/TeamMemberList.tsx`
+
+* [x] 渲染成员列表
+
+### 新增 `team/TeamMemberCard.tsx`
+
+* [x] 压缩卡片高度
+* [x] 第一行：name + status
+* [x] 第二行：backend / model / commands count
+* [x] 点击切换 activeAgent
+
+### 删除/停用旧 Inspector
+
+* [x] 删除 Backends 面板
+* [x] 删除 Activity 面板
+* [x] 删除 Config 面板
+* [x] 删除 Debug 面板
+* [x] 删除 InspectorTab 状态
+
+---
+
+## 阶段 6：通知中心替代 timeline/debug 固定展示
+
+### 新增 `notifications/NotificationCenter.tsx`
+
+* [x] 渲染右下角 toast 列表
+* [x] 自动清理过期通知
+
+### 新增 `notifications/ToastItem.tsx`
+
+* [x] 单条 toast UI
+* [x] 支持关闭
+
+### 新增 `hooks/useNotifications.ts`
+
+* [x] 维护 notification state
+* [x] 提供 `push/remove/clear`
+* [x] 监听关键事件转通知
+* [x] 每条通知 10 秒后消失
+
+### 移除 timeline 固定区块
+
+* [x] 不再在页面永久展示 timeline
+* [x] team.agent.message / agent.error / agent.done 转 toast
+
+---
+
+## 阶段 7：弹窗替代 prompt/confirm
+
+### 新增 `dialogs/CreateTeamDialog.tsx`
+
+* [x] 表单字段：name / leaderBackend / leaderModel
+* [x] 校验团队名
+* [x] loading/error
+
+### 新增 `dialogs/AddAgentDialog.tsx`
+
+* [x] 表单字段：name / backend / model
+* [x] 校验 name
+* [x] loading/error
+
+### 替换旧逻辑
+
+* [x] 删除 `window.prompt` 创建团队
+* [x] 删除 `window.prompt` 添加 Agent
+* [x] 删除 `pickBackend()`
+
+---
+
+## 阶段 8：Hooks 收口
+
+### 新增 `hooks/useTeams.ts`
+
+* [x] 迁移 team.list/create/delete/addAgent
+* [x] 提供 teams state
+
+### 新增 `hooks/useActiveTeam.ts`
+
+* [x] 管理 activeTeamId / activeSlotId
+* [x] teams 变化时修正 activeTeam
+
+### 新增 `hooks/useConversationStream.ts`
+
+* [x] 迁移 messages 加载
+* [x] 监听 conversation.stream
+* [x] 监听 conversation.agentEvent
+* [x] 计算 activePhase
+
+### 新增 `hooks/useRuntimeSnapshots.ts`
+
+* [x] 迁移 usage / commands / models / mode
+* [x] 监听对应事件
+* [x] 提供 setModel
+
+### 新增 `hooks/useTeamDrawer.ts`
+
+* [x] 管理 drawer open/close
+
+---
+
+# 十二、建议提交顺序
+
+```text
+refactor(ui): 拆分 main.tsx 基础布局组件
+refactor(ui): 提取聊天区和团队列表组件
+refactor(ui): 将右侧面板简化为团队抽屉
+feat(ui): 将模型和命令入口迁移到输入框
+feat(ui): 增加通知中心替代固定 timeline
+feat(ui): 使用弹窗创建团队和添加 Agent
+refactor(ui): 提取团队和会话状态 hooks
+```
+
+整体原则：**先拆结构，再迁移功能，再删旧面板，最后抽 hooks**。这样每一步都比较容易编译和回滚。
+
+实现状态：前端重构 TODO 清单已完成。
