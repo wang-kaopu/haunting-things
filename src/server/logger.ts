@@ -52,7 +52,7 @@ class Logger {
 function getLogFormat(): LogFormat {
   if (process.env.LOG_FORMAT === 'json') return 'json';
   if (process.env.LOG_FORMAT === 'pretty') return 'pretty';
-  return process.env.NODE_ENV === 'production' ? 'json' : 'pretty';
+  return 'pretty';
 }
 
 function formatPrettyLog(payload: Record<string, unknown>): string {

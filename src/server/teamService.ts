@@ -132,6 +132,9 @@ export class TeamService {
    * 删除整个 Team 工作空间，停止所有成员 runtime，并清理持久化记录。
    */
   async delete(teamId: string): Promise<{ deleted: true }> {
+    this.logger.info('team_delete_start', {
+      teamId,
+    });
     const team = this.repo.getTeam(teamId);
     if (!team) throw new Error(`Team not found: ${teamId}`);
 
@@ -148,6 +151,10 @@ export class TeamService {
       this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
     }
     this.repo.deleteTeam(teamId);
+    this.logger.info('team_delete_done', {
+      teamId,
+      memberCount: team.agents.length,
+    });
     return { deleted: true };
   }
 
@@ -206,6 +213,14 @@ export class TeamService {
     const model = input.model.trim();
     if (!model) throw new Error('model is required');
 
+    this.logger.info('agent_model_set', {
+      teamId: input.teamId,
+      slotId: input.slotId,
+      conversationId: agent.conversationId,
+      previousModel: agent.model,
+      model,
+    });
+
     const updatedAgent: TeamAgent = { ...agent, model };
     const updatedTeam: Team = {
       ...team,
@@ -230,6 +245,10 @@ export class TeamService {
    * 从 Team 中移除一个 Agent（leader 不允许被移除）。
    */
   async removeAgent(input: { teamId: string; slotId: string }): Promise<{ removed: true }> {
+    this.logger.info('agent_remove_start', {
+      teamId: input.teamId,
+      slotId: input.slotId,
+    });
     const team = this.requireTeam(input.teamId);
     const agent = team.agents.find((item) => item.slotId === input.slotId);
     if (!agent) throw new Error(`Agent not found: ${input.slotId}`);
@@ -243,6 +262,11 @@ export class TeamService {
     };
     this.repo.updateTeam(updated);
     this.events.emit('team.agent.removed', { teamId: updated.id, slotId: input.slotId });
+    this.logger.info('agent_remove_done', {
+      teamId: updated.id,
+      slotId: input.slotId,
+      conversationId: agent.conversationId,
+    });
     return { removed: true };
   }
 
@@ -256,6 +280,12 @@ export class TeamService {
     assignedSlotId?: string;
     createdBySlotId?: string;
   }): Promise<TeamTask> {
+    this.logger.info('task_create', {
+      teamId: input.teamId,
+      title: input.title,
+      assignedSlotId: input.assignedSlotId,
+      createdBySlotId: input.createdBySlotId,
+    });
     const team = this.requireTeam(input.teamId);
     const title = input.title.trim();
     if (!title) throw new Error('title is required');
@@ -289,6 +319,12 @@ export class TeamService {
    * 这样任务状态和完成结果都能持久化。
    */
   async finishTask(input: { teamId: string; summary: string; taskId?: string; fromSlotId?: string }): Promise<{ finished: true }> {
+    this.logger.info('task_finish_start', {
+      teamId: input.teamId,
+      taskId: input.taskId,
+      fromSlotId: input.fromSlotId,
+      summaryLength: input.summary.length,
+    });
     const team = this.requireTeam(input.teamId);
     const summary = input.summary.trim();
     if (!summary) throw new Error('summary is required');
@@ -341,6 +377,11 @@ export class TeamService {
         createdAt: now,
       });
     }
+    this.logger.info('task_finish_done', {
+      teamId: team.id,
+      taskId: input.taskId,
+      completedBySlotId: actor.slotId,
+    });
     return { finished: true };
   }
 
