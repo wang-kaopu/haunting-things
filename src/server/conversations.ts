@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, ChatMessage, Conversation } from '../shared/types';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '../shared/types';
 import type { Repository } from './db';
 import type { EventBus } from './events';
 import { AcpRuntime } from './acpRuntime';
@@ -11,7 +11,7 @@ import { AcpRuntime } from './acpRuntime';
  * 每个 Conversation 对应一个懒加载的 `AcpRuntime` 实例（首次 `sendMessage` 时启动）。
  * MCP 配置通过 `setMcpServers` 在启动前注入，启动后更新不会影响已有进程。
  *
- * 事件转发：`AcpRuntime` 的 message / permission / status / finish 事件
+ * 事件转发：`AcpRuntime` 的 message / agentEvent / permission / status / finish 事件
  * 经由 `EventBus` 广播给所有 WebSocket 客户端。
  */
 export class ConversationService {
@@ -23,6 +23,8 @@ export class ConversationService {
   private readonly finishHandlers = new Set<
     (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>
   >();
+  /** 本地 agent event 监听器，用于 Team 回流等服务内逻辑。 */
+  private readonly agentEventHandlers = new Set<(event: AgentEvent) => void | Promise<void>>();
 
   constructor(
     private readonly repo: Repository,
@@ -73,6 +75,11 @@ export class ConversationService {
     return this.repo.listMessages(conversationId);
   }
 
+  /** 返回指定 Conversation 的标准化 Agent 事件历史。 */
+  agentEvents(conversationId: string): AgentEvent[] {
+    return this.repo.listAgentEvents(conversationId);
+  }
+
   /**
    * 订阅 conversation.finish 本地回调。
    *
@@ -83,6 +90,16 @@ export class ConversationService {
   ): () => void {
     this.finishHandlers.add(handler);
     return () => this.finishHandlers.delete(handler);
+  }
+
+  /**
+   * 订阅 conversation.agentEvent 本地回调。
+   *
+   * 这是服务内协作钩子，不依赖 WebSocket 广播层。
+   */
+  onAgentEvent(handler: (event: AgentEvent) => void | Promise<void>): () => void {
+    this.agentEventHandlers.add(handler);
+    return () => this.agentEventHandlers.delete(handler);
   }
 
   /**
@@ -137,6 +154,7 @@ export class ConversationService {
    *
    * 首次创建时注册四类事件转发：
    * - `message`    → `conversation.stream`（含数据库持久化）
+   * - `agentEvent` → `conversation.agentEvent`
    * - `permission` → `conversation.permission`
    * - `status`     → `conversation.status`（同步更新数据库）
    * - `finish`     → `conversation.finish`
@@ -156,6 +174,15 @@ export class ConversationService {
       if (known) this.repo.updateMessage(message);
       else this.repo.addMessage(message);
       this.events.emit('conversation.stream', { conversationId: conversation.id, message });
+    });
+    runtime.on('agentEvent', (event: AgentEvent) => {
+      this.repo.addAgentEvent(event);
+      this.events.emit('conversation.agentEvent', event);
+      for (const handler of this.agentEventHandlers) {
+        Promise.resolve(handler(event)).catch((error) => {
+          console.warn(`[ConversationService] agentEvent handler failed for ${conversation.id}:`, error);
+        });
+      }
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
     runtime.on('status', (status, error) => {

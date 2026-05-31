@@ -1,7 +1,6 @@
 import type {
   AgentBackend,
-  ChatMessage,
-  ConversationStatus,
+  AgentEvent,
   MailboxMessage,
   Team,
   TeamAgent,
@@ -39,8 +38,6 @@ export class TeamService {
   private readonly activeWakeups = new Set<string>();
   /** 记录已自动回流的 teammate assistant message，避免重复投递。 */
   private readonly autoRepliedAssistantMessages = new Map<string, string>();
-  /** 记录每个 conversationId 的本轮唤醒起点时间。 */
-  private readonly turnStarts = new Map<string, number>();
   /** 记录每个 conversationId 本轮是否已显式回传。 */
   private readonly explicitRepliedTurns = new Map<string, boolean>();
 
@@ -49,7 +46,7 @@ export class TeamService {
     private readonly conversations: ConversationService,
     private readonly events: EventBus
   ) {
-    this.conversations.onFinish((event) => this.handleConversationFinish(event));
+    this.conversations.onAgentEvent((event) => this.handleConversationAgentEvent(event));
   }
 
   /**
@@ -120,7 +117,6 @@ export class TeamService {
     for (const agent of team.agents) {
       this.conversations.stop(agent.conversationId);
       this.autoRepliedAssistantMessages.delete(agent.conversationId);
-      this.turnStarts.delete(agent.conversationId);
       this.explicitRepliedTurns.delete(agent.conversationId);
       this.pendingWakeups.delete(`${teamId}:${agent.slotId}`);
       this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
@@ -309,34 +305,33 @@ export class TeamService {
   }
 
   /**
-   * 当 teammate 的 conversation 自然结束时，把最终 assistant 回复回流给 leader mailbox。
+   * 当 teammate 的 assistant 回复完成时，把最终自然语言回流给 leader mailbox。
    */
-  private async handleConversationFinish(event: { conversationId: string; status: ConversationStatus }): Promise<void> {
-    if (event.status !== 'idle') return;
+  private async handleConversationAgentEvent(event: AgentEvent): Promise<void> {
+    if (event.type !== 'agent.reply.done') return;
 
-    const { team, agent } = this.findTeamAgentByConversationId(event.conversationId) ?? {};
-    if (!team || !agent || agent.role !== 'teammate') return;
+    const found = this.findTeamAgentByConversationId(event.conversationId);
+    if (!found) return;
+
+    const { team, agent } = found;
+    if (agent.role !== 'teammate') return;
 
     // 检查本轮是否已显式回传
     const alreadyReplied = this.explicitRepliedTurns.get(event.conversationId) ?? false;
     if (alreadyReplied) return;
 
-    const reply = this.getLatestAssistantReply(event.conversationId);
-    if (!reply || !reply.content.trim()) return;
+    const content = event.content.trim();
+    if (!content) return;
 
-    // 检查是否为本轮唤醒后的新 assistant 消息
-    const turnStart = this.turnStarts.get(event.conversationId) ?? 0;
-    if (reply.createdAt < turnStart) return;
-
-    if (this.autoRepliedAssistantMessages.get(event.conversationId) === reply.id) return;
-    this.autoRepliedAssistantMessages.set(event.conversationId, reply.id);
+    if (this.autoRepliedAssistantMessages.get(event.conversationId) === event.messageId) return;
+    this.autoRepliedAssistantMessages.set(event.conversationId, event.messageId);
 
     await this.deliver({
       id: crypto.randomUUID(),
       teamId: team.id,
       toAgentId: team.leaderSlotId,
       fromAgentId: agent.slotId,
-      content: `Reply from ${agent.name}:\n${reply.content}`,
+      content: `Reply from ${agent.name}:\n${content}`,
       read: false,
       createdAt: Date.now(),
     });
@@ -432,7 +427,6 @@ export class TeamService {
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
 
     // 本轮唤醒起点
-    this.turnStarts.set(agent.conversationId, Date.now());
     this.explicitRepliedTurns.set(agent.conversationId, false);
 
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
@@ -541,15 +535,6 @@ export class TeamService {
     for (const team of this.repo.listTeams()) {
       const agent = team.agents.find((item) => item.conversationId === conversationId);
       if (agent) return { team, agent };
-    }
-    return null;
-  }
-
-  private getLatestAssistantReply(conversationId: string): ChatMessage | null {
-    const messages = this.conversations.messages(conversationId);
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message.role === 'assistant') return message;
     }
     return null;
   }

@@ -10,16 +10,58 @@ import {
   type RequestPermissionResponse,
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
-import type { AgentBackend, ChatMessage, ConversationStatus, PermissionRequest } from '../shared/types';
+import type {
+  AgentBackend,
+  AgentEvent,
+  AgentTurnPhase,
+  ChatMessage,
+  ConversationStatus,
+  PermissionRequest,
+} from '../shared/types';
 import { getBridgePackageVersioned } from './agentRegistry';
 import { ndjsonFromChildProcess } from './ndjsonTransport';
 
 type AcpRuntimeEvents = {
   message: [ChatMessage];
+  agentEvent: [AgentEvent];
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
 };
+
+type AcpRuntimeAgentEventInput =
+  | { type: 'agent.turn.started'; backend: AgentBackend }
+  | { type: 'agent.thinking' }
+  | { type: 'agent.reply.delta'; messageId: string; delta: string }
+  | { type: 'agent.reply.done'; messageId: string; content: string }
+  | {
+      type: 'agent.tool.call';
+      toolCallId: string;
+      toolName: string;
+      title?: string;
+      input?: unknown;
+    }
+  | {
+      type: 'agent.tool.result';
+      toolCallId: string;
+      toolName?: string;
+      output?: unknown;
+      isError?: boolean;
+    }
+  | {
+      type: 'agent.permission.request';
+      callId: string;
+      title: string;
+      body?: string;
+      options: PermissionRequest['options'];
+    }
+  | {
+      type: 'agent.error';
+      source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
+      message: string;
+      detail?: unknown;
+    }
+  | { type: 'agent.done'; status: ConversationStatus };
 
 /** ACP SDK 要求的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
 type McpServer = {
@@ -54,6 +96,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private sessionId: string | null = null;
   private assistantMessage: ChatMessage | null = null;
   private activePrompt = false;
+  private activeTurnId: string | null = null;
+  private turnFinalized = false;
+  private turnPhase: AgentTurnPhase = 'queued';
+  private hasReplyStarted = false;
+  private readonly toolCalls = new Map<string, { toolName: string; title: string }>();
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
   private readonly pendingRequests = new Set<PendingRequest>();
@@ -84,7 +131,14 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
    */
   async send(content: string): Promise<void> {
     await this.ensureStarted();
+    this.activeTurnId = crypto.randomUUID();
+    this.turnFinalized = false;
+    this.turnPhase = 'thinking';
+    this.hasReplyStarted = false;
+    this.toolCalls.clear();
     this.emit('status', 'running');
+    this.emitAgentEvent({ type: 'agent.turn.started', backend: this.input.backend });
+    this.emitAgentEvent({ type: 'agent.thinking' });
 
     this.assistantMessage = {
       id: crypto.randomUUID(),
@@ -105,12 +159,27 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         })
       );
     } catch (err) {
-      if (this.assistantMessage) {
-        this.assistantMessage = { ...this.assistantMessage, status: 'error' };
-        this.emit('message', this.assistantMessage);
+      const message = err instanceof Error ? err.message : String(err);
+
+      if (!this.turnFinalized) {
+        if (this.assistantMessage) {
+          this.assistantMessage = { ...this.assistantMessage, status: 'error' };
+          this.emit('message', this.assistantMessage);
+        }
+        this.turnPhase = 'failed';
+        this.emitAgentEvent({
+          type: 'agent.error',
+          source: 'runtime',
+          message,
+          detail: err,
+        });
+        this.emit('status', 'failed', message);
+        this.emitAgentEvent({ type: 'agent.done', status: 'failed' });
+        this.turnFinalized = true;
+        this.turnPhase = 'done';
+        this.activeTurnId = null;
+        this.emit('finish', 'failed');
       }
-      this.emit('status', 'failed', err instanceof Error ? err.message : String(err));
-      this.emit('finish', 'failed');
       return;
     } finally {
       this.activePrompt = false;
@@ -119,8 +188,17 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     if (this.assistantMessage) {
       this.assistantMessage = { ...this.assistantMessage, status: 'done' };
       this.emit('message', this.assistantMessage);
+      this.emitAgentEvent({
+        type: 'agent.reply.done',
+        messageId: this.assistantMessage.id,
+        content: this.assistantMessage.content,
+      });
     }
+    this.turnPhase = 'done';
     this.emit('status', 'idle');
+    this.emitAgentEvent({ type: 'agent.done', status: 'idle' });
+    this.turnFinalized = true;
+    this.activeTurnId = null;
     this.emit('finish', 'idle');
   }
 
@@ -201,6 +279,21 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       }
       this.pendingPermissions.clear();
       const status: ConversationStatus = wasClean ? 'stopped' : 'failed';
+      if (this.activeTurnId && !this.turnFinalized) {
+        if (!wasClean) {
+          this.turnPhase = 'failed';
+          this.emitAgentEvent({
+            type: 'agent.error',
+            source: 'transport',
+            message: error.message,
+            detail: { code, signal },
+          });
+        }
+        this.emitAgentEvent({ type: 'agent.done', status });
+        this.turnFinalized = true;
+        this.turnPhase = 'done';
+        this.activeTurnId = null;
+      }
       this.emit('status', status, wasClean ? undefined : error.message);
       this.emit('finish', status);
     });
@@ -264,25 +357,152 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   /**
    * 处理来自 Agent 的 `sessionUpdate` 通知。
    *
-   * 当前仅处理 `agent_message_chunk`（文本流），将文本累加到
-   * `assistantMessage` 并触发 `message` 事件。其他更新类型（tool_call、
-   * config updates 等）在 v1 中暂时忽略。
+   * 第一阶段只关心文本流；第二阶段开始把 tool call / tool result / thinking
+   * 的原始更新标准化成统一的 AgentEvent。
    */
   private handleSessionUpdate(notification: SessionNotification): void {
-    const update = notification.update;
-    const updateType = update.sessionUpdate;
+    const update = notification.update as Record<string, unknown> & { sessionUpdate?: string };
+    const updateType = typeof update.sessionUpdate === 'string' ? update.sessionUpdate : 'unknown';
 
-    if (updateType === 'agent_message_chunk') {
-      const chunk = update as { sessionUpdate: string; content?: { type: string; text?: string }; messageId?: string };
-      const text = chunk.content?.type === 'text' ? (chunk.content.text ?? '') : '';
-      if (text && this.assistantMessage) {
-        this.assistantMessage = {
-          ...this.assistantMessage,
-          content: this.assistantMessage.content + text,
-        };
-        this.emit('message', this.assistantMessage);
-      }
+    switch (updateType) {
+      case 'agent_message_chunk':
+        this.handleAgentMessageChunk(update);
+        return;
+      case 'agent_thought_chunk':
+      case 'thinking':
+      case 'reasoning':
+        this.handleThinkingUpdate();
+        return;
+      case 'tool_call':
+      case 'agent_tool_call':
+      case 'tool_call_started':
+        this.handleToolCallUpdate(update);
+        return;
+      case 'tool_call_update':
+      case 'tool_call_completed':
+      case 'tool_call_result':
+        this.handleToolResultUpdate(update);
+        return;
+      default:
+        console.debug('[ACP sessionUpdate ignored]', updateType, update);
     }
+  }
+
+  private handleAgentMessageChunk(update: Record<string, unknown>): void {
+    const content = update.content as { type?: unknown; text?: unknown } | undefined;
+    const text = content?.type === 'text' ? String(content.text ?? '') : '';
+    if (text && this.assistantMessage) {
+      this.turnPhase = 'replying';
+      this.hasReplyStarted = true;
+      this.assistantMessage = {
+        ...this.assistantMessage,
+        content: this.assistantMessage.content + text,
+      };
+      this.emit('message', this.assistantMessage);
+      this.emitAgentEvent({
+        type: 'agent.reply.delta',
+        messageId: this.assistantMessage.id,
+        delta: text,
+      });
+    }
+  }
+
+  private handleThinkingUpdate(): void {
+    if (this.turnPhase !== 'thinking') {
+      this.turnPhase = 'thinking';
+      this.emitAgentEvent({ type: 'agent.thinking' });
+    }
+  }
+
+  private handleToolCallUpdate(update: Record<string, unknown>): void {
+    const toolCallId = this.getToolCallId(update);
+    const toolName = this.getToolName(update);
+    const title = this.getToolTitle(update, toolName);
+    const input = this.getToolInput(update);
+
+    this.toolCalls.set(toolCallId, { toolName, title });
+    this.turnPhase = 'tool_calling';
+    this.emitAgentEvent({
+      type: 'agent.tool.call',
+      toolCallId,
+      toolName,
+      title,
+      input,
+    });
+  }
+
+  private handleToolResultUpdate(update: Record<string, unknown>): void {
+    const toolCallId = this.getToolCallId(update);
+    const known = this.toolCalls.get(toolCallId);
+    const output = this.getToolOutput(update);
+    const isError = this.getToolIsError(update);
+
+    this.turnPhase = isError ? 'failed' : 'tool_calling';
+    this.emitAgentEvent({
+      type: 'agent.tool.result',
+      toolCallId,
+      toolName: known?.toolName ?? this.getToolName(update),
+      output,
+      isError,
+    });
+
+    if (isError) {
+      this.emitAgentEvent({
+        type: 'agent.error',
+        source: 'tool',
+        message: this.getToolErrorMessage(update),
+        detail: update,
+      });
+    }
+  }
+
+  private getToolCallId(update: Record<string, unknown>): string {
+    const candidate =
+      update.toolCallId ??
+      update.tool_call_id ??
+      update.id ??
+      update.callId ??
+      update.call_id ??
+      crypto.randomUUID();
+    return String(candidate);
+  }
+
+  private getToolName(update: Record<string, unknown>): string {
+    const candidate =
+      update.toolName ??
+      update.tool_name ??
+      update.name ??
+      update.title ??
+      'unknown_tool';
+    return String(candidate);
+  }
+
+  private getToolTitle(update: Record<string, unknown>, toolName: string): string {
+    const candidate = update.title ?? toolName;
+    return String(candidate);
+  }
+
+  private getToolInput(update: Record<string, unknown>): unknown {
+    return update.rawInput ?? update.input ?? update.args ?? update.content ?? undefined;
+  }
+
+  private getToolOutput(update: Record<string, unknown>): unknown {
+    return update.rawOutput ?? update.output ?? update.result ?? update.content ?? undefined;
+  }
+
+  private getToolIsError(update: Record<string, unknown>): boolean {
+    const status = update.status;
+    if (status === 'failed') return true;
+    if (update.isError === true) return true;
+    if (update.error != null) return true;
+    return false;
+  }
+
+  private getToolErrorMessage(update: Record<string, unknown>): string {
+    const error = update.error ?? update.rawOutput ?? update.output ?? update.result ?? 'Tool call failed';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    return JSON.stringify(error);
   }
 
   /**
@@ -304,6 +524,14 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         label: opt.name,
       })),
     };
+    this.turnPhase = 'waiting_permission';
+    this.emitAgentEvent({
+      type: 'agent.permission.request',
+      callId,
+      title: permissionRequest.title,
+      body: permissionRequest.body,
+      options: permissionRequest.options,
+    });
 
     return new Promise<RequestPermissionResponse>((resolve) => {
       this.pendingPermissions.set(callId, resolve);
@@ -348,5 +576,16 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       this.pendingRequests.delete(pending);
       pending.reject(error);
     }
+  }
+
+  private emitAgentEvent(event: AcpRuntimeAgentEventInput): void {
+    if (!this.activeTurnId) return;
+    this.emit('agentEvent', {
+      id: crypto.randomUUID(),
+      conversationId: this.input.conversationId,
+      turnId: this.activeTurnId,
+      at: Date.now(),
+      ...event,
+    } as AgentEvent);
   }
 }

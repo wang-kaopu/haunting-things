@@ -21,6 +21,9 @@ export type AgentHealth = AgentInfo & {
 /** Conversation 当前状态。 */
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
 
+/** Agent 一轮运行过程中的标准阶段。 */
+export type AgentTurnPhase = 'queued' | 'thinking' | 'replying' | 'tool_calling' | 'waiting_permission' | 'failed' | 'done';
+
 /** 单个 Conversation 的元数据。 */
 export type Conversation = {
   id: string;
@@ -51,6 +54,93 @@ export type PermissionOption = {
   label: string;
   description?: string;
 };
+
+/** 标准化的 Agent 运行过程事件。 */
+export type AgentEvent =
+  | {
+      id: string;
+      type: 'agent.turn.started';
+      conversationId: string;
+      turnId: string;
+      backend: AgentBackend;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.thinking';
+      conversationId: string;
+      turnId: string;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.reply.delta';
+      conversationId: string;
+      turnId: string;
+      messageId: string;
+      delta: string;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.reply.done';
+      conversationId: string;
+      turnId: string;
+      messageId: string;
+      content: string;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.tool.call';
+      conversationId: string;
+      turnId: string;
+      toolCallId: string;
+      toolName: string;
+      title?: string;
+      input?: unknown;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.tool.result';
+      conversationId: string;
+      turnId: string;
+      toolCallId: string;
+      toolName?: string;
+      output?: unknown;
+      isError?: boolean;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.permission.request';
+      conversationId: string;
+      turnId: string;
+      callId: string;
+      title: string;
+      body?: string;
+      options: PermissionOption[];
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.error';
+      conversationId: string;
+      turnId: string;
+      source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
+      message: string;
+      detail?: unknown;
+      at: number;
+    }
+  | {
+      id: string;
+      type: 'agent.done';
+      conversationId: string;
+      turnId: string;
+      status: ConversationStatus;
+      at: number;
+    };
 
 /** Agent 发起的权限请求，需用户在 UI 中选择一个选项后才能继续执行。 */
 export type PermissionRequest = {
@@ -151,6 +241,7 @@ export type InvokeMap = {
   };
   'conversation.list': { params: void; result: Conversation[] };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
+  'conversation.agentEvents': { params: { conversationId: string }; result: AgentEvent[] };
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
@@ -199,6 +290,7 @@ export type InvokeMap = {
  */
 export type EventMap = {
   'conversation.stream': { conversationId: string; message: ChatMessage };
+  'conversation.agentEvent': AgentEvent;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

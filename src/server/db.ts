@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { ChatMessage, Conversation, MailboxMessage, Team, TeamTask, User } from '../shared/types';
+import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamTask, User } from '../shared/types';
 
 export type Db = Database.Database;
 
@@ -35,6 +35,16 @@ export function openDatabase(dbPath: string): Db {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       status TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_events (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      turn_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      payload TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
@@ -78,6 +88,8 @@ export function openDatabase(dbPath: string): Db {
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_conversation ON agent_events(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_turn ON agent_events(turn_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
   `);
@@ -174,6 +186,22 @@ export class Repository {
       .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC')
       .all(conversationId) as any[];
     return rows.map(rowToMessage);
+  }
+
+  addAgentEvent(event: AgentEvent): AgentEvent {
+    this.db
+      .prepare(
+        'INSERT INTO agent_events (id, conversation_id, turn_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(event.id, event.conversationId, event.turnId, event.type, JSON.stringify(event), event.at);
+    return event;
+  }
+
+  listAgentEvents(conversationId: string): AgentEvent[] {
+    const rows = this.db
+      .prepare('SELECT payload FROM agent_events WHERE conversation_id = ? ORDER BY created_at ASC')
+      .all(conversationId) as Array<{ payload: string }>;
+    return rows.map(rowToAgentEvent);
   }
 
   createTeam(team: Team): Team {
@@ -321,6 +349,10 @@ function rowToMessage(row: any): ChatMessage {
     status: row.status ?? undefined,
     createdAt: row.created_at,
   };
+}
+
+function rowToAgentEvent(row: any): AgentEvent {
+  return JSON.parse(row.payload) as AgentEvent;
 }
 
 function rowToTeam(row: any): Team {
