@@ -7,7 +7,7 @@
  * 对应 PLAN-4.md 中的用例一到用例七。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openDatabase, Repository } from '../src/server/db';
+import { openDatabase, Repository } from '../src/server/db/db';
 import { EventBus } from '../src/server/events';
 import type {
   AgentBackend,
@@ -34,7 +34,7 @@ const mockMcpInstances: Array<{
   callTool: (tool: string, args: Record<string, any>, fromSlotId?: string) => Promise<any>;
 }> = [];
 
-vi.mock('../src/server/teamMcpServer', () => {
+vi.mock('../src/server/mcp/teamMcpServer', () => {
   class MockTeamMcpServer {
     readonly teamId;
     readonly getTeam;
@@ -132,7 +132,7 @@ vi.mock('../src/server/teamMcpServer', () => {
   return { TeamMcpServer: MockTeamMcpServer };
 });
 
-import { TeamService } from '../src/server/teamService';
+import { TeamService } from '../src/server/services/teamService';
 
 // ---------------------------------------------------------------------------
 // FakeConversationService — 按 PLAN-4.md §5 设计

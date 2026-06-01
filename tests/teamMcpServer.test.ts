@@ -2,7 +2,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamMcpServer, resolveTeamMcpStdioInvocation } from '../src/server/teamMcpServer';
+import { TeamMcpServer, resolveTeamMcpStdioInvocation } from '../src/server/mcp/teamMcpServer';
 import type { MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
 
 function makeTeam(): Team {
@@ -156,19 +156,19 @@ describe('TeamMcpServer', () => {
   });
 
   it('resolves the stdio launcher differently for dev and production builds', () => {
-    const dev = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('src/server/teamMcpServer.ts')).href);
+    const dev = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('src/server/mcp/teamMcpServer.ts')).href);
     expect(dev).toEqual({
       command: process.execPath,
       args: [
         path.resolve('node_modules/tsx/dist/cli.mjs'),
-        path.resolve('src/server/teamMcpStdio.ts'),
+        path.resolve('src/server/mcp/teamMcpStdio.ts'),
       ],
     });
 
-    const prod = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('dist-server/server/teamMcpServer.js')).href);
+    const prod = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('dist-server/server/mcp/teamMcpServer.js')).href);
     expect(prod).toEqual({
       command: 'node',
-      args: [path.resolve('dist-server/server/teamMcpStdio.js')],
+      args: [path.resolve('dist-server/server/mcp/teamMcpStdio.js')],
     });
   });
 

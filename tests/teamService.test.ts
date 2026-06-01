@@ -9,7 +9,7 @@ const mockInstances: Array<{
   getStdioConfig: ReturnType<typeof vi.fn>;
 }> = [];
 
-vi.mock('../src/server/teamMcpServer', () => {
+vi.mock('../src/server/mcp/teamMcpServer', () => {
   class MockTeamMcpServer {
     readonly teamId;
     readonly getTeam;
@@ -43,7 +43,7 @@ vi.mock('../src/server/teamMcpServer', () => {
   return { TeamMcpServer: MockTeamMcpServer };
 });
 
-import { TeamService } from '../src/server/teamService';
+import { TeamService } from '../src/server/services/teamService';
 
 type FakeRepository = {
   createTeam(team: Team): Team;

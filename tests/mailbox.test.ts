@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, test } from 'vitest';
-import { openDatabase, Repository } from '../src/server/db';
+import { openDatabase, Repository } from '../src/server/db/db';
 
 describe('mailbox repository', () => {
   test('readUnreadAndMark returns unread messages once', () => {

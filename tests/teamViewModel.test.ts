@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Team, TeamMailboxEntry } from '../src/shared/types';
-import { mergeTeamMailboxEntries, resolveTeamSendInvocation } from '../src/renderer/teamViewModel';
+import { mergeTeamMailboxEntries, resolveTeamSendInvocation } from '../src/renderer/features/teams/teamViewModel';
 
 function makeTeam(): Team {
   return {

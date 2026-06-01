@@ -4,7 +4,7 @@ import {
   normalizeServerInfo,
   normalizeTeamList,
   normalizeConversationCommands,
-} from '../src/renderer/app/utils/backendData';
+} from '../src/renderer/shared/utils/backendData';
 
 describe('renderer backend data normalization', () => {
   test('normalizes missing team list payloads to an empty list', () => {

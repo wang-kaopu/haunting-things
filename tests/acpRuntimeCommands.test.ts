@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionNotification } from '@agentclientprotocol/sdk';
-import { AcpRuntime } from '../src/server/acpRuntime';
+import { AcpRuntime } from '../src/server/runtime/acpRuntime';
 import type { ConversationCommands } from '../src/shared/types';
 
 describe('AcpRuntime available commands', () => {

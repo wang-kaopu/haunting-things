@@ -32,11 +32,11 @@ vi.mock('node:child_process', () => ({
   spawn: spawnMock,
 }));
 
-vi.mock('../src/server/agentRegistry', () => ({
+vi.mock('../src/server/runtime/agentRegistry', () => ({
   getBridgePackageVersioned: () => 'mock-bridge',
 }));
 
-vi.mock('../src/server/ndjsonTransport', () => ({
+vi.mock('../src/server/runtime/ndjsonTransport', () => ({
   ndjsonFromChildProcess: () => ({}),
 }));
 
@@ -47,7 +47,7 @@ vi.mock('@agentclientprotocol/sdk', () => ({
   }),
 }));
 
-import { AcpRuntime } from '../src/server/acpRuntime';
+import { AcpRuntime } from '../src/server/runtime/acpRuntime';
 
 describe('AcpRuntime models', () => {
   it('applies the configured model after newSession and emits the model snapshot', async () => {

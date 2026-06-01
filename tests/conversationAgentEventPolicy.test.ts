@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationService } from '../src/server/conversations';
+import { ConversationService } from '../src/server/services/conversationService';
 import { EventBus } from '../src/server/events';
 import type { AgentEvent, Conversation } from '../src/shared/types';
 

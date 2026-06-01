@@ -4,7 +4,7 @@ type LogFields = Record<string, unknown>;
 type LogFormat = 'pretty' | 'json';
 
 /** 带常见密钥脱敏能力的轻量结构化 logger。 */
-class Logger {
+export class Logger {
   constructor(private readonly scope: string) {}
 
   /** 仅在 `LOG_LEVEL=debug` 时写入 debug 日志。 */
