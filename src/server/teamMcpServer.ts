@@ -35,6 +35,12 @@ type TeamCallbacks = {
   getCommands?: (conversationId: string) => ConversationCommands | null;
 };
 
+/**
+ * 将 Team 操作暴露给各 Agent MCP stdio server 的本地 TCP bridge。
+ *
+ * 每个 Team 都会得到一个仅监听回环地址的 TCP server 和随机认证 token。
+ * 代理进程通过 `teamMcpStdio.ts` 连接，并把 MCP tool call 转换成带长度前缀的 TCP 请求。
+ */
 export class TeamMcpServer {
   private server: net.Server | null = null;
   private port = 0;
@@ -59,6 +65,7 @@ export class TeamMcpServer {
     });
   }
 
+  /** 停止接收 MCP bridge 请求并释放端口。 */
   async stop(): Promise<void> {
     if (!this.server) return;
     await new Promise<void>((resolve) => this.server!.close(() => resolve()));
@@ -81,12 +88,14 @@ export class TeamMcpServer {
     };
   }
 
+  /** 解析最新 Team 快照；若 Team 已删除则抛错。 */
   private resolveTeam(): Team {
     const team = this.getTeam();
     if (!team) throw new Error(`Team not found: ${this.teamId}`);
     return team;
   }
 
+  /** 从单个 TCP socket 读取带长度前缀的 JSON 请求。 */
   private handleSocket(socket: net.Socket): void {
     let buffer = Buffer.alloc(0);
     socket.on('data', (chunk) => {
@@ -103,6 +112,7 @@ export class TeamMcpServer {
     socket.setTimeout(600_000, () => socket.destroy());
   }
 
+  /** 认证并分发单条 TCP 请求。 */
   private async handleRequest(socket: net.Socket, body: string): Promise<void> {
     try {
       const request = JSON.parse(body) as TcpRequest;
@@ -116,6 +126,7 @@ export class TeamMcpServer {
     }
   }
 
+  /** 将已校验的 MCP tool 名分发到对应 Team 操作。 */
   private async callTool(tool: string, args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     switch (tool) {
       case 'team_members':
@@ -135,6 +146,7 @@ export class TeamMcpServer {
     }
   }
 
+  /** 将一个团队成员发给另一个成员的消息写入 mailbox 队列。 */
   private async sendMessage(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     const team = this.resolveTeam();
     const to = String(args.to || '');
@@ -176,6 +188,7 @@ export class TeamMcpServer {
     return `Added teammate ${agent.name} (${agent.slotId})`;
   }
 
+  /** 按名称或 slot id 移除已有 teammate。 */
   private async removeAgent(args: Record<string, unknown>): Promise<string> {
     const team = this.resolveTeam();
     const agentRef = String(args.agent || '').trim();
@@ -186,6 +199,7 @@ export class TeamMcpServer {
     return `Removed teammate ${target.name}`;
   }
 
+  /** 标记任务完成并通知 leader。 */
   private async finishTask(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     const team = this.resolveTeam();
     const summary = String(args.summary || '').trim();
@@ -195,6 +209,7 @@ export class TeamMcpServer {
     return taskId ? `Task ${taskId} marked finished` : 'Task marked finished';
   }
 
+  /** 创建或复用 teammate，创建任务并发送分配消息。 */
   private async delegateTask(args: Record<string, unknown>, fromSlotId?: string): Promise<string> {
     const team = this.resolveTeam();
     const backend = parseAgentBackend(args.backend);
@@ -248,6 +263,7 @@ export class TeamMcpServer {
       : `Delegated task to ${target.name} (${target.slotId}).`;
   }
 
+  /** 根据展示名称或稳定 slot id 解析 teammate。 */
   private resolveTarget(team: Team, nameOrSlotId: string): TeamAgent | null {
     const normalized = nameOrSlotId.trim().toLowerCase();
     return (
@@ -257,6 +273,7 @@ export class TeamMcpServer {
     );
   }
 
+  /** 将单个 teammate 格式化为 `team_members` MCP tool 的响应文本。 */
   private formatAgent(agent: TeamAgent): string {
     const modelPart = agent.model ? `, model=${agent.model}` : '';
     const commands = this.callbacks.getCommands?.(agent.conversationId);
@@ -266,20 +283,24 @@ export class TeamMcpServer {
   }
 }
 
+/** 从 MCP tool 参数中解析可选 model id。 */
 function parseOptionalModel(args: Record<string, unknown>): string | undefined {
   const model = typeof args.model === 'string' ? args.model.trim() : '';
   return model || undefined;
 }
 
+/** 校验外部 MCP tool call 传入的 backend 字符串。 */
 function parseAgentBackend(value: unknown): AgentBackend {
   if (value === 'claude' || value === 'codex') return value;
   throw new Error('backend must be exactly "claude" or "codex"');
 }
 
+/** 当 delegate 调用未提供名称时选择可读的 teammate 名。 */
 function defaultDelegateName(backend: AgentBackend): string {
   return backend === 'claude' ? 'Claude Code' : 'Codex Agent';
 }
 
+/** 向 TCP socket 写入一条带长度前缀的 JSON payload。 */
 function writeTcpMessage(socket: net.Socket, payload: unknown): void {
   const body = Buffer.from(JSON.stringify(payload), 'utf8');
   const header = Buffer.alloc(4);
@@ -287,6 +308,7 @@ function writeTcpMessage(socket: net.Socket, payload: unknown): void {
   socket.write(Buffer.concat([header, body]));
 }
 
+/** 为源码模式（`tsx`）和构建模式（`node`）解析 stdio MCP launcher。 */
 export function resolveTeamMcpStdioInvocation(currentModuleUrl: string = import.meta.url): {
   command: string;
   args: string[];

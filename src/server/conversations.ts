@@ -20,22 +20,22 @@ import { AcpRuntime } from './acpRuntime';
  * 管理所有 Conversation 的创建、消息收发和 ACP 运行时生命周期。
  *
  * 每个 Conversation 对应一个懒加载的 `AcpRuntime` 实例（首次 `sendMessage` 时启动）。
- * MCP 配置通过 `setMcpServers` 在启动前注入，启动后更新不会影响已有进程。
+ * 通过 `setMcpServers` 在启动前注入 MCP 配置，启动后更新不会影响已有进程。
  *
  * 事件转发：`AcpRuntime` 的 message / agentEvent / permission / status / finish 事件
  * 经由 `EventBus` 广播给所有 WebSocket 客户端。
  */
 export class ConversationService {
   private readonly logger = createLogger('conversation');
-  /** conversationId → 运行时实例（懒加载）。 */
+  /** 以 `conversationId` 映射运行时实例（懒加载）。 */
   private readonly runtimes = new Map<string, AcpRuntime>();
-  /** conversationId → 待注入的 MCP server 配置列表。 */
+  /** 以 `conversationId` 映射待注入的 MCP server 配置列表。 */
   private readonly mcpServers = new Map<string, any[]>();
-  /** conversationId → 可用命令快照。 */
+  /** 以 `conversationId` 映射可用命令快照。 */
   private readonly commandSnapshots = new Map<string, ConversationCommands>();
-  /** conversationId → 模型快照。 */
+  /** 以 `conversationId` 映射模型快照。 */
   private readonly modelSnapshots = new Map<string, ConversationModels>();
-  /** conversationId → 模式快照。 */
+  /** 以 `conversationId` 映射模式快照。 */
   private readonly modeSnapshots = new Map<string, ConversationMode>();
   /** 本地 finish 监听器，用于 Team 协作回流等服务内逻辑。 */
   private readonly finishHandlers = new Set<
@@ -153,7 +153,7 @@ export class ConversationService {
    * 向指定 Conversation 发送用户消息。
    *
    * 消息先写库并 emit `conversation.stream`，再通过 `AcpRuntime.send` 触发 ACP prompt。
-   * Runtime 的流式响应通过事件回调持续推送。
+   * 运行时的流式响应通过事件回调持续推送。
    */
   async sendMessage(input: { conversationId: string; content: string; files?: string[] }): Promise<void> {
     const startedAt = Date.now();
@@ -410,6 +410,7 @@ export class ConversationService {
   }
 }
 
+/** 写入结构化日志前截断过长的 prompt/log 文本。 */
 function summarizeLogText(text: string, maxLength = 240): string {
   const trimmed = text.trim();
   if (trimmed.length <= maxLength) return trimmed;

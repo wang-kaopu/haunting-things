@@ -187,6 +187,7 @@ server.listen(config.port, config.host, () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+/** 优雅停止 HTTP/WebSocket 流量并关闭 SQLite；若关闭卡住则强制退出。 */
 function shutdown(): void {
   server.close(() => {
     db.close();
@@ -195,6 +196,7 @@ function shutdown(): void {
   setTimeout(() => process.exit(0), 1000).unref();
 }
 
+/** 提供已构建的 renderer 资源；前端未构建时返回明确的 503。 */
 function serveRenderer(expressApp: express.Express): void {
   const indexHtml = path.join(config.rendererDist, 'index.html');
   if (existsSync(indexHtml)) {
@@ -209,6 +211,7 @@ function serveRenderer(expressApp: express.Express): void {
   });
 }
 
+/** 根据当前监听配置生成本机和可选局域网访问地址。 */
 function getServerUrls(): string[] {
   const urls = new Set<string>([`http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`]);
   if (config.allowRemote) {
@@ -217,6 +220,7 @@ function getServerUrls(): string[] {
   return [...urls];
 }
 
+/** 枚举非内网回环 IPv4 地址，用于生成远程访问 URL。 */
 function getNonInternalIPv4(): string[] {
   const ips: string[] = [];
   for (const entries of Object.values(networkInterfaces())) {

@@ -14,6 +14,8 @@ export function RemoteAccessPanel({
   error,
   onRefresh,
 }: RemoteAccessPanelProps): React.ReactElement {
+  const urls = Array.isArray(serverInfo?.urls) ? serverInfo.urls : [];
+
   return (
     <section className="settings-card">
       <div className="settings-card-header">
@@ -38,7 +40,7 @@ export function RemoteAccessPanel({
       ) : (
         <>
           <div className="remote-url-list">
-            {serverInfo.urls.map((url) => (
+            {urls.map((url) => (
               <RemoteUrlRow key={url} url={url} />
             ))}
           </div>

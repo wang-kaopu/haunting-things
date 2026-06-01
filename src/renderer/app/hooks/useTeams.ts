@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Team, TeamAgent } from '../../../shared/types';
 import { bridge } from '../../bridgeClient';
 import type { AddAgentInput, CreateTeamInput } from '../types/ui';
+import { normalizeTeam, normalizeTeamAgent, normalizeTeamAgentStatusEvent, normalizeTeamList } from '../utils/backendData';
 
 export type UseTeamsResult = {
   teams: Team[];
@@ -23,7 +24,7 @@ export function useTeams(): UseTeamsResult {
     try {
       setError('');
       const next = await bridge.invoke('team.list', undefined);
-      setTeams(next);
+      setTeams(normalizeTeamList(next));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -40,14 +41,16 @@ export function useTeams(): UseTeamsResult {
     const unsubRemoved = bridge.on('team.agent.removed', () => {
       void refreshTeams();
     });
-    const unsubStatus = bridge.on('team.agent.status', ({ teamId, slotId, status }) => {
+    const unsubStatus = bridge.on('team.agent.status', (payload) => {
+      const event = normalizeTeamAgentStatusEvent(payload);
+      if (!event) return;
       setTeams((current) =>
         current.map((team) =>
-          team.id === teamId
+          team.id === event.teamId
             ? {
                 ...team,
-                agents: team.agents.map((agent) =>
-                  agent.slotId === slotId ? { ...agent, status } : agent
+                agents: (team.agents ?? []).map((agent) =>
+                  agent.slotId === event.slotId ? { ...agent, status: event.status } : agent
                 ),
               }
             : team
@@ -64,7 +67,8 @@ export function useTeams(): UseTeamsResult {
 
   const createTeam = useCallback(
     async (input: CreateTeamInput) => {
-      const team = await bridge.invoke('team.create', input);
+      const team = normalizeTeam(await bridge.invoke('team.create', input));
+      if (!team) throw new Error('团队创建响应格式无效');
       await refreshTeams();
       return team;
     },
@@ -81,7 +85,8 @@ export function useTeams(): UseTeamsResult {
 
   const addAgent = useCallback(
     async (teamId: string, input: AddAgentInput) => {
-      const agent = await bridge.invoke('team.addAgent', { teamId, ...input });
+      const agent = normalizeTeamAgent(await bridge.invoke('team.addAgent', { teamId, ...input }));
+      if (!agent) throw new Error('Agent 创建响应格式无效');
       await refreshTeams();
       return agent;
     },
@@ -89,7 +94,9 @@ export function useTeams(): UseTeamsResult {
   );
 
   const updateTeam = useCallback((team: Team) => {
-    setTeams((current) => current.map((item) => (item.id === team.id ? team : item)));
+    const nextTeam = normalizeTeam(team);
+    if (!nextTeam) return;
+    setTeams((current) => current.map((item) => (item.id === nextTeam.id ? nextTeam : item)));
   }, []);
 
   return {

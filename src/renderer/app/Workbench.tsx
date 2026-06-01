@@ -17,6 +17,7 @@ import { useTeamDrawer } from './hooks/useTeamDrawer';
 import { useTeams } from './hooks/useTeams';
 import { RemoteAccessPanel } from './settings/RemoteAccessPanel';
 import type { AddAgentInput, CreateTeamInput } from './types/ui';
+import { normalizePermissionRequest } from './utils/backendData';
 
 export type WorkbenchProps = {
   user: { id: string; username: string };
@@ -47,7 +48,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const activeAgentsByConversation = useMemo(() => {
     const map: Record<string, TeamAgent | undefined> = {};
     for (const team of teamsState.teams) {
-      for (const agent of team.agents) {
+      for (const agent of team.agents ?? []) {
         map[agent.conversationId] = agent;
       }
     }
@@ -56,8 +57,9 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const notifications = useNotifications({ activeAgentsByConversation });
 
   useEffect(() => {
-    const unsubPermission = bridge.on('conversation.permission', (req) => {
-      setPermission(req);
+    const unsubPermission = bridge.on('conversation.permission', (payload) => {
+      const request = normalizePermissionRequest(payload);
+      if (request) setPermission(request);
     });
     return () => {
       unsubPermission();

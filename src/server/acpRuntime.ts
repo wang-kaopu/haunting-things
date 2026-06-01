@@ -94,7 +94,7 @@ type AcpRuntimeAgentEventInput =
     }
   | { type: 'agent.done'; status: ConversationStatus };
 
-/** ACP SDK 要求的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
+/** 面向 ACP SDK 的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
 type McpServer = {
   name: string;
   command: string;
@@ -141,7 +141,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
   /** 所有正在等待响应的 SDK 请求，进程退出时统一 reject。 */
   private readonly pendingRequests = new Set<PendingRequest>();
-  /** callId → resolve 函数，等待用户确认权限后调用。 */
+  /** 以 `callId` 映射 resolve 函数，等待用户确认权限后调用。 */
   private readonly pendingPermissions = new Map<
     string,
     (response: RequestPermissionResponse) => void
@@ -258,18 +258,22 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('finish', 'idle');
   }
 
+  /** 返回 ACP bridge 最近一次上报的上下文窗口用量快照。 */
   getUsageSnapshot(): ConversationUsage | null {
     return this.usageSnapshot;
   }
 
+  /** 返回运行时最近一次公布的可用命令列表。 */
   getAvailableCommandsSnapshot(): ConversationCommands | null {
     return this.availableCommandsSnapshot;
   }
 
+  /** 返回运行时最近一次上报的模型列表快照。 */
   getModelsSnapshot(): ConversationModels | null {
     return this.modelsSnapshot;
   }
 
+  /** 返回运行时最近一次上报的模式或配置快照。 */
   getModeSnapshot(): ConversationMode | null {
     return this.modeSnapshot;
   }
@@ -345,14 +349,14 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       }
     });
 
-    // 启动失败监视器：initialize 完成前进程退出则 reject
+    /** 启动失败监视器：initialize 完成前进程退出则 reject。 */
     const startupFailure = new Promise<never>((_, reject) => {
       child.once('exit', (code, signal) => {
         reject(new Error(`ACP process exited during startup (code=${code ?? signal})`));
       });
     });
 
-    // 进程正常退出后的清理逻辑
+    /** 进程正常退出后的清理逻辑。 */
     child.once('exit', (code, signal) => {
       const wasClean = code === 0 || signal === 'SIGTERM';
       this.child = null;
@@ -386,20 +390,20 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     const stream = ndjsonFromChildProcess(child);
     const connection = new ClientSideConnection(
       (_agent) => ({
-        /** Agent 推送流式更新（文本块、工具调用等）。 */
+        /** 代理推送流式更新（文本块、工具调用等）。 */
         sessionUpdate: async (params: SessionNotification) => {
           this.handleSessionUpdate(params);
         },
-        /** Agent 请求用户对某个工具调用进行授权。 */
+        /** 代理请求用户对某个工具调用进行授权。 */
         requestPermission: async (params: RequestPermissionRequest): Promise<RequestPermissionResponse> => {
           return this.handlePermissionRequest(params);
         },
-        /** Agent 读取工作区内的文本文件。 */
+        /** 代理读取工作区内的文本文件。 */
         readTextFile: async ({ path: filePath }) => {
           const content = await readFile(filePath, 'utf8');
           return { content };
         },
-        /** Agent 向工作区写入文本文件。 */
+        /** 代理向工作区写入文本文件。 */
         writeTextFile: async ({ path: filePath, content }) => {
           await writeFile(filePath, content, 'utf8');
           return {};
@@ -504,6 +508,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
+  /** 将流式 assistant 文本片段追加到当前进行中的 assistant 消息。 */
   private handleAgentMessageChunk(update: Record<string, unknown>): void {
     const content = update.content as { type?: unknown; text?: unknown } | undefined;
     const text = content?.type === 'text' ? String(content.text ?? '') : '';
@@ -523,6 +528,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
+  /** 记录模型进入 thinking/reasoning 状态。 */
   private handleThinkingUpdate(): void {
     if (this.turnPhase !== 'thinking') {
       this.turnPhase = 'thinking';
@@ -530,6 +536,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
+  /** 标准化 plan 更新，并作为应用层 Agent 事件发出。 */
   private handlePlanUpdate(update: Record<string, unknown>): void {
     const entries = this.extractPlanEntries(update);
     this.turnPhase = 'planning';
@@ -540,6 +547,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
   }
 
+  /** 从 SDK 特定更新字段中标准化新启动的 tool call。 */
   private handleToolCallUpdate(update: Record<string, unknown>): void {
     const toolCallId = this.readToolCallId(update);
     const title = this.readToolTitle(update);
@@ -568,6 +576,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
   }
 
+  /** 将工具进度、完成和失败更新标准化为 Agent 事件。 */
   private handleToolCallProgressUpdate(update: Record<string, unknown>): void {
     if (this.isCompletedToolUpdate(update)) {
       this.emitToolResult(update, false);
@@ -599,6 +608,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
   }
 
+  /** 发出最终工具结果事件，并在需要时补充模型或工具错误事件。 */
   private emitToolResult(update: Record<string, unknown>, isError: boolean): void {
     const toolCallId = this.readToolCallId(update);
     const known = this.toolCalls.get(toolCallId);
@@ -626,6 +636,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
+  /** 从多个 bridge 字段别名读取稳定 tool call id，缺失时生成兜底 id。 */
   private readToolCallId(update: Record<string, unknown>): string {
     const candidate =
       update.toolCallId ??
@@ -637,6 +648,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return String(candidate);
   }
 
+  /** 从已知 bridge 字段别名读取面向用户的工具标题。 */
   private readToolTitle(update: Record<string, unknown>): string | undefined {
     return (
       this.readString(update.title) ??
@@ -647,14 +659,17 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     );
   }
 
+  /** 读取 bridge 提供的工具 kind 判别字段。 */
   private readToolKind(update: Record<string, unknown>): string | undefined {
     return this.readString(update.kind) ?? this.readString(update.toolKind);
   }
 
+  /** 读取工具状态字符串并规范化为小写。 */
   private readToolStatus(update: Record<string, unknown>): string | undefined {
     return this.readString(update.status)?.toLowerCase();
   }
 
+  /** 判断工具更新是否表示成功完成。 */
   private isCompletedToolUpdate(update: Record<string, unknown>): boolean {
     const status = this.readToolStatus(update);
     return (
@@ -667,6 +682,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     );
   }
 
+  /** 判断工具更新是否表示错误或取消。 */
   private isFailedToolUpdate(update: Record<string, unknown>): boolean {
     const status = update.status;
     const normalized = this.readToolStatus(update);
@@ -681,6 +697,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return false;
   }
 
+  /** 从不同形态的工具失败 payload 中提取简洁错误消息。 */
   private extractToolErrorMessage(update: Record<string, unknown>): string {
     const error = update.error ?? update.rawOutput ?? update.output ?? update.result ?? 'Tool call failed';
     if (typeof error === 'string') return error;
@@ -694,6 +711,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return JSON.stringify(error);
   }
 
+  /** 保存并发出 bridge 上报的当前运行模式。 */
   private handleCurrentModeUpdate(update: Record<string, unknown>): void {
     const mode =
       this.readString(update.mode) ??
@@ -713,6 +731,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('mode', snapshot);
   }
 
+  /** 处理配置项更新，目前仅关注活跃模型变更。 */
   private handleConfigOptionUpdate(update: Record<string, unknown>): void {
     const configId =
       this.readString(update.configId) ??
@@ -742,6 +761,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('models', snapshot);
   }
 
+  /** 从已知 ACP bridge plan payload 变体中提取计划条目。 */
   private extractPlanEntries(update: Record<string, unknown>): string[] {
     const entries: string[] = [];
     const push = (value: unknown): void => {
@@ -764,6 +784,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return entries;
   }
 
+  /** 将单个计划条目对象或字符串转换为展示文本。 */
   private planEntryToText(item: unknown): string {
     if (typeof item === 'string') return item.trim();
 
@@ -781,6 +802,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return '';
   }
 
+  /** 更新上下文窗口用量，并节流实时用量广播。 */
   private handleUsageUpdate(update: Record<string, unknown>): void {
     const size = this.readUsageNumber(update.size);
     const used = this.readUsageNumber(update.used);
@@ -807,6 +829,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('usage', snapshot);
   }
 
+  /** 解析可能以数字或数字字符串传入的 bridge 用量计数。 */
   private readUsageNumber(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     if (typeof value === 'string') {
@@ -816,10 +839,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return null;
   }
 
+  /** 返回去除首尾空白后的非空字符串，否则返回 undefined。 */
   private readString(value: unknown): string | undefined {
     return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   }
 
+  /** 标准化并发出 bridge 的可用 slash/agent 命令列表。 */
   private handleAvailableCommandsUpdate(update: Record<string, unknown>): void {
     const rawCommands = Array.isArray(update.availableCommands) ? update.availableCommands : [];
 
@@ -849,6 +874,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('commands', snapshot);
   }
 
+  /** 从 `newSession` 结果中提取初始模型元数据。 */
   private handleNewSessionModels(sessionResult: unknown): void {
     const raw = sessionResult as Record<string, unknown> | null;
     const modelsState = raw?.models;
@@ -892,6 +918,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('models', snapshot);
   }
 
+  /** 当 bridge 支持 unstable model API 时设置活跃模型。 */
   private async setSessionModel(modelId: string): Promise<void> {
     if (!this.connection || !this.sessionId) return;
 
@@ -1000,6 +1027,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
   }
 
+  /** 附加 conversation/turn 元数据，并发出标准化 Agent 事件。 */
   private emitAgentEvent(event: AcpRuntimeAgentEventInput): void {
     if (!this.activeTurnId) return;
     this.emit('agentEvent', {

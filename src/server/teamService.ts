@@ -33,7 +33,7 @@ type TeamSession = {
  */
 export class TeamService {
   private readonly logger = createLogger('team');
-  /** teamId → 当前运行时会话。 */
+  /** 以 `teamId` 映射当前运行时会话。 */
   private readonly sessions = new Map<string, TeamSession>();
   /** 已排队等待唤醒的 teamId:slotId。 */
   private readonly pendingWakeups = new Set<string>();
@@ -432,7 +432,7 @@ export class TeamService {
     const { team, agent } = found;
     if (agent.role !== 'teammate') return;
 
-    // 检查本轮是否已显式回传
+    /** 检查本轮是否已显式回传。 */
     const alreadyReplied = this.explicitRepliedTurns.get(event.conversationId) ?? false;
     if (alreadyReplied) {
       this.logger.debug('auto_reply_skip_explicit_reply', {
@@ -578,7 +578,7 @@ export class TeamService {
         ms: Date.now() - startedAt,
         error: error instanceof Error ? error.message : String(error),
       });
-      // wakeAgent 已经发出失败状态，这里只负责收尾和补轮次。
+      /** 方法 `wakeAgent` 已经发出失败状态，这里只负责收尾和补轮次。 */
     } finally {
       this.activeWakeups.delete(key);
       const hasUnread = this.repo.listUnreadMailbox(teamId, slotId).length > 0;
@@ -596,7 +596,7 @@ export class TeamService {
     const agent = team.agents.find((item) => item.slotId === slotId);
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
 
-    // 本轮唤醒起点
+    /** 本轮唤醒起点。 */
     this.explicitRepliedTurns.set(agent.conversationId, false);
 
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
@@ -656,7 +656,7 @@ export class TeamService {
    * 重建 Team 的 MCP 服务：停止旧 server，启动新 server，
    * 并将新的 stdio 配置（含端口和 token）注入所有成员的 MCP 配置。
    *
-   * env 在此处从 `Record<string,string>` 转换为 SDK 要求的 `{name,value}[]`。
+   * 在此处将 `env` 从 `Record<string,string>` 转换为 SDK 要求的 `{name,value}[]`。
    */
   private async restartSession(
     team: Team,
@@ -700,12 +700,14 @@ export class TeamService {
     return team;
   }
 
+  /** 查询 Team 内成员，不存在则抛出。 */
   private requireAgent(team: Team, slotId: string): TeamAgent {
     const agent = team.agents.find((item) => item.slotId === slotId);
     if (!agent) throw new Error(`Agent not found: ${slotId}`);
     return agent;
   }
 
+  /** 将 Team MCP stdio 桥接配置注入指定 Conversation 的启动配置。 */
   private injectConversationMcpConfig(mcpServer: TeamMcpServer, conversationId: string, slotId: string): void {
     const cfg = mcpServer.getStdioConfig(slotId);
     this.conversations.setMcpServers(conversationId, [

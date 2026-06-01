@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { AgentEvent, AgentTurnPhase, ChatMessage, Team, TeamAgent } from '../../../shared/types';
 import { bridge } from '../../bridgeClient';
 import { resolveTeamSendInvocation } from '../../teamViewModel';
+import { normalizeAgentEvent, normalizeAgentEventList, normalizeConversationStream, normalizeMessageList } from '../utils/backendData';
 import { phaseFromAgentEvent } from '../utils/format';
 
 export type UseConversationStreamInput = {
@@ -35,18 +36,21 @@ export function useConversationStream({
   }, [activeAgent?.conversationId]);
 
   useEffect(() => {
-    const unsubStream = bridge.on('conversation.stream', ({ conversationId, message }) => {
-      if (conversationId !== activeConversationRef.current) return;
+    const unsubStream = bridge.on('conversation.stream', (payload) => {
+      const event = normalizeConversationStream(payload);
+      if (!event || event.conversationId !== activeConversationRef.current) return;
       setMessages((current) => {
-        const index = current.findIndex((item) => item.id === message.id);
-        if (index < 0) return [...current, message];
+        const index = current.findIndex((item) => item.id === event.message.id);
+        if (index < 0) return [...current, event.message];
         const next = [...current];
-        next[index] = message;
+        next[index] = event.message;
         return next;
       });
     });
 
-    const unsubAgentEvent = bridge.on('conversation.agentEvent', (event) => {
+    const unsubAgentEvent = bridge.on('conversation.agentEvent', (payload) => {
+      const event = normalizeAgentEvent(payload);
+      if (!event) return;
       setAgentEventsByConversation((prev) => {
         const list = prev[event.conversationId] ?? [];
         return {
@@ -78,7 +82,7 @@ export function useConversationStream({
     bridge
       .invoke('conversation.messages', { conversationId })
       .then((items) => {
-        if (!cancelled) setMessages(items);
+        if (!cancelled) setMessages(normalizeMessageList(items));
       })
       .catch(() => {
         if (!cancelled) setMessages([]);
@@ -89,8 +93,9 @@ export function useConversationStream({
 
     bridge
       .invoke('conversation.agentEvents', { conversationId, limit: 200 })
-      .then((events) => {
+      .then((value) => {
         if (cancelled) return;
+        const events = normalizeAgentEventList(value);
         setAgentEventsByConversation((prev) => ({
           ...prev,
           [conversationId]: events,

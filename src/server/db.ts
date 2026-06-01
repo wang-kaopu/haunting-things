@@ -87,13 +87,21 @@ export function openDatabase(dbPath: string): Db {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
     );
 
+  `);
+  ensureColumn(db, 'conversations', 'model', 'TEXT');
+  ensureColumn(db, 'teams', 'leader_slot_id', "TEXT NOT NULL DEFAULT 'leader'");
+  ensureColumn(db, 'teams', 'agents', "TEXT NOT NULL DEFAULT '[]'");
+  db.prepare("UPDATE teams SET leader_slot_id = 'leader' WHERE leader_slot_id IS NULL OR leader_slot_id = ''").run();
+  db.prepare("UPDATE teams SET agents = '[]' WHERE agents IS NULL OR agents = '' OR agents = 'undefined'").run();
+  ensureColumn(db, 'mailbox', 'summary', 'TEXT');
+  ensureColumn(db, 'mailbox', 'read', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_agent_events_conversation ON agent_events(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_agent_events_turn ON agent_events(turn_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
   `);
-  ensureColumn(db, 'conversations', 'model', 'TEXT');
   return db;
 }
 
@@ -115,6 +123,7 @@ export class Repository {
       : null;
   }
 
+  /** 获取首个用户，用于单管理员初始化和密码流程。 */
   getAnyUser(): (User & { passwordHash: string; jwtSecret: string }) | null {
     const row = this.db
       .prepare('SELECT id, username, password_hash, jwt_secret FROM users ORDER BY created_at ASC LIMIT 1')
@@ -124,6 +133,7 @@ export class Repository {
       : null;
   }
 
+  /** 持久化新用户，并返回公开字段。 */
   createUser(input: { id: string; username: string; passwordHash: string; jwtSecret: string }): User {
     const now = Date.now();
     this.db
@@ -134,16 +144,19 @@ export class Repository {
     return { id: input.id, username: input.username };
   }
 
+  /** 认证成功后更新最近登录元数据。 */
   updateLastLogin(userId: string): void {
     this.db.prepare('UPDATE users SET last_login = ?, updated_at = ? WHERE id = ?').run(Date.now(), Date.now(), userId);
   }
 
+  /** 替换用户密码哈希和 JWT secret，使旧 token 失效。 */
   updatePassword(userId: string, passwordHash: string, jwtSecret: string): void {
     this.db
       .prepare('UPDATE users SET password_hash = ?, jwt_secret = ?, updated_at = ? WHERE id = ?')
       .run(passwordHash, jwtSecret, Date.now(), userId);
   }
 
+  /** 插入一条 conversation 记录。 */
   createConversation(conversation: Conversation): Conversation {
     this.db
       .prepare(
@@ -318,6 +331,7 @@ export class Repository {
     return task;
   }
 
+  /** 更新任务可变字段，包括完成相关元数据。 */
   updateTask(task: TeamTask): void {
     this.db
       .prepare(
@@ -361,6 +375,7 @@ function rowToConversation(row: any): Conversation {
   };
 }
 
+/** 将 `messages` 表行映射为共享领域类型。 */
 function rowToMessage(row: any): ChatMessage {
   return {
     id: row.id,
@@ -382,10 +397,20 @@ function rowToTeam(row: any): Team {
     name: row.name,
     workspace: row.workspace,
     leaderSlotId: row.leader_slot_id,
-    agents: JSON.parse(row.agents),
+    agents: parseTeamAgents(row.agents),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function parseTeamAgents(value: unknown): Team['agents'] {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as Team['agents']) : [];
+  } catch {
+    return [];
+  }
 }
 
 function rowToMailbox(row: any): MailboxMessage {

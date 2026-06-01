@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ServerInfo } from '../../../shared/types';
 import { bridge } from '../../bridgeClient';
+import { normalizeServerInfo } from '../utils/backendData';
 
 export type UseServerInfoResult = {
   serverInfo: ServerInfo | null;
@@ -19,7 +20,8 @@ export function useServerInfo(): UseServerInfoResult {
       setLoading(true);
       setError('');
 
-      const info = await bridge.invoke('server.info', undefined);
+      const info = normalizeServerInfo(await bridge.invoke('server.info', undefined));
+      if (!info) throw new Error('服务端信息响应格式无效');
       setServerInfo(info);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

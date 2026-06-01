@@ -6,6 +6,11 @@ export type AgentEventPolicy = {
   activity: boolean;
 };
 
+/**
+ * 判断 Agent 事件应如何进入持久化和实时 UI 流。
+ *
+ * 高频流式 delta 只走实时通道；最终回复、终态工具事件、权限请求和错误会保留为可查询记录。
+ */
 export function classifyAgentEvent(event: AgentEvent): AgentEventPolicy {
   switch (event.type) {
     case 'agent.reply.delta':
@@ -53,6 +58,7 @@ export function classifyAgentEvent(event: AgentEvent): AgentEventPolicy {
   }
 }
 
+/** 仅持久化描述终态的工具更新事件。 */
 function shouldPersistToolUpdate(status?: string): boolean {
   if (!status) return false;
 

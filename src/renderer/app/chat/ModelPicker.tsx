@@ -13,7 +13,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
   const [customModel, setCustomModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const options = models?.models ?? [];
+  const options = Array.isArray(models?.models) ? models.models : [];
   const current = agent?.model ?? models?.currentModelId ?? '';
 
   useEffect(() => {

@@ -60,7 +60,13 @@ class BrowserBridge {
   }
 
   private handleMessage(raw: string): void {
-    const message = JSON.parse(raw) as BridgeServerMessage;
+    let message: BridgeServerMessage;
+    try {
+      message = JSON.parse(raw) as BridgeServerMessage;
+    } catch {
+      return;
+    }
+    if (!message || typeof message !== 'object') return;
     if (message.type === 'result') {
       const pending = this.pending.get(message.id);
       if (!pending) return;

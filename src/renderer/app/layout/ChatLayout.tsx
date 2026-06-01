@@ -55,7 +55,7 @@ export function ChatLayout({
       />
       <MessageList messages={messages} activePhase={activePhase} />
       <SendBox
-        disabled={!team}
+        disabled={!team || !activeAgent}
         activeAgent={activeAgent}
         usage={usage}
         commands={commands}

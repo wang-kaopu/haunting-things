@@ -19,7 +19,7 @@ export function TeamMemberCard({
   mode,
   onSelect,
 }: TeamMemberCardProps): React.ReactElement {
-  const commandCount = commands?.commands.length ?? 0;
+  const commandCount = Array.isArray(commands?.commands) ? commands.commands.length : 0;
 
   return (
     <button type="button" className={`member-card${active ? ' selected' : ''}`} onClick={onSelect}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { TeamAgent } from '../../../shared/types';
 import { bridge } from '../../bridgeClient';
 import type { AppNotification, PushNotificationInput, RuntimeNotificationContext } from '../types/ui';
+import { normalizeAgentEvent, normalizeTeamMessageEvent } from '../utils/backendData';
 import { formatAgentEvent, shouldShowAgentEventInToast } from '../utils/format';
 
 export type UseNotificationsInput = RuntimeNotificationContext;
@@ -50,7 +51,9 @@ export function useNotifications({
   }, []);
 
   useEffect(() => {
-    const unsubAgentEvent = bridge.on('conversation.agentEvent', (event) => {
+    const unsubAgentEvent = bridge.on('conversation.agentEvent', (payload) => {
+      const event = normalizeAgentEvent(payload);
+      if (!event) return;
       if (!shouldShowAgentEventInToast(event)) return;
       const agent = activeAgentsByConversation[event.conversationId] as TeamAgent | undefined;
       const level = event.type === 'agent.error' ? 'error' : event.type === 'agent.permission.request' ? 'warning' : 'success';
@@ -60,11 +63,12 @@ export function useNotifications({
         level,
       });
     });
-    const unsubTeamMessage = bridge.on('team.agent.message', ({ entry }) => {
-      if (entry.processed) return;
+    const unsubTeamMessage = bridge.on('team.agent.message', (payload) => {
+      const event = normalizeTeamMessageEvent(payload);
+      if (!event || event.entry.processed) return;
       push({
-        title: `${entry.fromAgentName} → ${entry.toAgentName}`,
-        message: entry.message.summary || entry.message.content,
+        title: `${event.entry.fromAgentName} → ${event.entry.toAgentName}`,
+        message: event.entry.message.summary || event.entry.message.content,
         level: 'info',
       });
     });

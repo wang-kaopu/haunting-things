@@ -19,6 +19,7 @@ const BACKENDS: Record<AgentBackend, { name: string; command: string; versionArg
   },
 };
 
+/** 返回指定 Agent 后端对应的 ACP bridge package。 */
 export function getBridgePackage(backend: AgentBackend): string {
   return BACKENDS[backend].bridgePackage;
 }
@@ -34,10 +35,12 @@ export function getBridgePackageVersioned(backend: AgentBackend): string {
   return `${BACKENDS[backend].bridgePackage}@${BRIDGE_VERSIONS[backend]}`;
 }
 
+/** 检测所有支持的本地 Agent CLI，并返回可用性元数据。 */
 export async function listAgents(): Promise<AgentInfo[]> {
   return Promise.all((Object.keys(BACKENDS) as AgentBackend[]).map(detectAgent));
 }
 
+/** 在不启动运行时会话的前提下，返回指定后端的轻量健康检查结果。 */
 export async function healthAgent(backend: AgentBackend): Promise<AgentHealth> {
   const info = await detectAgent(backend);
   return {
@@ -47,6 +50,7 @@ export async function healthAgent(backend: AgentBackend): Promise<AgentHealth> {
   };
 }
 
+/** 解析指定后端 CLI，并尽量读取其版本号。 */
 async function detectAgent(backend: AgentBackend): Promise<AgentInfo> {
   const config = BACKENDS[backend];
   try {
@@ -69,6 +73,7 @@ async function detectAgent(backend: AgentBackend): Promise<AgentInfo> {
   }
 }
 
+/** 使用平台原生命令在 PATH 中定位可执行文件。 */
 async function resolveCommand(command: string): Promise<string> {
   const executable = process.platform === 'win32' ? 'where' : 'which';
   const result = await execFileAsync(executable, [command], { timeout: 5000 });

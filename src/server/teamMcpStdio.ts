@@ -81,16 +81,19 @@ server.tool(
 
 await server.connect(new StdioServerTransport());
 
+/** 将一次 MCP tool call 转发给对应 Team 的 TCP server。 */
 async function callTeamTool(tool: string, args: Record<string, unknown>): Promise<string> {
   const response = await sendTcpRequest({ tool, args, authToken, fromSlotId });
   if (response.error) throw new Error(String(response.error));
   return String(response.result || '');
 }
 
+/** 将普通字符串封装为 MCP text 响应。 */
 function textResult(text: string) {
   return { content: [{ type: 'text' as const, text }] };
 }
 
+/** 向本地 Team MCP TCP bridge 发送一条带长度前缀的 JSON 请求。 */
 function sendTcpRequest(payload: unknown): Promise<any> {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(port, '127.0.0.1');

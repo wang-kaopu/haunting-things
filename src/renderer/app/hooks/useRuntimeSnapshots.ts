@@ -7,6 +7,12 @@ import type {
   TeamAgent,
 } from '../../../shared/types';
 import { bridge } from '../../bridgeClient';
+import {
+  normalizeConversationCommands,
+  normalizeConversationMode,
+  normalizeConversationModels,
+  normalizeConversationUsage,
+} from '../utils/backendData';
 
 export type UseRuntimeSnapshotsInput = {
   activeAgent: TeamAgent | null;
@@ -32,16 +38,24 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
   const [modeByConversation, setModeByConversation] = useState<Record<string, ConversationMode>>({});
 
   useEffect(() => {
-    const unsubUsage = bridge.on('conversation.usage', (usage) => {
+    const unsubUsage = bridge.on('conversation.usage', (payload) => {
+      const usage = normalizeConversationUsage(payload);
+      if (!usage) return;
       setUsageByConversation((prev) => ({ ...prev, [usage.conversationId]: usage }));
     });
-    const unsubCommands = bridge.on('conversation.commands', (snapshot) => {
+    const unsubCommands = bridge.on('conversation.commands', (payload) => {
+      const snapshot = normalizeConversationCommands(payload);
+      if (!snapshot) return;
       setCommandsByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
     });
-    const unsubModels = bridge.on('conversation.models', (snapshot) => {
+    const unsubModels = bridge.on('conversation.models', (payload) => {
+      const snapshot = normalizeConversationModels(payload);
+      if (!snapshot) return;
       setModelsByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
     });
-    const unsubMode = bridge.on('conversation.mode', (snapshot) => {
+    const unsubMode = bridge.on('conversation.mode', (payload) => {
+      const snapshot = normalizeConversationMode(payload);
+      if (!snapshot) return;
       setModeByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
     });
 
@@ -59,19 +73,22 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
 
     bridge
       .invoke('conversation.commands', { conversationId })
-      .then((snapshot) => {
+      .then((value) => {
+        const snapshot = normalizeConversationCommands(value);
         if (snapshot) setCommandsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
       })
       .catch(() => {});
     bridge
       .invoke('conversation.models', { conversationId })
-      .then((snapshot) => {
+      .then((value) => {
+        const snapshot = normalizeConversationModels(value);
         if (snapshot) setModelsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
       })
       .catch(() => {});
     bridge
       .invoke('conversation.mode', { conversationId })
-      .then((snapshot) => {
+      .then((value) => {
+        const snapshot = normalizeConversationMode(value);
         if (snapshot) setModeByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
       })
       .catch(() => {});

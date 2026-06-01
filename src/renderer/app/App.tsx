@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
+import { normalizeAuthResponse, normalizeAuthUser, readJsonResponse } from './utils/backendData';
 import { Workbench } from './Workbench';
 
 type AuthUser = {
@@ -14,8 +15,8 @@ export function App(_props: AppProps): React.ReactElement {
 
   useEffect(() => {
     fetch('/api/auth/user', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.user ?? null))
+      .then((res) => (res.ok ? readJsonResponse(res) : null))
+      .then((data) => setUser(normalizeAuthResponse(data).user))
       .catch(() => setUser(null));
   }, []);
 
@@ -38,12 +39,17 @@ function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactE
       credentials: 'include',
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const data = normalizeAuthResponse(await readJsonResponse(res));
     if (!res.ok) {
       setError(data.error || '登录失败');
       return;
     }
-    onLogin(data.user);
+    const user = normalizeAuthUser(data.user);
+    if (!user) {
+      setError('登录响应格式无效');
+      return;
+    }
+    onLogin(user);
   }
 
   return (

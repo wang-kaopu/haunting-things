@@ -26,7 +26,8 @@ export function useActiveTeam({ teams }: UseActiveTeamInput): UseActiveTeamResul
 
   const activeAgent = useMemo(() => {
     if (!activeTeam) return null;
-    return activeTeam.agents.find((agent) => agent.slotId === activeSlotId) ?? activeTeam.agents[0] ?? null;
+    const agents = activeTeam.agents ?? [];
+    return agents.find((agent) => agent.slotId === activeSlotId) ?? agents[0] ?? null;
   }, [activeSlotId, activeTeam]);
 
   useEffect(() => {
@@ -45,8 +46,9 @@ export function useActiveTeam({ teams }: UseActiveTeamInput): UseActiveTeamResul
   useEffect(() => {
     if (!activeTeam) return;
     setActiveSlotId((current) => {
-      if (current && activeTeam.agents.some((agent) => agent.slotId === current)) return current;
-      return activeTeam.agents.find((agent) => agent.role === 'leader')?.slotId ?? activeTeam.agents[0]?.slotId ?? null;
+      const agents = activeTeam.agents ?? [];
+      if (current && agents.some((agent) => agent.slotId === current)) return current;
+      return agents.find((agent) => agent.role === 'leader')?.slotId ?? agents[0]?.slotId ?? null;
     });
   }, [activeTeam]);
 

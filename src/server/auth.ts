@@ -37,6 +37,7 @@ export class AuthService {
     this.state.initialPassword = password;
   }
 
+  /** 校验账号密码，并签发会话 token。 */
   async login(username: string, password: string): Promise<{ user: User; token: string } | null> {
     const user = this.repo.getUserByUsername(username);
     if (!user) {
@@ -67,6 +68,7 @@ export class AuthService {
     return true;
   }
 
+  /** 为命令行重置流程生成新的管理员密码。 */
   async resetAdminPassword(): Promise<string> {
     const user = this.repo.getAnyUser();
     if (!user) throw new Error('No admin user exists');
@@ -77,6 +79,7 @@ export class AuthService {
     return password;
   }
 
+  /** 使用用户当前 JWT secret 解码并校验会话 token。 */
   verifyToken(token: string | null | undefined): User | null {
     if (!token) return null;
     const decoded = jwt.decode(token) as TokenPayload | null;
@@ -107,6 +110,7 @@ export class AuthService {
     next();
   };
 
+  /** 将认证会话 cookie 写入响应。 */
   setCookie(res: Response, token: string): void {
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
@@ -117,6 +121,7 @@ export class AuthService {
     });
   }
 
+  /** 清除认证会话 cookie。 */
   clearCookie(res: Response): void {
     res.clearCookie(COOKIE_NAME, { path: '/' });
   }

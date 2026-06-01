@@ -4,6 +4,12 @@ import type { AuthService } from './auth';
 import type { BridgeClientMessage, BridgeHandler, BridgeInvokeName, BridgeResultMessage } from '../shared/bridge';
 import { createLogger } from './logger';
 
+/**
+ * 渲染端与服务端之间的已认证 WebSocket RPC bridge。
+ *
+ * 渲染端消息由 `InvokeMap` 约束类型；该类负责分发到已注册处理器，
+ * 并返回统一的成功或错误结果信封。
+ */
 export class WebBridge {
   private readonly handlers = new Map<string, BridgeHandler<any>>();
   private readonly logger = createLogger('bridge');
@@ -13,10 +19,12 @@ export class WebBridge {
     private readonly auth: AuthService
   ) {}
 
+  /** 注册一个可由 renderer 调用的 RPC handler。 */
   register<Name extends BridgeInvokeName>(name: Name, handler: BridgeHandler<Name>): void {
     this.handlers.set(name, handler);
   }
 
+  /** 为 WebSocket server 挂载认证和消息处理逻辑。 */
   initialize(onConnection: (socket: WebSocket) => void, onClose: (socket: WebSocket) => void): void {
     this.wss.on('connection', (socket, request) => {
       const token = this.auth.extractTokenFromCookieHeader((request as IncomingMessage).headers.cookie);
@@ -33,6 +41,7 @@ export class WebBridge {
     });
   }
 
+  /** 解析并分发一条客户端 invoke 消息。 */
   private async handleMessage(socket: WebSocket, raw: string): Promise<void> {
     let message: BridgeClientMessage;
     try {
@@ -87,11 +96,13 @@ export class WebBridge {
     }
   }
 
+  /** 在 socket 仍打开时发送一条结果信封。 */
   private send(socket: WebSocket, payload: BridgeResultMessage): void {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
   }
 }
 
+/** 返回适合日志记录的 invoke 参数摘要，避免包含大字段或密钥。 */
 function summarizeInvokeParams(name: string, data: unknown): unknown {
   if (!data || typeof data !== 'object') return data;
 
@@ -120,6 +131,7 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
   }
 }
 
+/** 返回用于结构化 invoke 日志的紧凑结果摘要。 */
 function summarizeInvokeResult(name: string, result: unknown): unknown {
   if (!result || typeof result !== 'object') return result;
 
@@ -141,10 +153,12 @@ function summarizeInvokeResult(name: string, result: unknown): unknown {
   }
 }
 
+/** 仅从对象中复制指定字段用于结构化日志。 */
 function pick(input: Record<string, unknown>, keys: string[]): Record<string, unknown> {
   return Object.fromEntries(keys.filter((key) => key in input).map((key) => [key, input[key]]));
 }
 
+/** 记录任意结果对象时截断过长字符串和数组。 */
 function summarizeObject(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(input).map(([key, value]) => {
@@ -159,6 +173,7 @@ function summarizeObject(input: Record<string, unknown>): Record<string, unknown
   );
 }
 
+/** 从任意 invoke payload 日志中脱敏明显的凭据字段。 */
 function redactObject(input: Record<string, unknown>): Record<string, unknown> {
   const blocked = new Set(['password', 'currentPassword', 'newPassword', 'token', 'authorization']);
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, blocked.has(key) ? '***' : value]));

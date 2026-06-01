@@ -8,7 +8,8 @@ export type AgentCommandsMenuProps = {
 
 export function AgentCommandsMenu({ commands }: AgentCommandsMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
-  const count = commands?.commands.length ?? 0;
+  const commandList = Array.isArray(commands?.commands) ? commands.commands : [];
+  const count = commandList.length;
 
   return (
     <div className="commands-menu">
@@ -20,7 +21,7 @@ export function AgentCommandsMenu({ commands }: AgentCommandsMenuProps): React.R
           {count === 0 ? (
             <p className="muted">暂无命令快照。</p>
           ) : (
-            commands?.commands.map((command) => (
+            commandList.map((command) => (
               <details key={command.name} className="command-mini">
                 <summary>
                   <code>{command.name}</code>
