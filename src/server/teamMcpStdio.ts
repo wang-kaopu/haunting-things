@@ -81,6 +81,10 @@ server.tool(
 
 await server.connect(new StdioServerTransport());
 
+process.stderr.write(
+  `[teamMcpStdio] ready pid=${process.pid} port=${port} slot=${fromSlotId || 'unknown'} tools=team_members,team_send_message,team_add_agent,team_remove_agent,team_finish_task,team_delegate_task\n`
+);
+
 /** 将一次 MCP tool call 转发给对应 Team 的 TCP server。 */
 async function callTeamTool(tool: string, args: Record<string, unknown>): Promise<string> {
   const response = await sendTcpRequest({ tool, args, authToken, fromSlotId });

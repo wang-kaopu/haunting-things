@@ -13,6 +13,7 @@ import type {
 import { classifyAgentEvent } from './agentEventPolicy';
 import type { Repository } from './db';
 import type { EventBus } from './events';
+import { createId } from './id';
 import { createLogger } from './logger';
 import { AcpRuntime } from './acpRuntime';
 
@@ -66,10 +67,10 @@ export class ConversationService {
     mcpServers?: any[];
   }): Conversation {
     const now = Date.now();
-    const workspace = input.workspace?.trim() || path.join(this.dataDir, 'workspaces', crypto.randomUUID());
+    const workspace = input.workspace?.trim() || path.join(this.dataDir, 'workspaces', createId());
     mkdirSync(workspace, { recursive: true });
     const conversation = this.repo.createConversation({
-      id: crypto.randomUUID(),
+      id: createId(),
       backend: input.backend,
       name: input.name || `${input.backend} conversation`,
       workspace,
@@ -168,7 +169,7 @@ export class ConversationService {
     });
 
     const userMessage = this.repo.addMessage({
-      id: crypto.randomUUID(),
+      id: createId(),
       conversationId: conversation.id,
       role: 'user',
       content: input.content,
@@ -221,7 +222,7 @@ export class ConversationService {
     const visibleMessage = input.displayMessage?.trim();
     if (visibleMessage) {
       const userMessage = this.repo.addMessage({
-        id: crypto.randomUUID(),
+        id: createId(),
         conversationId: conversation.id,
         role: 'user',
         content: visibleMessage,

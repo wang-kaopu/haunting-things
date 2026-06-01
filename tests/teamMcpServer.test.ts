@@ -158,8 +158,11 @@ describe('TeamMcpServer', () => {
   it('resolves the stdio launcher differently for dev and production builds', () => {
     const dev = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('src/server/teamMcpServer.ts')).href);
     expect(dev).toEqual({
-      command: 'npx',
-      args: ['tsx', path.resolve('src/server/teamMcpStdio.ts')],
+      command: process.execPath,
+      args: [
+        path.resolve('node_modules/tsx/dist/cli.mjs'),
+        path.resolve('src/server/teamMcpStdio.ts'),
+      ],
     });
 
     const prod = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('dist-server/server/teamMcpServer.js')).href);

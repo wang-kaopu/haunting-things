@@ -11,6 +11,7 @@ import type {
 import type { Repository } from './db';
 import type { ConversationService } from './conversations';
 import type { EventBus } from './events';
+import { createId } from './id';
 import { createLogger } from './logger';
 import { TeamMcpServer } from './teamMcpServer';
 
@@ -91,7 +92,7 @@ export class TeamService {
       name: `${input.name} - Leader`,
     });
     const leader: TeamAgent = {
-      slotId: `slot-${crypto.randomUUID().slice(0, 8)}`,
+      slotId: `slot-${createId()}`,
       conversationId: leaderConversation.id,
       role: 'leader',
       backend: input.leaderBackend,
@@ -101,7 +102,7 @@ export class TeamService {
     };
     const now = Date.now();
     const team = this.repo.createTeam({
-      id: crypto.randomUUID(),
+      id: createId(),
       name: input.name,
       workspace: leaderConversation.workspace,
       leaderSlotId: leader.slotId,
@@ -181,7 +182,7 @@ export class TeamService {
       name: `${team.name} - ${input.name}`,
     });
     const agent: TeamAgent = {
-      slotId: `slot-${crypto.randomUUID().slice(0, 8)}`,
+      slotId: `slot-${createId()}`,
       conversationId: conversation.id,
       role: 'teammate',
       backend: input.backend,
@@ -294,7 +295,7 @@ export class TeamService {
 
     const now = Date.now();
     return this.repo.createTask({
-      id: crypto.randomUUID(),
+      id: createId(),
       teamId: team.id,
       title,
       description: input.description?.trim() || undefined,
@@ -343,7 +344,7 @@ export class TeamService {
     }
     if (!task) {
       task = this.repo.createTask({
-        id: input.taskId ?? crypto.randomUUID(),
+        id: input.taskId ?? createId(),
         teamId: team.id,
         title: input.taskId ? `Task ${input.taskId}` : 'Ad hoc task',
         description: undefined,
@@ -367,7 +368,7 @@ export class TeamService {
     if (leader && actor.role !== 'leader') {
       const content = input.taskId ? `Task ${input.taskId} finished: ${summary}` : `Task finished: ${summary}`;
       await this.deliver({
-        id: crypto.randomUUID(),
+        id: createId(),
         teamId: team.id,
         toAgentId: leader.slotId,
         fromAgentId: actor.slotId,
@@ -397,7 +398,7 @@ export class TeamService {
       content: input.content,
       read: false,
       createdAt: Date.now(),
-      id: crypto.randomUUID(),
+      id: createId(),
     });
   }
 
@@ -416,7 +417,7 @@ export class TeamService {
       content: input.content,
       read: false,
       createdAt: Date.now(),
-      id: crypto.randomUUID(),
+      id: createId(),
     });
   }
 
@@ -465,7 +466,7 @@ export class TeamService {
       contentLength: content.length,
     });
     await this.deliver({
-      id: crypto.randomUUID(),
+      id: createId(),
       teamId: team.id,
       toAgentId: team.leaderSlotId,
       fromAgentId: agent.slotId,

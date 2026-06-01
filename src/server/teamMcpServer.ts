@@ -3,6 +3,8 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgent, TeamTask } from '../shared/types';
+import { createId } from './id';
+import { createLogger } from './logger';
 
 type TcpRequest = {
   authToken?: string;
@@ -42,9 +44,10 @@ type TeamCallbacks = {
  * 代理进程通过 `teamMcpStdio.ts` 连接，并把 MCP tool call 转换成带长度前缀的 TCP 请求。
  */
 export class TeamMcpServer {
+  private readonly logger = createLogger('team.mcp');
   private server: net.Server | null = null;
   private port = 0;
-  private readonly authToken = crypto.randomUUID();
+  private readonly authToken = crypto.randomBytes(32).toString('base64url');
 
   constructor(
     private readonly teamId: string,
@@ -76,7 +79,7 @@ export class TeamMcpServer {
   getStdioConfig(slotId: string): StdioMcpConfig {
     const team = this.resolveTeam();
     const invocation = resolveTeamMcpStdioInvocation();
-    return {
+    const config = {
       name: `haunting-souls-team-${team.id}`,
       command: invocation.command,
       args: invocation.args,
@@ -86,6 +89,18 @@ export class TeamMcpServer {
         TEAM_AGENT_SLOT_ID: slotId,
       },
     };
+    this.logger.info('stdio_config', {
+      teamId: team.id,
+      slotId,
+      name: config.name,
+      command: config.command,
+      args: config.args,
+      env: {
+        ...config.env,
+        TEAM_MCP_TOKEN: `***${this.authToken.slice(-6)}`,
+      },
+    });
+    return config;
   }
 
   /** 解析最新 Team 快照；若 Team 已删除则抛错。 */
@@ -159,7 +174,7 @@ export class TeamMcpServer {
       : team.agents.find((agent) => agent.role === 'leader') ?? team.agents[0];
 
     const message: MailboxMessage = {
-      id: crypto.randomUUID(),
+      id: createId(),
       teamId: team.id,
       toAgentId: target.slotId,
       fromAgentId: sender?.slotId ?? team.leaderSlotId,
@@ -248,7 +263,7 @@ export class TeamMcpServer {
       ? team.agents.find((agent) => agent.slotId === fromSlotId)
       : team.agents.find((agent) => agent.role === 'leader') ?? team.agents[0];
     const message: MailboxMessage = {
-      id: crypto.randomUUID(),
+      id: createId(),
       teamId: team.id,
       toAgentId: target.slotId,
       fromAgentId: sender?.slotId ?? team.leaderSlotId,
@@ -321,8 +336,12 @@ export function resolveTeamMcpStdioInvocation(currentModuleUrl: string = import.
       args: [path.join(path.dirname(current), 'teamMcpStdio.js')],
     };
   }
+  const projectRoot = path.resolve(path.dirname(current), '..', '..');
   return {
-    command: 'npx',
-    args: ['tsx', path.join(path.dirname(current), 'teamMcpStdio.ts')],
+    command: process.execPath,
+    args: [
+      path.join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs'),
+      path.join(path.dirname(current), 'teamMcpStdio.ts'),
+    ],
   };
 }

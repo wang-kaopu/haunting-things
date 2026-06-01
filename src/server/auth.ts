@@ -5,6 +5,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { parse as parseCookie } from 'cookie';
 import type { Repository } from './db';
 import type { User } from '../shared/types';
+import { createId } from './id';
 
 const COOKIE_NAME = 'hs_session';
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -29,7 +30,7 @@ export class AuthService {
     const password = crypto.randomBytes(9).toString('base64url');
     const passwordHash = await bcrypt.hash(password, 12);
     this.repo.createUser({
-      id: crypto.randomUUID(),
+      id: createId(),
       username: 'admin',
       passwordHash,
       jwtSecret: crypto.randomBytes(48).toString('hex'),

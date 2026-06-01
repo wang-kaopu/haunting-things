@@ -1,6 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
-import crypto from 'node:crypto';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import {
@@ -25,6 +24,7 @@ import type {
   PermissionRequest,
 } from '../shared/types';
 import { getBridgePackageVersioned } from './agentRegistry';
+import { createId } from './id';
 import { createLogger } from './logger';
 import { ndjsonFromChildProcess } from './ndjsonTransport';
 
@@ -170,7 +170,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
    */
   async send(content: string): Promise<void> {
     await this.ensureStarted();
-    this.activeTurnId = crypto.randomUUID();
+    this.activeTurnId = createId();
     this.turnFinalized = false;
     this.turnPhase = 'thinking';
     this.hasReplyStarted = false;
@@ -180,7 +180,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emitAgentEvent({ type: 'agent.thinking' });
 
     this.assistantMessage = {
-      id: crypto.randomUUID(),
+      id: createId(),
       conversationId: this.input.conversationId,
       role: 'assistant',
       content: '',
@@ -644,7 +644,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       update.id ??
       update.callId ??
       update.call_id ??
-      crypto.randomUUID();
+      createId();
     return String(candidate);
   }
 
@@ -959,7 +959,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
    * @returns 在用户确认后 resolve 的 Promise，供 SDK 层等待
    */
   private handlePermissionRequest(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
-    const callId = params.toolCall?.toolCallId ?? crypto.randomUUID();
+    const callId = params.toolCall?.toolCallId ?? createId();
 
     const permissionRequest: PermissionRequest = {
       conversationId: this.input.conversationId,
@@ -1031,7 +1031,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private emitAgentEvent(event: AcpRuntimeAgentEventInput): void {
     if (!this.activeTurnId) return;
     this.emit('agentEvent', {
-      id: crypto.randomUUID(),
+      id: createId(),
       conversationId: this.input.conversationId,
       turnId: this.activeTurnId,
       at: Date.now(),
