@@ -204,7 +204,7 @@ describe('TeamService', () => {
   });
 
   it('creates a team and refreshes the runtime when a teammate is added', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
 
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
     expect(team.agents).toHaveLength(1);
@@ -230,7 +230,7 @@ describe('TeamService', () => {
   });
 
   it('updates an agent model and synchronizes the conversation model', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude', leaderModel: 'sonnet-4' });
     const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex', model: 'haiku-3' });
 
@@ -249,7 +249,7 @@ describe('TeamService', () => {
   });
 
   it('deletes a team by stopping its runtimes and removing persisted state', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
     await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
 
@@ -263,7 +263,7 @@ describe('TeamService', () => {
   });
 
   it('records mailbox entries in the team timeline and marks them processed after delivery', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
 
     await service.sendMessage({ teamId: team.id, content: 'Hello leader' });
@@ -303,7 +303,7 @@ describe('TeamService', () => {
   });
 
   it('queues wakeups without blocking and serializes repeated prompts for the same agent', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
 
     let resolveFirstWake: (() => void) | null = null;
@@ -331,7 +331,7 @@ describe('TeamService', () => {
   });
 
   it('creates explicit tasks through taskCreate', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
 
     const task = await service.taskCreate({
@@ -350,7 +350,7 @@ describe('TeamService', () => {
   });
 
   it('creates a temporary task and completes it when finishTask has no taskId', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
     const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
 
@@ -382,7 +382,7 @@ describe('TeamService', () => {
   });
 
   it('auto-returns the teammate final assistant reply to the leader mailbox on conversation finish', async () => {
-    const service = new TeamService(repo as any, conversations as any, events);
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
     const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
 

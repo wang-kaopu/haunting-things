@@ -5,7 +5,12 @@ import { createApp } from './app/createApp';
 import { registerBridgeHandlers } from './app/bridge/registerBridgeHandlers';
 import { WebBridge } from './app/bridge/webBridge';
 import { loadConfig } from './config';
-import { openDatabase, Repository } from './db/db';
+import { openDatabase } from './db/connection';
+import { ConversationRepository } from './db/conversationRepository';
+import { MailboxRepository } from './db/mailboxRepository';
+import { TaskRepository } from './db/taskRepository';
+import { TeamRepository } from './db/teamRepository';
+import { UserRepository } from './db/userRepository';
 import { AuthService } from './services/authService';
 import { EventBus } from './events';
 import { ConversationService } from './services/conversationService';
@@ -15,8 +20,12 @@ import { TeamService } from './services/teamService';
 const config = loadConfig();
 const logger = createLogger('server');
 const db = openDatabase(config.dbPath);
-const repo = new Repository(db);
-const auth = new AuthService(repo);
+const usersRepo = new UserRepository(db);
+const conversationsRepo = new ConversationRepository(db);
+const teamsRepo = new TeamRepository(db);
+const mailboxRepo = new MailboxRepository(db);
+const tasksRepo = new TaskRepository(db);
+const auth = new AuthService(usersRepo);
 await auth.ensureAdmin();
 
 if (process.argv.includes('--reset-password')) {
@@ -30,8 +39,8 @@ if (process.argv.includes('--reset-password')) {
 }
 
 const events = new EventBus();
-const conversations = new ConversationService(repo, events, config.dataDir);
-const teams = new TeamService(repo, conversations, events);
+const conversations = new ConversationService(conversationsRepo, events, config.dataDir);
+const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events);
 const app = createApp({ auth, logger, rendererDist: config.rendererDist });
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

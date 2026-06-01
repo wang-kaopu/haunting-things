@@ -11,7 +11,7 @@ import type {
   ConversationUsage,
 } from '../../shared/types';
 import { classifyAgentEvent } from '../agentEventPolicy';
-import type { Repository } from '../db/db';
+import type { ConversationRepositoryPort } from '../db/conversationRepository';
 import type { EventBus } from '../events';
 import { createId } from '../id';
 import { createLogger } from '../logger';
@@ -46,7 +46,7 @@ export class ConversationService {
   private readonly agentEventHandlers = new Set<(event: AgentEvent) => void | Promise<void>>();
 
   constructor(
-    private readonly repo: Repository,
+    private readonly repo: ConversationRepositoryPort,
     private readonly events: EventBus,
     private readonly dataDir: string
   ) {}

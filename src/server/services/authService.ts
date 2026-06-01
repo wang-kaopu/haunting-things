@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { parse as parseCookie } from 'cookie';
-import type { Repository } from '../db/db';
+import type { UserRepositoryPort } from '../db/userRepository';
 import type { User } from '../../shared/types';
 import { createId } from '../id';
 
@@ -22,7 +22,7 @@ type TokenPayload = {
 export class AuthService {
   readonly state: AuthState = { initialPassword: null };
 
-  constructor(private readonly repo: Repository) {}
+  constructor(private readonly repo: UserRepositoryPort) {}
 
   async ensureAdmin(): Promise<void> {
     if (this.repo.getAnyUser()) return;

@@ -3,14 +3,17 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, test } from 'vitest';
-import { openDatabase, Repository } from '../src/server/db/db';
+import { openDatabase } from '../src/server/db/connection';
+import { MailboxRepository } from '../src/server/db/mailboxRepository';
+import { TeamRepository } from '../src/server/db/teamRepository';
 
 describe('mailbox repository', () => {
   test('readUnreadAndMark returns unread messages once', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'haunting-souls-test-'));
     const db = openDatabase(path.join(dir, 'test.sqlite'));
-    const repo = new Repository(db);
-    repo.createTeam({
+    const teamsRepo = new TeamRepository(db);
+    const mailboxRepo = new MailboxRepository(db);
+    teamsRepo.createTeam({
       id: 'team-1',
       name: 'Test Team',
       workspace: dir,
@@ -29,7 +32,7 @@ describe('mailbox repository', () => {
       updatedAt: 1,
     });
 
-    repo.writeMailbox({
+    mailboxRepo.writeMailbox({
       id: 'm1',
       teamId: 'team-1',
       toAgentId: 'agent-1',
@@ -39,8 +42,8 @@ describe('mailbox repository', () => {
       createdAt: 1,
     });
 
-    const firstRead = repo.readUnreadAndMark('team-1', 'agent-1');
-    const secondRead = repo.readUnreadAndMark('team-1', 'agent-1');
+    const firstRead = mailboxRepo.readUnreadAndMark('team-1', 'agent-1');
+    const secondRead = mailboxRepo.readUnreadAndMark('team-1', 'agent-1');
 
     expect(firstRead).toHaveLength(1);
     expect(firstRead[0].content).toBe('hello');
@@ -93,8 +96,8 @@ describe('mailbox repository', () => {
     legacyDb.close();
 
     const db = openDatabase(dbPath);
-    const repo = new Repository(db);
-    const teams = repo.listTeams();
+    const teamsRepo = new TeamRepository(db);
+    const teams = teamsRepo.listTeams();
 
     expect(teams).toHaveLength(1);
     expect(teams[0].leaderSlotId).toBe('leader');

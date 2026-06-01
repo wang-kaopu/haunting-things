@@ -1,4 +1,4 @@
-import type { Db } from './db';
+import type { Db } from './connection';
 
 export function initializeSchema(db: Db): void {
   db.exec(`

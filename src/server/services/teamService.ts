@@ -8,7 +8,9 @@ import type {
   TeamMailboxEntry,
   TeamTask,
 } from '../../shared/types';
-import type { Repository } from '../db/db';
+import type { MailboxRepositoryPort } from '../db/mailboxRepository';
+import type { TaskRepositoryPort } from '../db/taskRepository';
+import type { TeamRepositoryPort } from '../db/teamRepository';
 import type { ConversationService } from './conversationService';
 import type { EventBus } from '../events';
 import { createId } from '../id';
@@ -46,7 +48,9 @@ export class TeamService {
   private readonly explicitRepliedTurns = new Map<string, boolean>();
 
   constructor(
-    private readonly repo: Repository,
+    private readonly teamsRepo: TeamRepositoryPort,
+    private readonly mailboxRepo: MailboxRepositoryPort,
+    private readonly tasksRepo: TaskRepositoryPort,
     private readonly conversations: ConversationService,
     private readonly events: EventBus
   ) {
@@ -101,7 +105,7 @@ export class TeamService {
       status: 'idle',
     };
     const now = Date.now();
-    const team = this.repo.createTeam({
+    const team = this.teamsRepo.createTeam({
       id: createId(),
       name: input.name,
       workspace: leaderConversation.workspace,
@@ -121,12 +125,12 @@ export class TeamService {
 
   /** 返回所有 Team 列表。 */
   list(): Team[] {
-    return this.repo.listTeams();
+    return this.teamsRepo.listTeams();
   }
 
   /** 按 ID 查询单个 Team，不存在返回 null。 */
   get(teamId: string): Team | null {
-    return this.repo.getTeam(teamId);
+    return this.teamsRepo.getTeam(teamId);
   }
 
   /**
@@ -136,7 +140,7 @@ export class TeamService {
     this.logger.info('team_delete_start', {
       teamId,
     });
-    const team = this.repo.getTeam(teamId);
+    const team = this.teamsRepo.getTeam(teamId);
     if (!team) throw new Error(`Team not found: ${teamId}`);
 
     const session = this.sessions.get(teamId);
@@ -151,7 +155,7 @@ export class TeamService {
       this.pendingWakeups.delete(`${teamId}:${agent.slotId}`);
       this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
     }
-    this.repo.deleteTeam(teamId);
+    this.teamsRepo.deleteTeam(teamId);
     this.logger.info('team_delete_done', {
       teamId,
       memberCount: team.agents.length,
@@ -191,7 +195,7 @@ export class TeamService {
       status: 'idle',
     };
     const updated = { ...team, agents: [...team.agents, agent], updatedAt: Date.now() };
-    this.repo.updateTeam(updated);
+    this.teamsRepo.updateTeam(updated);
     const session = await this.ensureSession(updated.id);
     this.injectConversationMcpConfig(session.mcpServer, conversation.id, agent.slotId);
     this.events.emit('team.agent.added', { teamId: updated.id, agent });
@@ -228,7 +232,7 @@ export class TeamService {
       agents: team.agents.map((item) => (item.slotId === input.slotId ? updatedAgent : item)),
       updatedAt: Date.now(),
     };
-    this.repo.updateTeam(updatedTeam);
+    this.teamsRepo.updateTeam(updatedTeam);
 
     this.conversations.setModel({
       conversationId: agent.conversationId,
@@ -261,7 +265,7 @@ export class TeamService {
       agents: team.agents.filter((item) => item.slotId !== input.slotId),
       updatedAt: Date.now(),
     };
-    this.repo.updateTeam(updated);
+    this.teamsRepo.updateTeam(updated);
     this.events.emit('team.agent.removed', { teamId: updated.id, slotId: input.slotId });
     this.logger.info('agent_remove_done', {
       teamId: updated.id,
@@ -294,7 +298,7 @@ export class TeamService {
     if (input.createdBySlotId) this.requireAgent(team, input.createdBySlotId);
 
     const now = Date.now();
-    return this.repo.createTask({
+    return this.tasksRepo.createTask({
       id: createId(),
       teamId: team.id,
       title,
@@ -310,7 +314,7 @@ export class TeamService {
   /** 返回当前 Team 的任务列表。 */
   tasks(teamId: string): TeamTask[] {
     this.requireTeam(teamId);
-    return this.repo.listTasks(teamId);
+    return this.tasksRepo.listTasks(teamId);
   }
 
   /**
@@ -338,12 +342,12 @@ export class TeamService {
     this.explicitRepliedTurns.set(actor.conversationId, true);
 
     const now = Date.now();
-    let task = input.taskId ? this.repo.getTask(input.taskId) : null;
+    let task = input.taskId ? this.tasksRepo.getTask(input.taskId) : null;
     if (task && task.teamId !== team.id) {
       throw new Error(`Task not found: ${input.taskId}`);
     }
     if (!task) {
-      task = this.repo.createTask({
+      task = this.tasksRepo.createTask({
         id: input.taskId ?? createId(),
         teamId: team.id,
         title: input.taskId ? `Task ${input.taskId}` : 'Ad hoc task',
@@ -355,7 +359,7 @@ export class TeamService {
         updatedAt: now,
       });
     }
-    this.repo.updateTask({
+    this.tasksRepo.updateTask({
       ...task,
       status: 'done',
       completionSummary: summary,
@@ -489,7 +493,7 @@ export class TeamService {
       await session.mcpServer.stop();
       this.sessions.delete(teamId);
     }
-    const team = this.repo.getTeam(teamId);
+    const team = this.teamsRepo.getTeam(teamId);
     if (team) {
       for (const agent of team.agents) {
         this.conversations.stop(agent.conversationId);
@@ -502,7 +506,7 @@ export class TeamService {
    */
   timeline(teamId: string): TeamMailboxEntry[] {
     const team = this.requireTeam(teamId);
-    return this.repo.listMailbox(teamId).map((message) => this.buildMailboxEntry(team, message));
+    return this.mailboxRepo.listMailbox(teamId).map((message) => this.buildMailboxEntry(team, message));
   }
 
   /**
@@ -528,7 +532,7 @@ export class TeamService {
       this.explicitRepliedTurns.set(fromAgent.conversationId, true);
     }
 
-    this.repo.writeMailbox(message);
+    this.mailboxRepo.writeMailbox(message);
     this.events.emit('team.agent.message', {
       teamId: message.teamId,
       entry: this.buildMailboxEntry(team, message),
@@ -582,7 +586,7 @@ export class TeamService {
       /** 方法 `wakeAgent` 已经发出失败状态，这里只负责收尾和补轮次。 */
     } finally {
       this.activeWakeups.delete(key);
-      const hasUnread = this.repo.listUnreadMailbox(teamId, slotId).length > 0;
+      const hasUnread = this.mailboxRepo.listUnreadMailbox(teamId, slotId).length > 0;
       if (hasUnread) this.scheduleWakeAgent(teamId, slotId);
     }
   }
@@ -601,7 +605,7 @@ export class TeamService {
     this.explicitRepliedTurns.set(agent.conversationId, false);
 
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
-    const messages = this.repo.readUnreadAndMark(teamId, slotId);
+    const messages = this.mailboxRepo.readUnreadAndMark(teamId, slotId);
     for (const message of messages) {
       this.events.emit('team.agent.message', {
         teamId,
@@ -672,7 +676,7 @@ export class TeamService {
     await this.sessions.get(team.id)?.mcpServer.stop();
     const mcpServer = new TeamMcpServer(
       team.id,
-      () => this.repo.getTeam(team.id),
+      () => this.teamsRepo.getTeam(team.id),
       {
         addAgent: (input) => this.addAgent(input),
         taskCreate: (input) => this.taskCreate(input),
@@ -696,7 +700,7 @@ export class TeamService {
 
   /** 查询 Team，不存在则抛出。 */
   private requireTeam(teamId: string): Team {
-    const team = this.repo.getTeam(teamId);
+    const team = this.teamsRepo.getTeam(teamId);
     if (!team) throw new Error(`Team not found: ${teamId}`);
     return team;
   }
@@ -736,7 +740,7 @@ export class TeamService {
   }
 
   private findTeamAgentByConversationId(conversationId: string): { team: Team; agent: TeamAgent } | null {
-    for (const team of this.repo.listTeams()) {
+    for (const team of this.teamsRepo.listTeams()) {
       const agent = team.agents.find((item) => item.conversationId === conversationId);
       if (agent) return { team, agent };
     }

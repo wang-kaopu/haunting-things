@@ -1,13 +1,16 @@
 /**
  * 半集成测试：Codex Leader 与 Claude Teammate 协作闭环。
  *
- * 使用真实 SQLite 内存库（Repository）+ 真实 EventBus，
+ * 使用真实 SQLite 内存库 + 真实 EventBus，
  * mock ConversationService / TeamMcpServer，验证 TeamService 的完整业务链路。
  *
  * 对应 PLAN-4.md 中的用例一到用例七。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openDatabase, Repository } from '../src/server/db/db';
+import { openDatabase } from '../src/server/db/connection';
+import { MailboxRepository } from '../src/server/db/mailboxRepository';
+import { TaskRepository } from '../src/server/db/taskRepository';
+import { TeamRepository } from '../src/server/db/teamRepository';
 import { EventBus } from '../src/server/events';
 import type {
   AgentBackend,
@@ -283,7 +286,9 @@ async function flushWakeups(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 describe('team integration flow', () => {
-  let repo: Repository;
+  let teamsRepo: TeamRepository;
+  let mailboxRepo: MailboxRepository;
+  let tasksRepo: TaskRepository;
   let conversations: FakeConversationService;
   let events: EventBus;
   let teamService: TeamService;
@@ -295,13 +300,15 @@ describe('team integration flow', () => {
 
     // 真实内存 SQLite
     db = openDatabase(':memory:');
-    repo = new Repository(db);
+    teamsRepo = new TeamRepository(db);
+    mailboxRepo = new MailboxRepository(db);
+    tasksRepo = new TaskRepository(db);
 
     conversations = new FakeConversationService();
     events = new EventBus();
     emitSpy = vi.spyOn(events, 'emit');
 
-    teamService = new TeamService(repo as any, conversations as any, events);
+    teamService = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations as any, events);
   });
 
   afterEach(() => {
@@ -348,7 +355,7 @@ describe('team integration flow', () => {
     expect(mockMcpInstances[0].start).toHaveBeenCalledTimes(1);
 
     // 持久化验证
-    const persisted = repo.getTeam(team.id);
+    const persisted = teamsRepo.getTeam(team.id);
     expect(persisted).not.toBeNull();
     expect(persisted!.agents).toHaveLength(1);
     expect(persisted!.leaderSlotId).toBe(leader.slotId);
@@ -375,7 +382,7 @@ describe('team integration flow', () => {
     });
 
     // Team agents 数量从 1 变成 2
-    const refreshed = repo.getTeam(team.id)!;
+    const refreshed = teamsRepo.getTeam(team.id)!;
     expect(refreshed.agents).toHaveLength(2);
 
     // 新 Agent 属性正确
@@ -431,7 +438,7 @@ describe('team integration flow', () => {
     await flushWakeups();
 
     // Claude 被创建
-    const refreshed = repo.getTeam(team.id)!;
+    const refreshed = teamsRepo.getTeam(team.id)!;
     expect(refreshed.agents).toHaveLength(2);
     const claude = refreshed.agents.find((a) => a.backend === 'claude' && a.role === 'teammate')!;
     expect(claude).toBeDefined();
@@ -491,7 +498,7 @@ describe('team integration flow', () => {
 
     await flushWakeups();
 
-    const afterFirst = repo.getTeam(team.id)!;
+    const afterFirst = teamsRepo.getTeam(team.id)!;
     const claudeCountAfterFirst = afterFirst.agents.filter((a) => a.backend === 'claude').length;
     expect(claudeCountAfterFirst).toBe(1);
     const claude = afterFirst.agents.find((a) => a.backend === 'claude')!;
@@ -505,7 +512,7 @@ describe('team integration flow', () => {
     await flushWakeups();
 
     // Team agents 数量仍为 2，没有重复创建
-    const afterSecond = repo.getTeam(team.id)!;
+    const afterSecond = teamsRepo.getTeam(team.id)!;
     const claudeCountAfterSecond = afterSecond.agents.filter((a) => a.backend === 'claude').length;
     expect(claudeCountAfterSecond).toBe(claudeCountAfterFirst);
 
@@ -708,7 +715,7 @@ describe('team integration flow', () => {
     expect(validResult.name).toBe('Valid Claude');
     expect(validResult.backend).toBe('claude');
 
-    expect(repo.getTeam(team.id)!.agents).toHaveLength(agentCountBefore + 1);
+    expect(teamsRepo.getTeam(team.id)!.agents).toHaveLength(agentCountBefore + 1);
   });
 
   // =========================================================================
