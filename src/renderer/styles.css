@@ -510,6 +510,14 @@ label,
   gap: 16px;
 }
 
+.chat-header-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
 .chat-header__title {
   display: flex;
   align-items: baseline;
@@ -1948,13 +1956,121 @@ label,
    Responsive — 平板与小屏
    ================================================================ */
 
+/* ================================================================
+   Mobile Sidebar Trigger — 桌面端隐藏，移动端显示
+   ================================================================ */
+
+.mobile-sidebar-trigger {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: none;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #f4f4f4;
+  color: #0d0d0d;
+  box-shadow: none;
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.mobile-sidebar-trigger svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.mobile-sidebar-trigger:hover {
+  background: #e9e9e9;
+  border-color: transparent;
+}
+
+.mobile-sidebar-trigger:active {
+  transform: scale(0.96);
+}
+
+.mobile-sidebar-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(13, 13, 13, 0.12);
+}
+
+/* ================================================================
+   Responsive — 移动端
+   ================================================================ */
+
 @media (max-width: 900px) {
+  .mobile-sidebar-trigger {
+    display: inline-grid;
+  }
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
   .app-shell {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    display: grid;
     grid-template-columns: 1fr;
+    background: #ffffff;
   }
 
   .sidebar {
-    display: none;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 80;
+    display: flex;
+    width: min(320px, 86vw);
+    height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform 160ms ease;
+    box-shadow: 16px 0 48px rgba(0, 0, 0, 0.14);
+  }
+
+  .app-shell.mobile-sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.24);
+  }
+
+  .chat-layout {
+    min-width: 0;
+    min-height: 0;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .messages-wrap {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .messages {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 16px 12px 140px;
   }
 
   .messages__inner,
@@ -1968,35 +2084,16 @@ label,
   }
 }
 
-@media (max-width: 600px) {
-  html,
-  body,
-  #root {
-    overflow: auto;
-  }
-
-  .app-shell {
-    grid-template-columns: 1fr;
-    min-height: 100vh;
-    height: auto;
-    overflow: visible;
-  }
-
-  .sidebar {
+@media (min-width: 901px) {
+  .mobile-sidebar-trigger,
+  .mobile-sidebar-backdrop {
     display: none;
   }
+}
 
-  .chat-layout {
-    height: auto;
-    min-height: 100dvh;
-  }
-
+@media (max-width: 600px) {
   .chat-header {
     padding: 0 12px;
-  }
-
-  .messages {
-    padding: 16px 12px 140px;
   }
 
   .message__user-bubble {
@@ -2004,26 +2101,12 @@ label,
   }
 
   .composer {
-    padding: 12px;
-  }
-
-  .composer-inner {
-    max-width: 100%;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
   }
 
   .composer-tools {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .team-drawer {
-    width: 100%;
-    max-width: 320px;
-  }
-
-  .drawer-toggle {
-    top: auto;
-    bottom: 80px;
+    flex-direction: row;
+    align-items: center;
   }
 
   .chat-empty__suggestions {

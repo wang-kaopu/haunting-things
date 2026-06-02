@@ -23,6 +23,7 @@ export type ChatLayoutProps = {
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
+  onOpenSidebar?: () => void;
   onSendMessage: (payload: SendBoxPayload) => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
@@ -43,6 +44,7 @@ export function ChatLayout({
   commands,
   models,
   mode,
+  onOpenSidebar,
   onSendMessage,
   onSetModel,
   onSetMode,
@@ -62,6 +64,7 @@ export function ChatLayout({
         activeAgent={activeAgent}
         activePhase={activePhase}
         usage={usage}
+        onOpenSidebar={onOpenSidebar}
       />
       {messages.length === 0 ? (
         <ChatEmpty />

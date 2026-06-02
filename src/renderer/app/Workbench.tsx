@@ -25,8 +25,7 @@ export type WorkbenchProps = {
 /**
  * GPT 风格主工作台。
  *
- * 两栏布局：左侧 Sidebar + 右侧 Chat Main。
- * TeamDrawer 改为右侧固定覆盖面板，点击切换按钮展开/收起。
+ * 桌面端两栏布局，移动端 Sidebar 改为 fixed 抽屉（通过 ☰ 按钮打开）。
  */
 export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElement {
   const teamsState = useTeams();
@@ -39,6 +38,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [permissionQueue, setPermissionQueue] = useState<PermissionRequest[]>([]);
   const permission = permissionQueue[0] ?? null;
 
@@ -162,7 +162,15 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   }
 
   return (
-    <main className="app-shell">
+    <main className={mobileSidebarOpen ? 'app-shell mobile-sidebar-open' : 'app-shell'}>
+      {mobileSidebarOpen ? (
+        <button
+          type="button"
+          className="mobile-sidebar-backdrop"
+          aria-label="关闭侧边栏"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      ) : null}
       <Sidebar
         username={user.username}
         teams={teamsState.teams}
@@ -172,8 +180,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         phases={conversation.phaseByConversation}
         onCreateTeamClick={() => setCreateTeamOpen(true)}
         onAddAgentClick={() => setAddAgentOpen(true)}
-        onSelectTeam={active.selectTeam}
-        onSelectAgent={active.selectAgent}
+        onSelectTeam={(teamId) => {
+          active.selectTeam(teamId);
+          setMobileSidebarOpen(false);
+        }}
+        onSelectAgent={(slotId) => {
+          active.selectAgent(slotId);
+          setMobileSidebarOpen(false);
+        }}
         onDeleteTeam={deleteTeam}
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={() => void logout()}
@@ -187,6 +201,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         commands={snapshots.commands}
         models={snapshots.models}
         mode={snapshots.mode}
+        onOpenSidebar={() => setMobileSidebarOpen(true)}
         onSendMessage={conversation.sendTeamMessage}
         onSetModel={setModel}
         onSetMode={setMode}
