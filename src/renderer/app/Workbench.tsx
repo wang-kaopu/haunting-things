@@ -187,7 +187,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         commands={snapshots.commands}
         models={snapshots.models}
         mode={snapshots.mode}
-        onAddAgentClick={() => setAddAgentOpen(true)}
         onSendMessage={conversation.sendTeamMessage}
         onSetModel={setModel}
         onSetMode={setMode}
@@ -219,8 +218,13 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
           <div className="modal settings-dialog">
             <div className="modal-header">
               <h2>设置</h2>
-              <button type="button" onClick={() => setSettingsOpen(false)}>
-                关闭
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="关闭设置"
+                onClick={() => setSettingsOpen(false)}
+              >
+                ×
               </button>
             </div>
 
@@ -255,7 +259,7 @@ function PermissionDialog({
   const [selected, setSelected] = useState(permission.options[0]?.id ?? '');
   return (
     <div className="permission-overlay">
-      <div className="permission-dialog panel">
+      <div className="permission-dialog">
         <h3>{permission.title}</h3>
         {permission.body ? <pre className="permission-body">{permission.body}</pre> : null}
         <div className="permission-options">
@@ -268,8 +272,12 @@ function PermissionDialog({
                 checked={selected === opt.id}
                 onChange={() => setSelected(opt.id)}
               />
-              {opt.label}
-              {opt.description ? <span className="permission-desc"> - {opt.description}</span> : null}
+              <span className="permission-option-content">
+                <strong>{opt.label}</strong>
+                {opt.description ? (
+                  <span className="permission-desc">{opt.description}</span>
+                ) : null}
+              </span>
             </label>
           ))}
         </div>

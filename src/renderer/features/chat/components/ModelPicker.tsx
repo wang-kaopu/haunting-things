@@ -21,7 +21,6 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
     setError('');
   }, [agent?.conversationId, current]);
 
-  /** 提交模型切换请求，并在切换期间禁用选择器避免重复操作。 */
   async function submit(model: string): Promise<void> {
     const nextModel = model.trim();
     if (!nextModel || submitting || nextModel === current) return;
@@ -39,9 +38,9 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
   return (
     <div className="model-picker">
       <label className="toolbar-select-label">
-        <span></span>
         <select
-          className="toolbar-select model-select"
+          aria-label="模型"
+          className="toolbar-control toolbar-select model-select"
           value={selectedValue}
           disabled={!agent || !hasOptions || submitting}
           onChange={(event) => {

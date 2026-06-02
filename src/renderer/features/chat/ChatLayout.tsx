@@ -23,7 +23,6 @@ export type ChatLayoutProps = {
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
-  onAddAgentClick: () => void;
   onSendMessage: (payload: SendBoxPayload) => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
@@ -44,7 +43,6 @@ export function ChatLayout({
   commands,
   models,
   mode,
-  onAddAgentClick,
   onSendMessage,
   onSetModel,
   onSetMode,
@@ -52,7 +50,7 @@ export function ChatLayout({
   if (!team) {
     return (
       <section className="chat-layout empty">
-        <p>选择一个团队开始对话，或点击左侧 "New Chat" 创建新团队。</p>
+        <p>选择一个团队开始对话，或点击左侧 Members 区域添加成员。</p>
       </section>
     );
   }
@@ -64,7 +62,6 @@ export function ChatLayout({
         activeAgent={activeAgent}
         activePhase={activePhase}
         usage={usage}
-        onAddAgentClick={onAddAgentClick}
       />
       {messages.length === 0 ? (
         <ChatEmpty />

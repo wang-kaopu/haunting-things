@@ -86,7 +86,6 @@ export function PermissionModePicker({
     setError('');
   }, [agent?.conversationId]);
 
-  /** 提交权限模式切换请求，YOLO模式会先要求用户二次确认。 */
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
       return;
@@ -114,9 +113,9 @@ export function PermissionModePicker({
   return (
     <div className="permission-mode-picker">
       <label className="toolbar-select-label">
-        <span></span>
         <select
-          className="toolbar-select permission-mode-select"
+          aria-label="权限模式"
+          className="toolbar-control toolbar-select permission-mode-select"
           value={current}
           disabled={!agent || options.length === 0 || submitting}
           title={currentOption?.description}

@@ -48,17 +48,8 @@ select {
 }
 
 button {
-  border: 1px solid #c8d0dc;
-  background: #fff;
-  border-radius: 6px;
-  padding: 8px 10px;
+  font: inherit;
   cursor: pointer;
-}
-
-button:hover,
-button.selected {
-  background: var(--accent-soft);
-  border-color: #7fa3e8;
 }
 
 button:disabled {
@@ -145,8 +136,40 @@ code {
 label,
 .field {
   display: grid;
-  gap: 6px;
-  color: #4a5568;
+  gap: 7px;
+  color: #565869;
+  font-size: 13px;
+}
+
+.field > span {
+  font-size: 13px;
+  color: #565869;
+}
+
+.field input,
+.field select,
+.modal input,
+.modal select {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #0d0d0d;
+  font-size: 14px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.field input:focus,
+.field select:focus,
+.modal input:focus,
+.modal select:focus {
+  outline: none;
+  border-color: #0d0d0d;
+  box-shadow: 0 0 0 3px rgba(13, 13, 13, 0.08);
 }
 
 /* ================================================================
@@ -316,77 +339,101 @@ label,
 
 /* ---- Sidebar Team List ---- */
 
-.sidebar__list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+/* ---- Sidebar Team List (和 Members 同风格) ---- */
+
+.sidebar-team-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-.sidebar__item {
+.sidebar-team-item {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
+  height: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  background: transparent;
+  position: relative;
+}
+
+.sidebar-team-item:hover {
+  background: #ececec;
+}
+
+.sidebar-team-item.selected {
+  background: #e7e7e7;
+}
+
+.sidebar-team-main {
+  min-width: 0;
+  height: 32px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
   border: none;
   border-radius: 8px;
   background: transparent;
   text-align: left;
-  cursor: pointer;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
+  color: var(--text, #0d0d0d);
 }
 
-.sidebar__item:hover {
-  background: var(--sidebar-hover);
+.sidebar-team-main:hover,
+.sidebar-team-main.selected {
+  border-color: transparent;
+  background: transparent;
 }
 
-.sidebar__item--active {
-  background: var(--sidebar-active);
+.sidebar-team-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
-.sidebar__item-title {
+.sidebar-team-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+  color: var(--text, #0d0d0d);
+  font-size: 13px;
 }
 
-.sidebar__item-actions {
+.sidebar-team-menu-wrap {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s;
+  justify-content: center;
 }
 
-.sidebar__item:hover .sidebar__item-actions {
-  opacity: 1;
-}
-
-.sidebar__item-actions button {
+.sidebar-team-menu-button {
   width: 26px;
   height: 26px;
   padding: 0;
   border: none;
-  background: transparent;
   border-radius: 6px;
-  font-size: 12px;
+  background: transparent;
   color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 1;
 }
 
-.sidebar__item-actions button:hover {
-  background: #ddd;
-  color: var(--danger);
+.sidebar-team-menu-button:hover {
+  background: #dedede;
+  border-color: transparent;
+}
+
+.sidebar-team-menu {
+  top: 30px;
+  right: 0;
 }
 
 .sidebar__footer {
@@ -983,7 +1030,6 @@ label,
    Badges & Chips
    ================================================================ */
 
-.tool-pill,
 .usage-chip,
 .mode-chip,
 .phase-badge,
@@ -1048,29 +1094,98 @@ label,
 }
 
 /* ================================================================
-   Toolbar Selects & Popovers
+   Toolbar Controls — 统一 GPT 风格胶囊控件
    ================================================================ */
 
 .model-picker,
 .permission-mode-picker,
-.commands-menu {
+.commands-menu,
+.image-picker {
   position: relative;
-}
-
-.model-picker,
-.permission-mode-picker {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   min-width: 0;
 }
 
-.icon-button {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  line-height: 1;
+.toolbar-select-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
 }
+
+.toolbar-control,
+.toolbar-select {
+  height: 32px;
+  max-width: 220px;
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  background: #f7f7f8;
+  color: #0d0d0d;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.toolbar-select {
+  width: auto;
+  min-width: 0;
+  padding: 0 30px 0 12px;
+  appearance: auto;
+}
+
+.toolbar-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+}
+
+.toolbar-control:hover,
+.toolbar-select:hover {
+  background: #ececec;
+  border-color: #cfcfcf;
+}
+
+.toolbar-control:focus-visible,
+.toolbar-select:focus-visible {
+  outline: none;
+  border-color: #0d0d0d;
+  box-shadow: 0 0 0 2px rgba(13, 13, 13, 0.08);
+}
+
+.toolbar-control:disabled,
+.toolbar-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.model-select {
+  max-width: 240px;
+}
+
+.permission-mode-select {
+  max-width: 190px;
+}
+
+.command-select {
+  max-width: 160px;
+}
+
+.image-picker.dragging .image-picker-button {
+  border-color: #0d0d0d;
+  background: #ececec;
+  color: #0d0d0d;
+}
+
+.toolbar-select-error {
+  max-width: 260px;
+}
+
+/* ---- Popovers ---- */
 
 .menu-popover,
 .tool-popover {
@@ -1126,49 +1241,6 @@ label,
 .danger:hover {
   background: #ffe8e6;
   border-color: #f1a6a0;
-}
-
-.toolbar-select-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.toolbar-select {
-  width: auto;
-  height: 28px;
-  min-width: 0;
-  padding: 3px 28px 3px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--muted);
-  background-color: var(--panel-muted);
-}
-
-.toolbar-select:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.model-select {
-  max-width: 240px;
-}
-
-.permission-mode-select {
-  max-width: 190px;
-}
-
-.command-select {
-  max-width: 160px;
-}
-
-.toolbar-select-error {
-  max-width: 260px;
 }
 
 .hint-text,
@@ -1319,7 +1391,7 @@ label,
 }
 
 /* ================================================================
-   Modals & Permission Dialog
+   Modals & Permission Dialog — GPT 风格
    ================================================================ */
 
 .modal-backdrop,
@@ -1329,20 +1401,32 @@ label,
   z-index: 50;
   display: grid;
   place-items: center;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(2px);
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
 }
 
 .modal,
 .permission-dialog {
-  width: min(460px, calc(100vw - 32px));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
-  padding: 18px;
+  width: min(480px, calc(100vw - 32px));
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 22px;
   display: grid;
-  gap: 12px;
+  gap: 16px;
+}
+
+.modal h3,
+.permission-dialog h3 {
+  margin: 0;
+  color: #0d0d0d;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .modal-header {
@@ -1352,29 +1436,84 @@ label,
   gap: 12px;
 }
 
+.modal-header h2 {
+  margin: 0;
+  color: #0d0d0d;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #f4f4f4;
+  color: #0d0d0d;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.modal-close-button:hover {
+  background: #e9e9e9;
+}
+
 .modal-actions,
 .permission-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+
+.modal-actions button,
+.permission-actions button {
+  height: 36px;
+  min-width: 72px;
+  border-radius: 999px;
+  border: none;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.modal-actions button[type="submit"],
+.permission-actions button:first-child {
+  background: #0d0d0d;
+  color: #ffffff;
+}
+
+.modal-actions button[type="submit"]:hover,
+.permission-actions button:first-child:hover {
+  background: #2f2f2f;
 }
 
 .modal .secondary,
 .permission-actions .secondary {
   margin-top: 0;
+  background: #f4f4f4;
+  color: #0d0d0d;
 }
+
+.modal .secondary:hover,
+.permission-actions .secondary:hover {
+  background: #e9e9e9;
+}
+
+/* ---- Permission Dialog 选项卡片化 ---- */
 
 .permission-body {
   margin: 0;
-  max-height: 220px;
+  max-height: 240px;
   overflow: auto;
-  padding: 10px;
+  padding: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: var(--panel-muted);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: #f7f7f8;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  color: #353740;
+  font-size: 13px;
 }
 
 .permission-options {
@@ -1383,19 +1522,43 @@ label,
 }
 
 .permission-option {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: flex-start;
-  gap: 8px;
-  color: #18202f;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0d0d0d;
+  cursor: pointer;
+}
+
+.permission-option:hover {
+  background: #f7f7f8;
 }
 
 .permission-option input {
-  width: auto;
-  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  accent-color: #0d0d0d;
+}
+
+.permission-option-content {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.permission-option-content strong {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .permission-desc {
-  color: var(--muted);
+  color: #6b7280;
+  font-size: 12px;
 }
 
 /* ================================================================

@@ -9,14 +9,14 @@ export type TeamListProps = {
   onDeleteTeam: (teamId: string) => Promise<void>;
 };
 
-/** 侧边栏团队列表，空状态保持在本地。 */
+/** 侧边栏团队列表，空状态统一使用 sidebar-empty。 */
 export function TeamList({ teams, activeTeamId, onSelectTeam, onDeleteTeam }: TeamListProps): React.ReactElement {
   if (teams.length === 0) {
-    return <p className="sidebar-empty">暂无团队。</p>;
+    return <p className="sidebar-empty">暂无团队</p>;
   }
 
   return (
-    <div className="sidebar__list">
+    <div className="sidebar-team-list">
       {teams.map((team) => (
         <TeamListItem
           key={team.id}

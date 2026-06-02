@@ -16,7 +16,6 @@ export function AgentCommandsMenu({
   const commandList = Array.isArray(commands?.commands) ? commands.commands : [];
   const count = commandList.length;
 
-  /** 处理一次命令选择；选择器保持占位值，方便连续插入同一个命令。 */
   function selectCommand(commandName: string): void {
     const normalized = commandName.trim();
     if (!normalized) return;
@@ -26,9 +25,9 @@ export function AgentCommandsMenu({
   return (
     <div className="commands-menu">
       <label className="toolbar-select-label">
-        <span></span>
         <select
-          className="toolbar-select command-select"
+          aria-label="命令"
+          className="toolbar-control toolbar-select command-select"
           value=""
           disabled={disabled || count === 0}
           title={count > 0 ? '可用命令' : '暂无命令快照'}

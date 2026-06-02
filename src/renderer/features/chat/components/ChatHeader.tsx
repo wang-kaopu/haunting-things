@@ -8,16 +8,14 @@ export type ChatHeaderProps = {
   activeAgent: TeamAgent | null;
   activePhase?: AgentTurnPhase;
   usage?: ConversationUsage | null;
-  onAddAgentClick: () => void;
 };
 
-/** GPT 风格简化的顶部状态栏。 */
+/** GPT 风格简化的顶部状态栏——展示团队名、Agent 名和运行状态。 */
 export function ChatHeader({
   team,
   activeAgent,
   activePhase,
   usage,
-  onAddAgentClick,
 }: ChatHeaderProps): React.ReactElement {
   return (
     <header className="chat-header">
@@ -29,12 +27,6 @@ export function ChatHeader({
       <div className="chat-header__status">
         <UsageChip usage={usage} />
         {activePhase ? <span className={`phase-badge ${activePhase}`}>{formatPhase(activePhase)}</span> : null}
-      </div>
-
-      <div className="chat-header__actions">
-        <button type="button" onClick={onAddAgentClick} disabled={!team}>
-          ＋ 添加 Agent
-        </button>
       </div>
     </header>
   );
