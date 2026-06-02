@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { parse as parseCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
