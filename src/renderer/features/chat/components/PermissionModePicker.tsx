@@ -114,7 +114,7 @@ export function PermissionModePicker({
   return (
     <div className="permission-mode-picker">
       <label className="toolbar-select-label">
-        <span>权限</span>
+        <span></span>
         <select
           className="toolbar-select permission-mode-select"
           value={current}

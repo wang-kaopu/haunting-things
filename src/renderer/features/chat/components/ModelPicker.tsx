@@ -39,7 +39,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
   return (
     <div className="model-picker">
       <label className="toolbar-select-label">
-        <span>模型</span>
+        <span></span>
         <select
           className="toolbar-select model-select"
           value={selectedValue}
