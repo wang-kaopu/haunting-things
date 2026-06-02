@@ -5,13 +5,13 @@
 实现两个功能：
 
 1. Claude 启动 ACP session 后默认切换到 `default` 权限模式，Codex 启动 ACP session 后默认切换到 `auto` 权限模式。
-2. 在聊天输入框工具栏中，“模型选择”按钮右侧新增一个“权限模式选择”小组件，用于动态切换当前 Claude / Codex 会话的权限模式。
+2. 在聊天输入框工具栏中，模型和权限模式都使用直接可见的下拉选择组件，用于动态切换当前 Claude / Codex 会话的模型和权限模式。
 
 ## 实现状态
 
 已实现。当前版本新增了 `conversation.setMode` bridge 调用链，`AcpRuntime` 在 `newSession` 和可选模型切换后会按 backend 默认调用 `setSessionMode()`：Claude 使用 `default`，Codex 使用 `auto`。聊天输入框工具栏会在模型选择右侧展示权限模式选择器。
 
-权限模式仍按运行时状态处理，不写入数据库；模型切换导致 runtime 重启后会重新回到该 backend 的默认权限模式。如果某个 ACP bridge 不支持指定 mode，后端会抛出 `Current ACP bridge does not support session mode switching` 或 bridge 自身错误，前端选择器会在弹层中展示错误。
+权限模式仍按运行时状态处理，不写入数据库；模型切换导致 runtime 重启后会重新回到该 backend 的默认权限模式。如果某个 ACP bridge 不支持指定 mode，后端会抛出 `Current ACP bridge does not support session mode switching` 或 bridge 自身错误，前端选择器会在下拉组件下方展示错误。
 
 后端会按 backend 校验允许的 mode id，防止把另一个 backend 的权限模式透传给当前会话：
 
@@ -572,7 +572,6 @@ export function PermissionModePicker({
   mode,
   onSetMode,
 }: PermissionModePickerProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -585,16 +584,13 @@ export function PermissionModePicker({
   const fallbackMode = agent?.backend === "claude" ? "default" : "auto";
   const current = mode?.mode || fallbackMode;
   const currentOption = options.find((item) => item.id === current);
-  const label = currentOption?.label ?? current;
 
   useEffect(() => {
     setError("");
-    setOpen(false);
   }, [agent?.conversationId]);
 
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
-      setOpen(false);
       return;
     }
 
@@ -610,7 +606,6 @@ export function PermissionModePicker({
       setSubmitting(true);
       setError("");
       await onSetMode(nextMode);
-      setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -620,52 +615,28 @@ export function PermissionModePicker({
 
   return (
     <div className="permission-mode-picker">
-      <button
-        type="button"
-        className="tool-pill"
-        disabled={!agent || options.length === 0}
-        onClick={() => setOpen((value) => !value)}
-      >
-        权限：{label} ▼
-      </button>
-
-      {open && options.length > 0 ? (
-        <div className="tool-popover permission-mode-popover">
-          <label className="field">
-            <span>权限模式</span>
-            <select
-              value={current}
-              disabled={submitting}
-              onChange={(event) => {
-                void submit(event.target.value);
-              }}
-            >
-              {options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.danger ? `⚠ ${option.label}` : option.label}
-                </option>
-              ))}
-              {!options.some((option) => option.id === current) ? (
-                <option value={current}>{current}</option>
-              ) : null}
-            </select>
-          </label>
-
-          {currentOption?.description ? (
-            <p
-              className={
-                currentOption.danger
-                  ? "warning-text compact"
-                  : "hint-text compact"
-              }
-            >
-              {currentOption.description}
-            </p>
+      <label className="toolbar-select-label">
+        <span>权限</span>
+        <select
+          className="toolbar-select permission-mode-select"
+          value={current}
+          disabled={!agent || options.length === 0 || submitting}
+          title={currentOption?.description}
+          onChange={(event) => {
+            void submit(event.target.value);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+          {!options.some((option) => option.id === current) ? (
+            <option value={current}>{current}</option>
           ) : null}
-
-          {error ? <p className="error-text compact">{error}</p> : null}
-        </div>
-      ) : null}
+        </select>
+      </label>
+      {error ? <p className="error-text compact toolbar-select-error">{error}</p> : null}
     </div>
   );
 }
@@ -675,7 +646,7 @@ export function PermissionModePicker({
 
 - Claude YOLO 模式使用 `bypassPermissions`。
 - Codex YOLO 模式使用 `full-access`。
-- 默认展示 `auto`，即使 bridge 暂时还没上报 mode，也不会显示空状态。
+- Claude 默认展示 `default`，Codex 默认展示 `auto`，即使 bridge 暂时还没上报 mode，也不会显示空状态。
 - YOLO 模式加 `window.confirm` 二次确认，避免误点。
 
 ---
@@ -809,9 +780,9 @@ tests/acpRuntimeModels.test.ts
 
 - Claude agent 展示 `default / acceptEdits / plan / dontAsk / bypassPermissions`。
 - Codex agent 展示 `read-only / auto / full-access`。
-- 点击切换后调用 `onSetMode(mode)`。
+- 下拉切换后调用 `onSetMode(mode)`。
 - YOLO 模式触发二次确认。
-- 没有 activeAgent 时按钮 disabled。
+- 没有 activeAgent 时下拉组件 disabled。
 
 ---
 

@@ -69,7 +69,6 @@ export function PermissionModePicker({
   mode,
   onSetMode,
 }: PermissionModePickerProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -82,17 +81,14 @@ export function PermissionModePicker({
   const fallbackMode = agent?.backend === 'claude' ? 'default' : 'auto';
   const current = mode?.mode || fallbackMode;
   const currentOption = options.find((item) => item.id === current);
-  const label = currentOption?.label ?? current;
 
   useEffect(() => {
     setError('');
-    setOpen(false);
   }, [agent?.conversationId]);
 
   /** 提交权限模式切换请求，YOLO模式会先要求用户二次确认。 */
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
-      setOpen(false);
       return;
     }
 
@@ -108,7 +104,6 @@ export function PermissionModePicker({
       setSubmitting(true);
       setError('');
       await onSetMode(nextMode);
-      setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -118,46 +113,26 @@ export function PermissionModePicker({
 
   return (
     <div className="permission-mode-picker">
-      <button
-        type="button"
-        className="tool-pill"
-        disabled={!agent || options.length === 0}
-        onClick={() => setOpen((value) => !value)}
-      >
-        权限：{label} ▼
-      </button>
-
-      {open && options.length > 0 ? (
-        <div className="tool-popover permission-mode-popover">
-          <label className="field">
-            <span>权限模式</span>
-            <select
-              value={current}
-              disabled={submitting}
-              onChange={(event) => {
-                void submit(event.target.value);
-              }}
-            >
-              {options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-              {!options.some((option) => option.id === current) ? (
-                <option value={current}>{current}</option>
-              ) : null}
-            </select>
-          </label>
-
-          {currentOption?.description ? (
-            <p className={currentOption.danger ? 'warning-text compact' : 'hint-text compact'}>
-              {currentOption.description}
-            </p>
-          ) : null}
-
-          {error ? <p className="error-text compact">{error}</p> : null}
-        </div>
-      ) : null}
+      <label className="toolbar-select-label">
+        <span>权限</span>
+        <select
+          className="toolbar-select permission-mode-select"
+          value={current}
+          disabled={!agent || options.length === 0 || submitting}
+          title={currentOption?.description}
+          onChange={(event) => {
+            void submit(event.target.value);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+          {!options.some((option) => option.id === current) ? <option value={current}>{current}</option> : null}
+        </select>
+      </label>
+      {error ? <p className="error-text compact toolbar-select-error">{error}</p> : null}
     </div>
   );
 }

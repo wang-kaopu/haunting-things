@@ -44,12 +44,14 @@ export function Sidebar({
         onSelectTeam={onSelectTeam}
         onDeleteTeam={onDeleteTeam}
       />
-      <button type="button" onClick={onSettingsClick}>
-        设置
-      </button>
-      <button type="button" className="secondary" onClick={onLogout}>
-        退出登录
-      </button>
+      <div className="sidebar-actions">
+        <button type="button" onClick={onSettingsClick}>
+          设置
+        </button>
+        <button type="button" className="secondary" onClick={onLogout}>
+          退出登录
+        </button>
+      </div>
     </aside>
   );
 }

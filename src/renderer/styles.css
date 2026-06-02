@@ -183,6 +183,13 @@ label,
   gap: 8px;
   overflow: auto;
   min-height: 0;
+  flex: 1;
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .team-row {
@@ -219,6 +226,14 @@ label,
 .permission-mode-picker,
 .commands-menu {
   position: relative;
+}
+
+.model-picker,
+.permission-mode-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .icon-button {
@@ -450,6 +465,7 @@ label,
 .composer-tools {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   min-width: 0;
 }
@@ -532,6 +548,45 @@ label,
   background: #ecfdf3;
 }
 
+.toolbar-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.toolbar-select {
+  width: auto;
+  height: 28px;
+  min-width: 0;
+  padding: 3px 28px 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  background-color: var(--panel-muted);
+}
+
+.toolbar-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.model-select {
+  max-width: 240px;
+}
+
+.permission-mode-select {
+  max-width: 190px;
+}
+
+.toolbar-select-error {
+  max-width: 260px;
+}
+
 .hint-text,
 .warning-text {
   margin: 0;
@@ -567,10 +622,6 @@ label,
 
 .commands-popover {
   width: min(420px, calc(100vw - 48px));
-}
-
-.permission-mode-popover {
-  width: min(340px, calc(100vw - 48px));
 }
 
 .command-mini {
