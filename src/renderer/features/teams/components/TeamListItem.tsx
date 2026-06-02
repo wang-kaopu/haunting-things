@@ -9,7 +9,7 @@ export type TeamListItemProps = {
   onDelete: () => Promise<void>;
 };
 
-/** 渲染侧边栏团队条目，并把删除操作收进二级菜单避免误触。 */
+/** GPT 风格侧边栏团队条目，删除操作收进 ⋯ 菜单避免误触。 */
 export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -19,42 +19,42 @@ export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemP
   }, [active]);
 
   return (
-    <div className={`team-row${active ? ' active' : ''}`}>
-      <button type="button" className={`team-main${active ? ' selected' : ''}`} onClick={onSelect}>
-        <span>{team.name}</span>
+    <div className="team-row">
+      <button
+        type="button"
+        className={`sidebar__item${active ? ' sidebar__item--active' : ''}`}
+        onClick={onSelect}
+      >
+        <span className="sidebar__item-title">{team.name}</span>
+        <span className="sidebar__item-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            aria-label={`更多操作：${team.name}`}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            ⋯
+          </button>
+        </span>
       </button>
-      <div className="team-menu-wrap">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`更多操作：${team.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            setMenuOpen((value) => !value);
-          }}
-        >
-          ⋯
-        </button>
-        {menuOpen ? (
-          <div className="menu-popover">
-            <button
-              type="button"
-              className="danger"
-              disabled={deleting}
-              onClick={(event) => {
-                event.stopPropagation();
-                setDeleting(true);
-                void onDelete().finally(() => {
-                  setDeleting(false);
-                  setMenuOpen(false);
-                });
-              }}
-            >
-              {deleting ? '删除中...' : '删除团队'}
-            </button>
-          </div>
-        ) : null}
-      </div>
+      {menuOpen ? (
+        <div className="menu-popover">
+          <button
+            type="button"
+            className="danger"
+            disabled={deleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDeleting(true);
+              void onDelete().finally(() => {
+                setDeleting(false);
+                setMenuOpen(false);
+              });
+            }}
+          >
+            {deleting ? '删除中...' : '删除团队'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

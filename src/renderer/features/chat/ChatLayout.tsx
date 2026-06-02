@@ -30,9 +30,10 @@ export type ChatLayoutProps = {
 };
 
 /**
- * 当前 Agent 的聊天主面板。
+ * GPT 风格聊天主面板。
  *
- * Header、消息列表和发送框共享同一个运行时快照，保证模型、命令和消息显示一致。
+ * 未选择团队时展示提示，无消息时展示欢迎页，
+ * 否则展示 Header、消息列表和底部输入框。
  */
 export function ChatLayout({
   team,
@@ -49,7 +50,11 @@ export function ChatLayout({
   onSetMode,
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
-    return <section className="chat-layout empty">先创建一个团队开始。</section>;
+    return (
+      <section className="chat-layout empty">
+        <p>选择一个团队开始对话，或点击左侧 "New Chat" 创建新团队。</p>
+      </section>
+    );
   }
 
   return (
@@ -61,7 +66,11 @@ export function ChatLayout({
         usage={usage}
         onAddAgentClick={onAddAgentClick}
       />
-      <MessageList messages={messages} activePhase={activePhase} />
+      {messages.length === 0 ? (
+        <ChatEmpty />
+      ) : (
+        <MessageList messages={messages} activePhase={activePhase} />
+      )}
       <SendBox
         disabled={!team || !activeAgent}
         activeAgent={activeAgent}
@@ -73,5 +82,21 @@ export function ChatLayout({
         onSetMode={onSetMode}
       />
     </section>
+  );
+}
+
+/** GPT 风格空状态欢迎页。 */
+function ChatEmpty(): React.ReactElement {
+  return (
+    <div className="chat-empty">
+      <div className="chat-empty__icon">HT</div>
+      <h1>What can I help with?</h1>
+      <div className="chat-empty__suggestions">
+        <button type="button">Summarize this project</button>
+        <button type="button">Generate a task plan</button>
+        <button type="button">Debug current agent</button>
+        <button type="button">Explain this codebase</button>
+      </div>
+    </div>
   );
 }

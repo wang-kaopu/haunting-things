@@ -4,7 +4,6 @@ import type { PermissionRequest, PermissionResponse, TeamAgent } from '../../sha
 import { bridge } from '../shared/bridgeClient';
 import { ChatLayout } from '../features/chat/ChatLayout';
 import { Sidebar } from '../features/teams/Sidebar';
-import { TeamDrawer } from '../features/teams/TeamDrawer';
 import { AddAgentDialog } from '../features/teams/dialogs/AddAgentDialog';
 import { CreateTeamDialog } from '../features/teams/dialogs/CreateTeamDialog';
 import { NotificationCenter } from '../features/notifications/components/NotificationCenter';
@@ -13,7 +12,6 @@ import { useConversationStream } from '../shared/hooks/useConversationStream';
 import { useNotifications } from '../shared/hooks/useNotifications';
 import { useRuntimeSnapshots } from '../shared/hooks/useRuntimeSnapshots';
 import { useServerInfo } from '../shared/hooks/useServerInfo';
-import { useTeamDrawer } from '../shared/hooks/useTeamDrawer';
 import { useTeams } from '../shared/hooks/useTeams';
 import { RemoteAccessPanel } from '../features/settings/components/RemoteAccessPanel';
 import type { AddAgentInput, CreateTeamInput } from '../shared/types/ui';
@@ -25,14 +23,14 @@ export type WorkbenchProps = {
 };
 
 /**
- * 已登录后的主工作台。
+ * GPT 风格主工作台。
  *
- * 这里负责组合 Team 列表、当前 conversation、运行时快照、权限弹窗和通知中心。
+ * 两栏布局：左侧 Sidebar + 右侧 Chat Main。
+ * TeamDrawer 改为右侧固定覆盖面板，点击切换按钮展开/收起。
  */
 export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElement {
   const teamsState = useTeams();
   const active = useActiveTeam({ teams: teamsState.teams });
-  const drawer = useTeamDrawer();
   const conversation = useConversationStream({
     activeTeam: active.activeTeam,
     activeAgent: active.activeAgent,
@@ -123,7 +121,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.push({ title: '权限模式已切换', message: nextMode, level: 'success' });
   }
 
-  /** 将权限请求加入队列，避免连续请求互相覆盖导致后端挂起。 */
   function enqueuePermission(request: PermissionRequest): void {
     setPermissionQueue((current) => {
       const index = current.findIndex((item) => item.conversationId === request.conversationId && item.callId === request.callId);
@@ -134,14 +131,12 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     });
   }
 
-  /** 移除已处理的权限请求，让队列中的下一条请求继续展示。 */
   function removePermission(request: PermissionRequest): void {
     setPermissionQueue((current) =>
       current.filter((item) => item.conversationId !== request.conversationId || item.callId !== request.callId)
     );
   }
 
-  /** 向后端提交权限响应；关闭弹窗会明确发送 cancelled，避免 Agent 永久等待。 */
   async function respondToPermission(request: PermissionRequest, response: PermissionResponse): Promise<void> {
     try {
       const result = await bridge.invoke('conversation.respondPermission', {
@@ -167,13 +162,18 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   }
 
   return (
-    <main className={drawer.open ? 'app-shell drawer-open' : 'app-shell drawer-collapsed'}>
+    <main className="app-shell">
       <Sidebar
         username={user.username}
         teams={teamsState.teams}
+        activeTeam={active.activeTeam}
         activeTeamId={active.activeTeamId}
+        activeSlotId={active.activeSlotId}
+        phases={conversation.phaseByConversation}
         onCreateTeamClick={() => setCreateTeamOpen(true)}
+        onAddAgentClick={() => setAddAgentOpen(true)}
         onSelectTeam={active.selectTeam}
+        onSelectAgent={active.selectAgent}
         onDeleteTeam={deleteTeam}
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={() => void logout()}
@@ -191,16 +191,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onSendMessage={conversation.sendTeamMessage}
         onSetModel={setModel}
         onSetMode={setMode}
-      />
-      <TeamDrawer
-        open={drawer.open}
-        team={active.activeTeam}
-        activeSlotId={active.activeSlotId}
-        phases={conversation.phaseByConversation}
-        commandsByConversation={snapshots.commandsByConversation}
-        modeByConversation={snapshots.modeByConversation}
-        onToggle={drawer.toggle}
-        onSelectAgent={active.selectAgent}
       />
       <NotificationCenter items={notifications.items} onRemove={notifications.remove} />
       <CreateTeamDialog open={createTeamOpen} onClose={() => setCreateTeamOpen(false)} onSubmit={createTeam} />

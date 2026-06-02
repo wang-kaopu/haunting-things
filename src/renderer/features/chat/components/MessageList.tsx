@@ -8,7 +8,7 @@ export type MessageListProps = {
   activePhase?: AgentTurnPhase;
 };
 
-/** 渲染聊天消息流，并在用户离开底部时保留阅读位置和新消息提示。 */
+/** GPT 风格居中消息流，保留滚动定位和新消息提示逻辑。 */
 export function MessageList({ messages, activePhase }: MessageListProps): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastLengthRef = useRef(messages.length);
@@ -47,10 +47,12 @@ export function MessageList({ messages, activePhase }: MessageListProps): React.
           if (nearBottom) setNewMessageCount(0);
         }}
       >
-        {messages.length === 0 ? <p className="empty-inline">暂无消息。</p> : null}
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} activePhase={activePhase} />
-        ))}
+        <div className="messages__inner">
+          {messages.length === 0 ? <p className="empty-inline">暂无消息。</p> : null}
+          {messages.map((message) => (
+            <MessageBubble key={message.id} message={message} activePhase={activePhase} />
+          ))}
+        </div>
       </div>
       {!pinnedToBottom && newMessageCount > 0 ? (
         <button

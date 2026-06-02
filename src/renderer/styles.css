@@ -1,9 +1,14 @@
+/* ================================================================
+   Base — CSS 变量与全局重置
+   ================================================================ */
+
 :root {
   color-scheme: light;
   font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  background: #f5f7fa;
-  color: #18202f;
-  --border: #dce2ea;
+  background: #ffffff;
+  color: #0d0d0d;
+  --border: #e5e5e5;
+  --border-strong: #d9d9d9;
   --panel: #ffffff;
   --panel-muted: #f8fafc;
   --muted: #667085;
@@ -12,6 +17,11 @@
   --success: #027a48;
   --warning: #b54708;
   --danger: #b42318;
+  --sidebar-bg: #f9f9f9;
+  --sidebar-hover: #ececec;
+  --sidebar-active: #e7e7e7;
+  --bubble-user: #f4f4f4;
+  --composer-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
 }
 
 html,
@@ -114,6 +124,10 @@ code {
   box-shadow: 0 12px 40px rgb(24 32 47 / 8%);
 }
 
+/* ================================================================
+   Login
+   ================================================================ */
+
 .login {
   min-height: 100vh;
   display: grid;
@@ -135,235 +149,480 @@ label,
   color: #4a5568;
 }
 
+/* ================================================================
+   Layout — 两栏：Sidebar + Chat Main
+   ================================================================ */
+
 .app-shell {
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 260px minmax(440px, 1fr) 280px;
-  background: #f5f7fa;
+  grid-template-columns: 300px minmax(0, 1fr);
+  background: #ffffff;
 }
 
-.app-shell.drawer-collapsed {
-  grid-template-columns: 260px minmax(440px, 1fr) 44px;
-}
+/* ================================================================
+   Sidebar — GPT 风格左侧栏
+   ================================================================ */
 
-.sidebar,
-.team-drawer {
-  background: var(--panel);
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 12px;
   min-width: 0;
   min-height: 0;
-  height: 100%;
   overflow: hidden;
 }
 
-.sidebar {
-  border-right: 1px solid var(--border);
-  padding: 16px;
+.sidebar__brand {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
+  padding: 4px 8px 12px;
 }
 
-.brand {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 12px;
+.sidebar__brand strong {
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.brand span {
+.sidebar__brand span {
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.list {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  overflow: auto;
+/* ---- Sidebar Sections ---- */
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  gap: 6px;
+}
+
+.sidebar-members-section {
+  flex: 0 0 auto;
+  max-height: 220px;
+  margin-bottom: 12px;
+}
+
+.sidebar-teams-section {
   flex: 1;
+  min-height: 0;
 }
 
-.sidebar-actions {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-}
-
-.team-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: stretch;
-  position: relative;
-}
-
-.team-main {
-  min-width: 0;
-  text-align: left;
+.sidebar-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.team-main span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.sidebar-section-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 
-.team-row.active .team-main,
-.team-main.selected {
-  background: #eef4ff;
-  border-color: #7fa3e8;
+.sidebar-section-action:hover {
+  background: var(--sidebar-hover);
 }
 
-.team-menu-wrap,
-.model-picker,
-.permission-mode-picker,
-.commands-menu {
-  position: relative;
+.sidebar-section-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
-.model-picker,
-.permission-mode-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+/* ---- Sidebar Agent List ---- */
+
+.sidebar-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
-.icon-button {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  line-height: 1;
-}
-
-.menu-popover,
-.tool-popover {
-  position: absolute;
-  z-index: 20;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
-}
-
-.menu-popover {
-  right: 0;
-  top: 38px;
-  min-width: 128px;
-  padding: 6px;
-}
-
-.menu-popover button {
+.sidebar-agent-item {
   width: 100%;
+  height: 32px;
+  display: grid;
+  grid-template-columns: 8px 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
   text-align: left;
 }
 
-.danger {
+.sidebar-agent-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.sidebar-agent-item.selected {
+  background: var(--sidebar-active);
+}
+
+.sidebar-agent-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sidebar-agent-status.idle {
+  background: #22c55e;
+}
+
+.sidebar-agent-status.busy {
+  background: #ef4444;
+}
+
+.sidebar-agent-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.sidebar-agent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.sidebar-empty {
+  margin: 4px 8px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---- Sidebar Team List ---- */
+
+.sidebar__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__item {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.sidebar__item:hover {
+  background: var(--sidebar-hover);
+}
+
+.sidebar__item--active {
+  background: var(--sidebar-active);
+}
+
+.sidebar__item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar__item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.sidebar__item:hover .sidebar__item-actions {
+  opacity: 1;
+}
+
+.sidebar__item-actions button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar__item-actions button:hover {
+  background: #ddd;
   color: var(--danger);
-  border-color: #f3c2bc;
-  background: #fff5f4;
 }
 
-.danger:hover {
-  background: #ffe8e6;
-  border-color: #f1a6a0;
-}
-
-.secondary {
+.sidebar__footer {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
+
+.sidebar__footer-item {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar__footer-item:hover {
+  background: var(--sidebar-hover);
+}
+
+/* ================================================================
+   Chat Layout — 主聊天区
+   ================================================================ */
 
 .chat-layout {
+  position: relative;
   min-width: 0;
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
 }
 
-.chat-header {
-  min-width: 0;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  background: #fff;
+.chat-layout.empty {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ================================================================
+   Chat Header — 固定顶部
+   ================================================================ */
+
+.chat-header {
+  height: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid #eeeeee;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
   gap: 16px;
 }
 
-.chat-title {
+.chat-header__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
-  display: grid;
-  gap: 4px;
 }
 
-.chat-title h2,
-.chat-title p {
+.chat-header__title strong {
+  font-size: 15px;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
+.chat-header__title span {
+  font-size: 13px;
+  color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.chat-header__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chat-header__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.chat-header__actions button {
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chat-header__actions button:hover {
+  background: var(--sidebar-hover);
+}
+
+/* ================================================================
+   Message List — 居中消息流
+   ================================================================ */
+
 .messages-wrap {
-  position: relative;
+  flex: 1;
   min-height: 0;
-  display: grid;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .messages {
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  padding: 24px 24px 32px;
 }
 
+.messages__inner {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.jump-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  z-index: 5;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+/* ================================================================
+   Message Bubble — GPT 风格消息
+   ================================================================ */
+
 .message {
-  max-width: min(860px, 92%);
+  display: flex;
+  gap: 14px;
+  width: 100%;
   min-width: 0;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+}
+
+/* Assistant — 左侧自然排版，无卡片背景 */
+.message--assistant {
+  align-items: flex-start;
+}
+
+.message__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #10a37f;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.message__content {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.7;
+  font-size: 15px;
+  color: #0d0d0d;
   overflow-wrap: anywhere;
 }
 
-.message.user {
-  margin-left: auto;
-  background: #e9f0ff;
+/* User — 靠右浅灰气泡 */
+.message--user {
+  justify-content: flex-end;
 }
 
-.message.error {
-  border-color: #fecdca;
+.message__user-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--bubble-user);
+  color: #0d0d0d;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Error 状态 */
+.message--error .message__content,
+.message--error .message__user-bubble {
+  border: 1px solid #fecdca;
   background: #fffbfa;
 }
 
-.message small {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--muted);
+.message-error {
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 12px;
 }
 
+/* 附件 */
 .message img,
 .markdown-message img {
   max-width: 100%;
@@ -392,17 +651,7 @@ label,
   object-fit: contain;
 }
 
-.message table,
-.message pre {
-  max-width: 100%;
-}
-
-.message-error {
-  margin-top: 8px;
-  color: var(--danger);
-  font-size: 12px;
-}
-
+/* 调试 Prompt 折叠 */
 .debug-prompt-inline {
   display: grid;
   gap: 8px;
@@ -432,34 +681,539 @@ label,
   font-size: 12px;
 }
 
-.jump-bottom {
-  position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-}
+/* ================================================================
+   Composer — GPT 风格底部悬浮输入框
+   ================================================================ */
 
 .composer {
-  border-top: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+  padding: 16px 24px 24px;
+  background: linear-gradient(to top, #ffffff 72%, rgba(255, 255, 255, 0));
+}
+
+.composer__box {
+  max-width: 760px;
+  margin: 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: var(--composer-shadow);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composer__textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 200px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 15px;
+  line-height: 1.6;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.composer__textarea:disabled {
+  opacity: 0.5;
+}
+
+.composer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.composer__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer__tools button,
+.composer__tools .tool-pill {
+  height: 32px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 0 10px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.composer__tools button:hover {
+  background: var(--sidebar-hover);
+}
+
+.composer__send {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #0d0d0d;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.composer__send:hover {
+  background: #333;
+}
+
+.composer__send:disabled {
+  background: #d0d0d0;
+  cursor: not-allowed;
+}
+
+/* ================================================================
+   Empty State — GPT 风格欢迎页
+   ================================================================ */
+
+.chat-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.chat-empty__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #10a37f;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.chat-empty h1 {
+  font-size: 28px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  color: #0d0d0d;
+}
+
+.chat-empty__suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+  max-width: 560px;
+  width: 100%;
+}
+
+.chat-empty__suggestions button {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: #0d0d0d;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat-empty__suggestions button:hover {
+  background: var(--sidebar-hover);
+  border-color: var(--border-strong);
+}
+
+/* ================================================================
+   Team Drawer — 右侧覆盖面板
+   ================================================================ */
+
+.team-drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 280px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(15, 23, 42, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-drawer.open {
+  transform: translateX(0);
+}
+
+.team-drawer.collapsed {
+  transform: translateX(100%);
+}
+
+.drawer-toggle {
+  position: fixed;
+  right: 0;
+  top: 14px;
+  z-index: 35;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px 0 0 8px;
   background: #fff;
-  padding: 14px;
+  border: 1px solid var(--border);
+  border-right: none;
+  box-shadow: -2px 0 12px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--muted);
+  transition: right 0.25s ease, background 0.15s;
+}
+
+.team-drawer.open ~ .drawer-toggle,
+.drawer-toggle.open {
+  right: 280px;
+}
+
+.drawer-toggle:hover {
+  background: var(--sidebar-hover);
+}
+
+.drawer-content {
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+.drawer-content h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ================================================================
+   Team List (Sidebar items 保持兼容)
+   ================================================================ */
+
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.team-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   Member Cards (Drawer 内)
+   ================================================================ */
+
+.member-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.member-card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.member-card:hover {
+  border-color: var(--border-strong);
+}
+
+.member-card.selected {
+  border-color: #7fa3e8;
+  background: #eef4ff;
+}
+
+.member-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.member-card-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ================================================================
+   Badges & Chips
+   ================================================================ */
+
+.tool-pill,
+.usage-chip,
+.mode-chip,
+.phase-badge,
+.agent-phase {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.usage-chip {
+  color: var(--success);
+  background: #ecfdf3;
+}
+
+.mode-chip {
+  color: var(--success);
+  background: #ecfdf3;
+}
+
+.phase-badge.failed,
+.agent-phase.failed {
+  color: var(--danger);
+  background: #fee4e2;
+}
+
+.phase-badge.tool_calling,
+.agent-phase.tool_calling {
+  color: var(--accent);
+  background: #d1e9ff;
+}
+
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #475467;
+  background: #f2f4f7;
+  white-space: nowrap;
+}
+
+.agent-badge.active {
+  color: var(--accent);
+  background: #d1e9ff;
+}
+
+.agent-badge.failed {
+  color: var(--danger);
+  background: #fee4e2;
+}
+
+.agent-badge.stopped {
+  color: #344054;
+  background: #eaecf0;
+}
+
+/* ================================================================
+   Toolbar Selects & Popovers
+   ================================================================ */
+
+.model-picker,
+.permission-mode-picker,
+.commands-menu {
+  position: relative;
+}
+
+.model-picker,
+.permission-mode-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  line-height: 1;
+}
+
+.menu-popover,
+.tool-popover {
+  position: absolute;
+  z-index: 40;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.menu-popover {
+  right: 0;
+  top: 38px;
+  min-width: 128px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-popover button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.menu-popover button:hover {
+  background: var(--sidebar-hover);
+}
+
+.tool-popover {
+  left: 0;
+  bottom: 42px;
+  width: min(360px, calc(100vw - 48px));
+  max-height: 360px;
+  overflow: auto;
+  padding: 10px;
   display: grid;
   gap: 10px;
 }
 
-.composer textarea {
-  min-height: 72px;
-  max-height: 220px;
+.danger {
+  color: var(--danger);
+  border-color: #f3c2bc;
+  background: #fff5f4;
 }
 
-.composer-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+.danger:hover {
+  background: #ffe8e6;
+  border-color: #f1a6a0;
 }
+
+.toolbar-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.toolbar-select {
+  width: auto;
+  height: 28px;
+  min-width: 0;
+  padding: 3px 28px 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  background-color: var(--panel-muted);
+}
+
+.toolbar-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.model-select {
+  max-width: 240px;
+}
+
+.permission-mode-select {
+  max-width: 190px;
+}
+
+.command-select {
+  max-width: 160px;
+}
+
+.toolbar-select-error {
+  max-width: 260px;
+}
+
+.hint-text,
+.warning-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.warning-text {
+  color: var(--danger);
+}
+
+.hint-text.compact,
+.warning-text.compact {
+  font-size: 12px;
+}
+
+.error-text.compact {
+  padding: 0;
+  font-size: 12px;
+}
+
+.send-error {
+  font-size: 12px;
+}
+
+/* ================================================================
+   Image Picker & Attachments
+   ================================================================ */
 
 .composer-tools {
   display: flex;
@@ -521,230 +1275,9 @@ label,
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
 }
 
-.tool-pill,
-.usage-chip,
-.mode-chip,
-.phase-badge,
-.agent-phase {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 12px;
-  background: var(--panel-muted);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.usage-chip {
-  color: var(--success);
-  background: #ecfdf3;
-}
-
-.mode-chip {
-  color: var(--success);
-  background: #ecfdf3;
-}
-
-.toolbar-select-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.toolbar-select {
-  width: auto;
-  height: 28px;
-  min-width: 0;
-  padding: 3px 28px 3px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--muted);
-  background-color: var(--panel-muted);
-}
-
-.toolbar-select:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.model-select {
-  max-width: 240px;
-}
-
-.permission-mode-select {
-  max-width: 190px;
-}
-
-.command-select {
-  max-width: 160px;
-}
-
-.toolbar-select-error {
-  max-width: 260px;
-}
-
-.hint-text,
-.warning-text {
-  margin: 0;
-  color: var(--muted);
-}
-
-.warning-text {
-  color: var(--danger);
-}
-
-.phase-badge.failed,
-.agent-phase.failed {
-  color: var(--danger);
-  background: #fee4e2;
-}
-
-.phase-badge.tool_calling,
-.agent-phase.tool_calling {
-  color: var(--accent);
-  background: #d1e9ff;
-}
-
-.tool-popover {
-  left: 0;
-  bottom: 38px;
-  width: min(360px, calc(100vw - 48px));
-  max-height: 360px;
-  overflow: auto;
-  padding: 10px;
-  display: grid;
-  gap: 10px;
-}
-
-.inline-form.horizontal {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.error-text.compact {
-  padding: 0;
-  font-size: 12px;
-}
-
-.hint-text.compact,
-.warning-text.compact {
-  font-size: 12px;
-}
-
-.send-error {
-  font-size: 12px;
-}
-
-.team-drawer {
-  position: relative;
-  border-left: 1px solid var(--border);
-}
-
-.team-drawer.collapsed {
-  display: grid;
-  place-items: start center;
-  padding-top: 12px;
-}
-
-.drawer-toggle {
-  position: absolute;
-  left: -18px;
-  top: 14px;
-  z-index: 5;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
-}
-
-.drawer-content {
-  height: 100%;
-  min-height: 0;
-  padding: 16px;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
-}
-
-.member-list {
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-}
-
-.member-card {
-  display: grid;
-  gap: 4px;
-  text-align: left;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-}
-
-.member-card.selected {
-  border-color: #7fa3e8;
-  background: #eef4ff;
-}
-
-.member-card-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.agent-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.member-card-meta {
-  color: var(--muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.agent-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  color: #475467;
-  background: #f2f4f7;
-  white-space: nowrap;
-}
-
-.agent-badge.active {
-  color: var(--accent);
-  background: #d1e9ff;
-}
-
-.agent-badge.failed {
-  color: var(--danger);
-  background: #fee4e2;
-}
-
-.agent-badge.stopped {
-  color: #344054;
-  background: #eaecf0;
-}
+/* ================================================================
+   Notifications
+   ================================================================ */
 
 .notification-center {
   position: fixed;
@@ -801,6 +1334,10 @@ label,
   background: transparent;
 }
 
+/* ================================================================
+   Modals & Permission Dialog
+   ================================================================ */
+
 .modal-backdrop,
 .permission-overlay {
   position: fixed;
@@ -821,6 +1358,13 @@ label,
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
   padding: 18px;
   display: grid;
+  gap: 12px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
@@ -870,6 +1414,14 @@ label,
   color: var(--muted);
 }
 
+/* ================================================================
+   Settings
+   ================================================================ */
+
+.settings-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
 .settings-card {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -890,7 +1442,7 @@ label,
   align-items: center;
   gap: 8px;
   margin: 8px 0 12px;
-  color: var(--text);
+  color: var(--text, #18202f);
   font-size: 14px;
 }
 
@@ -930,16 +1482,9 @@ label,
   color: var(--muted);
 }
 
-.settings-dialog {
-  width: min(560px, calc(100vw - 32px));
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+/* ================================================================
+   Loading & Error strips
+   ================================================================ */
 
 .load-error,
 .loading-strip {
@@ -960,61 +1505,99 @@ label,
   color: var(--danger);
 }
 
-@media (max-width: 980px) {
+/* ================================================================
+   Inline form helpers
+   ================================================================ */
+
+.inline-form.horizontal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+/* ================================================================
+   Responsive — 平板与小屏
+   ================================================================ */
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .messages__inner,
+  .composer__box {
+    max-width: 100%;
+  }
+
+  .chat-empty__suggestions {
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
   html,
   body,
   #root {
     overflow: auto;
   }
 
-  .app-shell,
-  .app-shell.drawer-open,
-  .app-shell.drawer-collapsed {
+  .app-shell {
     grid-template-columns: 1fr;
     min-height: 100vh;
     height: auto;
     overflow: visible;
   }
 
-  .sidebar,
-  .chat-layout,
-  .team-drawer {
-    border: 0;
-    border-bottom: 1px solid var(--border);
-    height: auto;
-    min-height: auto;
-    overflow: visible;
-  }
-
-  .team-drawer.collapsed {
+  .sidebar {
     display: none;
   }
 
-  .drawer-toggle {
-    left: auto;
-    right: 16px;
-    top: 12px;
+  .chat-layout {
+    height: auto;
+    min-height: 100dvh;
   }
 
-  .drawer-content {
-    height: auto;
+  .chat-header {
+    padding: 0 12px;
   }
 
   .messages {
-    min-height: 420px;
+    padding: 16px 12px 140px;
   }
 
-  .composer-footer {
-    align-items: stretch;
+  .message__user-bubble {
+    max-width: 86%;
+  }
+
+  .composer {
+    padding: 12px;
+  }
+
+  .composer__box {
+    max-width: 100%;
+  }
+
+  .composer-tools {
     flex-direction: column;
-  }
-
-  .image-picker {
     align-items: stretch;
-    flex-direction: column;
   }
 
-  .composer-footer > button {
+  .team-drawer {
     width: 100%;
+    max-width: 320px;
+  }
+
+  .drawer-toggle {
+    top: auto;
+    bottom: 80px;
+  }
+
+  .chat-empty__suggestions {
+    grid-template-columns: 1fr;
   }
 }

@@ -11,7 +11,7 @@ export type ChatHeaderProps = {
   onAddAgentClick: () => void;
 };
 
-/** 渲染当前团队和 Agent 的顶部状态栏，集中展示模型、用量和运行阶段。 */
+/** GPT 风格简化的顶部状态栏。 */
 export function ChatHeader({
   team,
   activeAgent,
@@ -21,19 +21,21 @@ export function ChatHeader({
 }: ChatHeaderProps): React.ReactElement {
   return (
     <header className="chat-header">
-      <div className="chat-title">
-        <h2>{team?.name ?? '未选择团队'}</h2>
-        <p className="muted">
-          {activeAgent ? `${activeAgent.name} · ${activeAgent.backend}${activeAgent.model ? ` · ${activeAgent.model}` : ''}` : '暂无 Agent'}
-        </p>
-        <div className="status-row">
-          <UsageChip usage={usage} />
-          {activePhase ? <span className={`phase-badge ${activePhase}`}>{formatPhase(activePhase)}</span> : null}
-        </div>
+      <div className="chat-header__title">
+        <strong>{team?.name ?? '未选择团队'}</strong>
+        {activeAgent ? <span>{activeAgent.name}</span> : <span>暂无 Agent</span>}
       </div>
-      <button type="button" onClick={onAddAgentClick} disabled={!team}>
-        添加 Agent
-      </button>
+
+      <div className="chat-header__status">
+        <UsageChip usage={usage} />
+        {activePhase ? <span className={`phase-badge ${activePhase}`}>{formatPhase(activePhase)}</span> : null}
+      </div>
+
+      <div className="chat-header__actions">
+        <button type="button" onClick={onAddAgentClick} disabled={!team}>
+          ＋ 添加 Agent
+        </button>
+      </div>
     </header>
   );
 }
