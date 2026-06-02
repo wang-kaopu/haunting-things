@@ -1,11 +1,28 @@
 {
   "name": "haunting-things",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
-  "description": "A trimmed Claude/Codex team workspace inspired by AionUi.",
-  "license": "Apache-2.0",
-  "main": "dist-server/electron/main.js",
+  "description": "haunting things are haunting everywhere",
+  "license": "MIT",
+  "main": "dist-server/server/index.js",
+  "bin": {
+    "haunting-things": "bin/haunting-things.js"
+  },
+  "files": [
+    ".node-version",
+    ".nvmrc",
+    "bin/",
+    "dist/",
+    "dist-server/",
+    "scripts/",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22 <23",
     "npm": ">=10"
@@ -27,6 +44,7 @@
     "build:server": "node scripts/build-server.mjs",
     "prebuild": "npm run check:node && npm run ensure:native",
     "build": "npm run build:renderer && npm run build:server",
+    "prepack": "npm run build",
     "prestart": "npm run check:node && npm run ensure:native",
     "start": "node dist-server/server/index.js",
     "prestart:remote": "npm run check:node && npm run ensure:native",
@@ -46,6 +64,7 @@
     "cookie": "^1.0.2",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
+    "haunting-things": "file:haunting-things-0.1.0.tgz",
     "jsonwebtoken": "^9.0.2",
     "pino": "^10.3.1",
     "react": "^19.1.0",
