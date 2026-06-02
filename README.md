@@ -3,7 +3,6 @@
 [![GitHub](https://img.shields.io/badge/GitHub-wang--kaopu%2Fhaunting--things-blue?logo=github)](https://github.com/wang-kaopu/haunting-things)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/haunting-things?label=npm&color=green)](https://www.npmjs.com/package/haunting-things)
-[![npm downloads](https://img.shields.io/npm/dm/haunting-things?label=downloads&color=blue)](https://www.npmjs.com/package/haunting-things)
 [![Node](https://img.shields.io/node/v/haunting-things?label=node)](https://www.npmjs.com/package/haunting-things)
 [![npm version](https://img.shields.io/npm/v/haunting-things?label=npm&color=green)](https://www.npmjs.com/package/haunting-things)
 
