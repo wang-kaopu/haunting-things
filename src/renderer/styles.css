@@ -700,7 +700,7 @@ label,
   background: linear-gradient(to top, #ffffff 72%, rgba(255, 255, 255, 0));
 }
 
-.composer__box {
+.composer-inner {
   max-width: 760px;
   margin: 0 auto;
   border: 1px solid var(--border-strong);
@@ -713,7 +713,7 @@ label,
   gap: 8px;
 }
 
-.composer__textarea {
+.composer-textarea {
   width: 100%;
   min-height: 48px;
   max-height: 200px;
@@ -726,42 +726,18 @@ label,
   padding: 4px 0;
 }
 
-.composer__textarea:disabled {
+.composer-textarea:disabled {
   opacity: 0.5;
 }
 
-.composer__toolbar {
+.composer-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.composer__tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.composer__tools button,
-.composer__tools .tool-pill {
-  height: 32px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: #ffffff;
-  padding: 0 10px;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.composer__tools button:hover {
-  background: var(--sidebar-hover);
-}
-
-.composer__send {
+.composer-send {
   width: 32px;
   height: 32px;
   min-width: 32px;
@@ -778,11 +754,11 @@ label,
   transition: background 0.15s;
 }
 
-.composer__send:hover {
+.composer-send:hover {
   background: #333;
 }
 
-.composer__send:disabled {
+.composer-send:disabled {
   background: #d0d0d0;
   cursor: not-allowed;
 }
@@ -1537,7 +1513,7 @@ label,
   }
 
   .messages__inner,
-  .composer__box {
+  .composer-inner {
     max-width: 100%;
   }
 
@@ -1586,7 +1562,7 @@ label,
     padding: 12px;
   }
 
-  .composer__box {
+  .composer-inner {
     max-width: 100%;
   }
 

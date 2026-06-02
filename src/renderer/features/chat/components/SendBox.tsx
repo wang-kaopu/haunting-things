@@ -9,10 +9,8 @@ import type {
 } from '../../../../shared/types';
 import { bridge } from '../../../shared/bridgeClient';
 import { normalizeAttachmentRef } from '../../../shared/utils/backendData';
-import { AgentCommandsMenu } from './AgentCommandsMenu';
+import { ComposerTools } from './ComposerTools';
 import { ImageAttachmentPicker, ImageAttachmentPreview } from './ImageAttachmentPicker';
-import { ModelPicker } from './ModelPicker';
-import { PermissionModePicker } from './PermissionModePicker';
 
 const ALLOWED_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -130,17 +128,17 @@ export function SendBox({
 
   return (
     <div className="composer">
-      <div className="composer__box">
+      <div className="composer-inner">
         <ImageAttachmentPreview
           attachments={attachments}
           onRemove={(id) => void removeAttachment(id)}
         />
         <textarea
           ref={textareaRef}
-          className="composer__textarea"
+          className="composer-textarea"
           value={content}
           disabled={disabled || sending}
-          placeholder={disabled ? '请先选择团队' : 'Message...'}
+          placeholder={disabled ? '请选择团队' : 'Message...'}
           onChange={(event) => setContent(event.target.value)}
           onPaste={(event) => void handlePaste(event)}
           onKeyDown={(event) => {
@@ -151,29 +149,37 @@ export function SendBox({
           }}
           rows={1}
         />
-        <div className="composer__toolbar">
-          <div className="composer__tools">
-            <ModelPicker agent={activeAgent} models={models} onSetModel={onSetModel} />
-            <PermissionModePicker agent={activeAgent} mode={mode} onSetMode={onSetMode} />
-            <ImageAttachmentPicker
-              disabled={disabled || sending}
-              uploading={uploading}
-              onAddImages={uploadImages}
-            />
-            <AgentCommandsMenu commands={commands} disabled={disabled || sending} onSelectCommand={insertCommand} />
-          </div>
+        <div className="composer-footer">
+          <ComposerTools
+            activeAgent={activeAgent}
+            commands={commands}
+            models={models}
+            mode={mode}
+            onSetModel={onSetModel}
+            onSetMode={onSetMode}
+            disabled={disabled || sending}
+            onSelectCommand={insertCommand}
+            imagePicker={
+              <ImageAttachmentPicker
+                disabled={disabled || sending}
+                uploading={uploading}
+                onAddImages={uploadImages}
+              />
+            }
+          />
           <button
             type="button"
-            className="composer__send"
+            className="composer-send"
             disabled={!canSend}
             onClick={() => void submit()}
-            title="发送 (Enter)"
+            aria-label="发送消息"
+            title="发送消息 (Enter)"
           >
             {sending ? '…' : '↑'}
           </button>
         </div>
+        {error ? <p className="send-error">{error}</p> : null}
       </div>
-      {error ? <p className="send-error">{error}</p> : null}
     </div>
   );
 }
