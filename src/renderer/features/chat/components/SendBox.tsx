@@ -135,10 +135,9 @@ export function SendBox({
         />
         <textarea
           ref={textareaRef}
-          className="composer-textarea"
           value={content}
           disabled={disabled || sending}
-          placeholder={disabled ? '请选择团队' : 'Message...'}
+          placeholder={disabled ? '请选择团队' : '给团队发送消息'}
           onChange={(event) => setContent(event.target.value)}
           onPaste={(event) => void handlePaste(event)}
           onKeyDown={(event) => {
@@ -172,8 +171,8 @@ export function SendBox({
             className="composer-send"
             disabled={!canSend}
             onClick={() => void submit()}
-            aria-label="发送消息"
-            title="发送消息 (Enter)"
+            aria-label={sending ? '发送中' : '发送消息'}
+            title={sending ? '发送中' : '发送消息'}
           >
             {sending ? '…' : '↑'}
           </button>

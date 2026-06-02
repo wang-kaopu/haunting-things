@@ -13,7 +13,7 @@ import { useNotifications } from '../shared/hooks/useNotifications';
 import { useRuntimeSnapshots } from '../shared/hooks/useRuntimeSnapshots';
 import { useServerInfo } from '../shared/hooks/useServerInfo';
 import { useTeams } from '../shared/hooks/useTeams';
-import { RemoteAccessPanel } from '../features/settings/components/RemoteAccessPanel';
+import { SettingsDialog } from '../features/settings/components/SettingsDialog';
 import type { AddAgentInput, CreateTeamInput } from '../shared/types/ui';
 import { normalizePermissionRequest } from '../shared/utils/backendData';
 
@@ -213,34 +213,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
           }}
         />
       ) : null}
-      {settingsOpen ? (
-        <div className="modal-backdrop">
-          <div className="modal settings-dialog">
-            <div className="modal-header settings-dialog-header">
-              <div>
-                <h2>设置</h2>
-                <p>管理本地服务和远程访问。</p>
-              </div>
-
-              <button
-                type="button"
-                className="modal-close-button"
-                aria-label="关闭设置"
-                onClick={() => setSettingsOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <RemoteAccessPanel
-              serverInfo={serverInfo}
-              loading={serverInfoLoading}
-              error={serverInfoError}
-              onSetRemoteAccess={setRemoteAccess}
-            />
-          </div>
-        </div>
-      ) : null}
+      <SettingsDialog
+        open={settingsOpen}
+        serverInfo={serverInfo}
+        loading={serverInfoLoading}
+        error={serverInfoError}
+        onClose={() => setSettingsOpen(false)}
+        onSetRemoteAccess={setRemoteAccess}
+      />
       {teamsState.error ? (
         <div className="load-error" role="alert">
           {teamsState.error}

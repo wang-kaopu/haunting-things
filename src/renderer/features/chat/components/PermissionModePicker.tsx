@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ConversationMode, TeamAgent } from '../../../../shared/types';
+import { CustomSelect } from '../../../shared/components/CustomSelect';
 
 type PermissionModeOption = {
   id: string;
@@ -63,7 +64,7 @@ export type PermissionModePickerProps = {
   onSetMode: (mode: string) => Promise<void>;
 };
 
-/** 展示当前 Agent 的权限模式，并把切换请求提交给后端运行时。 */
+/** 展示当前 Agent 的权限模式——使用自制下拉框，危险模式保留二次确认。 */
 export function PermissionModePicker({
   agent,
   mode,
@@ -80,7 +81,6 @@ export function PermissionModePicker({
 
   const fallbackMode = agent?.backend === 'claude' ? 'default' : 'auto';
   const current = mode?.mode || fallbackMode;
-  const currentOption = options.find((item) => item.id === current);
 
   useEffect(() => {
     setError('');
@@ -112,25 +112,28 @@ export function PermissionModePicker({
 
   return (
     <div className="permission-mode-picker">
-      <label className="toolbar-select-label">
-        <select
-          aria-label="权限模式"
-          className="toolbar-control toolbar-select permission-mode-select"
-          value={current}
-          disabled={!agent || options.length === 0 || submitting}
-          title={currentOption?.description}
-          onChange={(event) => {
-            void submit(event.target.value);
-          }}
-        >
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-          {!options.some((option) => option.id === current) ? <option value={current}>{current}</option> : null}
-        </select>
-      </label>
+      <CustomSelect
+        compact
+        className="permission-mode-select"
+        ariaLabel="权限模式"
+        value={current}
+        placeholder="权限"
+        disabled={!agent || options.length === 0 || submitting}
+        options={[
+          ...options.map((option) => ({
+            value: option.id,
+            label: option.label,
+            description: option.description,
+            danger: option.danger,
+          })),
+          ...(!options.some((option) => option.id === current)
+            ? [{ value: current, label: current }]
+            : []),
+        ]}
+        onChange={(nextValue) => {
+          void submit(nextValue);
+        }}
+      />
       {error ? <p className="error-text compact toolbar-select-error">{error}</p> : null}
     </div>
   );

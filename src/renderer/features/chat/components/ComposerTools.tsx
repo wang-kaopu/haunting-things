@@ -23,9 +23,10 @@ export type ComposerToolsProps = {
 };
 
 /**
- * 消息输入框的工具栏。
+ * 消息输入框工具栏——顺序接近 GPT 网页版。
  *
- * 模型、图片、命令和模式状态放在同一行，方便发送前调整运行时上下文。
+ * 左侧：附件图标 → 模型 → 权限 → 命令
+ * 右侧：发送按钮（由 SendBox 管理）
  */
 export function ComposerTools({
   activeAgent,
@@ -40,9 +41,9 @@ export function ComposerTools({
 }: ComposerToolsProps): React.ReactElement {
   return (
     <div className="composer-tools">
+      {imagePicker}
       <ModelPicker agent={activeAgent} models={models} onSetModel={onSetModel} />
       <PermissionModePicker agent={activeAgent} mode={mode} onSetMode={onSetMode} />
-      {imagePicker}
       <AgentCommandsMenu commands={commands} disabled={disabled} onSelectCommand={onSelectCommand} />
     </div>
   );

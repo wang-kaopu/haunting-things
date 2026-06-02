@@ -10,7 +10,7 @@ export type ImageAttachmentPickerProps = {
 };
 
 /**
- * 图片选择入口。
+ * 图片选择入口——图标按钮，不再显示"添加图片"长文字。
  *
  * 负责文件选择和拖拽收集；上传、命名和错误状态交给上层 composer 统一处理。
  */
@@ -60,11 +60,13 @@ export function ImageAttachmentPicker({
       />
       <button
         type="button"
-        className="toolbar-control image-picker-button"
+        className="composer-icon-button image-picker-button"
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
+        aria-label={uploading ? '图片上传中' : '添加图片'}
+        title={uploading ? '图片上传中' : '添加图片'}
       >
-        {uploading ? '上传中' : '图片'}
+        {uploading ? '…' : '+'}
       </button>
     </div>
   );

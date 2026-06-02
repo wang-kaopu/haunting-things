@@ -746,73 +746,94 @@ label,
    ================================================================ */
 
 .composer {
-  position: relative;
-  flex-shrink: 0;
+  border-top: none;
+  background: linear-gradient(to top, #ffffff 76%, rgba(255, 255, 255, 0));
   padding: 16px 24px 24px;
-  background: linear-gradient(to top, #ffffff 72%, rgba(255, 255, 255, 0));
+  flex-shrink: 0;
 }
 
 .composer-inner {
   max-width: 760px;
   margin: 0 auto;
-  border: 1px solid var(--border-strong);
+  border: 1px solid #d9d9d9;
   border-radius: 24px;
   background: #ffffff;
-  box-shadow: var(--composer-shadow);
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  display: grid;
   gap: 8px;
 }
 
-.composer-textarea {
-  width: 100%;
+.composer textarea {
   min-height: 48px;
   max-height: 200px;
   border: none;
   outline: none;
   resize: none;
+  background: transparent;
+  padding: 0;
   font-size: 15px;
   line-height: 1.6;
-  background: transparent;
-  padding: 4px 0;
-}
-
-.composer-textarea:disabled {
-  opacity: 0.5;
+  width: 100%;
 }
 
 .composer-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
+.composer-tools {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-icon-button,
 .composer-send {
   width: 32px;
   height: 32px;
-  min-width: 32px;
-  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
   border: none;
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.composer-icon-button {
+  background: #f7f7f8;
+  color: #0d0d0d;
+}
+
+.composer-icon-button:hover {
+  background: #ececec;
+}
+
+.composer-send {
+  flex: 0 0 auto;
   background: #0d0d0d;
   color: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  padding: 0;
-  transition: background 0.15s;
+  font-weight: 600;
 }
 
 .composer-send:hover {
-  background: #333;
+  background: #2f2f2f;
 }
 
 .composer-send:disabled {
   background: #d0d0d0;
+  color: #ffffff;
   cursor: not-allowed;
+}
+
+.image-picker.dragging .image-picker-button {
+  background: #ececec;
+  box-shadow: 0 0 0 2px rgba(13, 13, 13, 0.08);
 }
 
 /* ================================================================
@@ -1099,7 +1120,7 @@ label,
 }
 
 /* ================================================================
-   Toolbar Controls — 统一 GPT 风格胶囊控件
+   Custom Select — 自制下拉框
    ================================================================ */
 
 .model-picker,
@@ -1112,71 +1133,136 @@ label,
   min-width: 0;
 }
 
-.toolbar-select-label {
+.custom-select {
+  position: relative;
   display: inline-flex;
-  align-items: center;
   min-width: 0;
 }
 
-.toolbar-control,
-.toolbar-select {
+.custom-select-trigger {
   height: 32px;
   max-width: 220px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid #d9d9d9;
   border-radius: 999px;
   background: #f7f7f8;
   color: #0d0d0d;
+  padding: 0 10px 0 12px;
   font-size: 13px;
   line-height: 1;
-  white-space: nowrap;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
 }
 
-.toolbar-select {
-  width: auto;
-  min-width: 0;
-  padding: 0 30px 0 12px;
-  appearance: auto;
-}
-
-.toolbar-control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-}
-
-.toolbar-control:hover,
-.toolbar-select:hover {
+.custom-select-trigger:hover {
   background: #ececec;
   border-color: #cfcfcf;
 }
 
-.toolbar-control:focus-visible,
-.toolbar-select:focus-visible {
+.custom-select-trigger:focus-visible {
   outline: none;
   border-color: #0d0d0d;
   box-shadow: 0 0 0 2px rgba(13, 13, 13, 0.08);
 }
 
-.toolbar-control:disabled,
-.toolbar-select:disabled {
+.custom-select-trigger:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
 
-.model-select {
+.custom-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-chevron {
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.custom-select-popover {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  z-index: 30;
+  width: max-content;
+  min-width: 180px;
+  max-width: 320px;
+  max-height: 280px;
+  overflow: auto;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #ececec;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+}
+
+.custom-select-option {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #0d0d0d;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.custom-select-option:hover {
+  background: #f4f4f4;
+}
+
+.custom-select-option.selected {
+  background: #ececec;
+}
+
+.custom-select-option.danger .custom-select-option-label {
+  color: #b42318;
+}
+
+.custom-select-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.custom-select-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-option-desc {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.custom-select-empty {
+  padding: 8px 10px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.model-select .custom-select-trigger {
   max-width: 240px;
 }
 
-.permission-mode-select {
+.permission-mode-select .custom-select-trigger {
   max-width: 190px;
 }
 
-.command-select {
+.command-select .custom-select-trigger {
   max-width: 160px;
 }
 
@@ -1570,11 +1656,29 @@ label,
    Settings — GPT 风格设置面板
    ================================================================ */
 
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
 .settings-dialog {
-  width: min(620px, calc(100vw - 32px));
-  max-height: min(720px, calc(100vh - 48px));
-  padding: 0;
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .settings-dialog-header {
@@ -1600,7 +1704,7 @@ label,
   font-size: 13px;
 }
 
-.modal-close-button {
+.settings-close-button {
   width: 32px;
   height: 32px;
   display: inline-grid;
@@ -1614,76 +1718,88 @@ label,
   line-height: 1;
 }
 
-.modal-close-button:hover {
+.settings-close-button:hover {
   background: #e9e9e9;
 }
 
-.settings-dialog .settings-card {
-  border: none;
-  border-radius: 0;
-  background: #ffffff;
-  padding: 8px 24px 24px;
-  box-shadow: none;
+/* ---- Settings Panel ---- */
+
+.settings-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px 24px;
 }
 
-.settings-card-header {
+.settings-section {
   display: grid;
-  gap: 4px;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 
-.settings-card-header h3 {
-  margin: 0;
-  color: #0d0d0d;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.settings-card-header p {
-  margin: 0;
+.settings-section h3 {
+  margin: 0 0 8px;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
-/* ---- 远程访问开关行 ---- */
+.settings-item {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #f0f0f0;
+  padding: 14px 0;
+}
 
-.remote-toggle-row {
-  min-height: 56px;
+.settings-item:first-of-type {
+  border-top: none;
+}
+
+.settings-item-main {
+  min-height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  margin: 0;
-  padding: 14px 0;
-  border-top: 1px solid #f0f0f0;
-  color: #0d0d0d;
-  font-size: 14px;
 }
 
-.remote-toggle-row span {
+.settings-item-copy {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.remote-toggle-row strong {
+.settings-item-copy strong {
   color: #0d0d0d;
   font-size: 14px;
   font-weight: 500;
 }
 
-.remote-toggle-row small {
+.settings-item-copy span {
   color: #6b7280;
   font-size: 12px;
   line-height: 1.4;
 }
 
-.remote-toggle-row input {
+.settings-item-detail {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---- Switch ---- */
+
+.settings-switch {
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-switch span {
   width: 38px;
   height: 22px;
-  margin: 0;
-  appearance: none;
-  border: none;
   border-radius: 999px;
   background: #d1d5db;
   position: relative;
@@ -1691,7 +1807,7 @@ label,
   transition: background 120ms ease;
 }
 
-.remote-toggle-row input::before {
+.settings-switch span::before {
   content: "";
   position: absolute;
   top: 3px;
@@ -1704,15 +1820,15 @@ label,
   transition: transform 120ms ease;
 }
 
-.remote-toggle-row input:checked {
+.settings-switch input:checked + span {
   background: #0d0d0d;
 }
 
-.remote-toggle-row input:checked::before {
+.settings-switch input:checked + span::before {
   transform: translateX(16px);
 }
 
-.remote-toggle-row input:disabled {
+.settings-switch input:disabled + span {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -1722,7 +1838,6 @@ label,
 .remote-url-list {
   display: grid;
   gap: 8px;
-  margin: 14px 0;
 }
 
 .remote-url-row {
@@ -1745,8 +1860,8 @@ label,
 }
 
 .remote-url-label {
-  font-size: 12px;
   color: #6b7280;
+  font-size: 12px;
 }
 
 .settings-copy-button {
@@ -1764,15 +1879,15 @@ label,
   background: #ececec;
 }
 
-/* ---- 设置面板内文字 ---- */
-
-.settings-dialog .muted {
+.settings-muted {
+  margin: 0;
   color: #6b7280;
   font-size: 12px;
   line-height: 1.5;
 }
 
-.settings-dialog .error-text {
+.settings-error {
+  margin: 0;
   border-radius: 12px;
   background: #fff1f0;
   color: #b42318;
