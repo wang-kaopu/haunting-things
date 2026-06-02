@@ -10,7 +10,7 @@ export type ImageAttachmentPickerProps = {
 };
 
 /**
- * 图片选择入口。
+ * 图片选择入口——图标按钮，不再显示"添加图片"长文字。
  *
  * 负责文件选择和拖拽收集；上传、命名和错误状态交给上层 composer 统一处理。
  */
@@ -22,9 +22,6 @@ export function ImageAttachmentPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  /**
-   * 从文件选择器或拖拽事件中过滤出图片文件。
-   */
   async function addFiles(files: FileList | File[]): Promise<void> {
     const images = Array.from(files).filter((file) => file.type.startsWith('image/'));
     if (images.length === 0) return;
@@ -63,11 +60,13 @@ export function ImageAttachmentPicker({
       />
       <button
         type="button"
-        className="tool-pill image-picker-button"
+        className="composer-icon-button image-picker-button"
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
+        aria-label={uploading ? '图片上传中' : '添加图片'}
+        title={uploading ? '图片上传中' : '添加图片'}
       >
-        {uploading ? '图片上传中' : '添加图片'}
+        {uploading ? '…' : '+'}
       </button>
     </div>
   );

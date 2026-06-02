@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { ConversationModels, TeamAgent } from '../../../../shared/types';
+import { CustomSelect } from '../../../shared/components/CustomSelect';
 
 export type ModelPickerProps = {
   agent?: TeamAgent | null;
@@ -8,7 +9,7 @@ export type ModelPickerProps = {
   onSetModel: (model: string) => Promise<void>;
 };
 
-/** 展示当前 Agent 的模型选择器，并把运行时模型切换提交给后端。 */
+/** 展示当前 Agent 的模型选择器——使用自制下拉框替代原生 select。 */
 export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): React.ReactElement {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +22,6 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
     setError('');
   }, [agent?.conversationId, current]);
 
-  /** 提交模型切换请求，并在切换期间禁用选择器避免重复操作。 */
   async function submit(model: string): Promise<void> {
     const nextModel = model.trim();
     if (!nextModel || submitting || nextModel === current) return;
@@ -38,25 +38,29 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
 
   return (
     <div className="model-picker">
-      <label className="toolbar-select-label">
-        <span></span>
-        <select
-          className="toolbar-select model-select"
-          value={selectedValue}
-          disabled={!agent || !hasOptions || submitting}
-          onChange={(event) => {
-            void submit(event.target.value);
-          }}
-        >
-          {!current || !hasOptions ? <option value="">默认模型</option> : null}
-          {current && !options.some((model) => model.id === current) ? <option value={current}>{current}</option> : null}
-          {options.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name || model.id}
-            </option>
-          ))}
-        </select>
-      </label>
+      <CustomSelect
+        compact
+        className="model-select"
+        ariaLabel="模型"
+        value={selectedValue}
+        placeholder="默认模型"
+        disabled={!agent || !hasOptions || submitting}
+        options={[
+          ...(!current || !hasOptions
+            ? [{ value: '', label: '默认模型', disabled: true }]
+            : []),
+          ...(current && !options.some((model) => model.id === current)
+            ? [{ value: current, label: current }]
+            : []),
+          ...options.map((model) => ({
+            value: model.id,
+            label: model.name || model.id,
+          })),
+        ]}
+        onChange={(nextValue) => {
+          void submit(nextValue);
+        }}
+      />
       {error ? <p className="error-text compact toolbar-select-error">{error}</p> : null}
     </div>
   );

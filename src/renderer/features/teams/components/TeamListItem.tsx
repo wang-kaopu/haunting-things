@@ -9,7 +9,7 @@ export type TeamListItemProps = {
   onDelete: () => Promise<void>;
 };
 
-/** 渲染侧边栏团队条目，并把删除操作收进二级菜单避免误触。 */
+/** GPT 风格侧边栏团队条目——和 Members 一样的一行式列表项，删除收进 ⋯ 菜单。 */
 export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -19,24 +19,32 @@ export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemP
   }, [active]);
 
   return (
-    <div className={`team-row${active ? ' active' : ''}`}>
-      <button type="button" className={`team-main${active ? ' selected' : ''}`} onClick={onSelect}>
-        <span>{team.name}</span>
+    <div className={`sidebar-team-item${active ? ' selected' : ''}`}>
+      <button
+        type="button"
+        className="sidebar-team-main"
+        title={team.name}
+        onClick={onSelect}
+      >
+        <span className="sidebar-team-icon" aria-hidden="true">#</span>
+        <span className="sidebar-team-name">{team.name}</span>
       </button>
-      <div className="team-menu-wrap">
+
+      <div className="sidebar-team-menu-wrap">
         <button
           type="button"
-          className="icon-button"
+          className="sidebar-team-menu-button"
           aria-label={`更多操作：${team.name}`}
           onClick={(event) => {
             event.stopPropagation();
-            setMenuOpen((value) => !value);
+            setMenuOpen((v) => !v);
           }}
         >
           ⋯
         </button>
+
         {menuOpen ? (
-          <div className="menu-popover">
+          <div className="menu-popover sidebar-team-menu">
             <button
               type="button"
               className="danger"
