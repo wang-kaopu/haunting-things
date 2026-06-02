@@ -28,6 +28,7 @@ export type ServerInfo = {
   host: string;
   port: number;
   allowRemote: boolean;
+  restarting?: boolean;
   urls: string[];
 };
 
@@ -109,6 +110,7 @@ export type InvokeMap = {
   'team.timeline': { params: { teamId: string }; result: TeamMailboxEntry[] };
   'team.stop': { params: { teamId: string }; result: { stopped: true } };
   'server.info': { params: void; result: ServerInfo };
+  'server.setRemoteAccess': { params: { allowRemote: boolean }; result: ServerInfo };
 };
 
 /**

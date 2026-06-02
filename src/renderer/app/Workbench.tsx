@@ -43,6 +43,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     loading: serverInfoLoading,
     error: serverInfoError,
     refreshServerInfo,
+    setRemoteAccess,
   } = useServerInfo();
 
   const activeAgentsByConversation = useMemo(() => {
@@ -173,6 +174,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
               loading={serverInfoLoading}
               error={serverInfoError}
               onRefresh={refreshServerInfo}
+              onSetRemoteAccess={setRemoteAccess}
             />
           </div>
         </div>

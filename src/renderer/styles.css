@@ -839,6 +839,22 @@ label,
   margin-bottom: 12px;
 }
 
+.remote-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.remote-toggle-row input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .remote-url-list {
   display: grid;
   gap: 8px;

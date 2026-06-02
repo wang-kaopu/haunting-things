@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { loadServerPreferences } from './serverPreferences';
 
 export const DEFAULT_PORT = 25808;
 
@@ -17,8 +18,14 @@ export function loadConfig(): AppConfig {
   const dataDir = process.env.DATA_DIR?.trim() || path.join(homedir(), '.Haunting-things');
   mkdirSync(dataDir, { recursive: true });
 
-  const allowRemote = process.env.ALLOW_REMOTE === 'true' || process.env.HOST === '0.0.0.0';
-  const host = process.env.HOST?.trim() || (allowRemote ? '0.0.0.0' : '127.0.0.1');
+  const preferences = loadServerPreferences(dataDir);
+  const hostOverride = process.env.HOST?.trim();
+  const allowRemote =
+    parseBoolean(process.env.ALLOW_REMOTE) ??
+    (hostOverride ? hostOverride === '0.0.0.0' : undefined) ??
+    preferences.allowRemote ??
+    false;
+  const host = hostOverride || resolveListenHost(allowRemote);
   const port = Number.parseInt(process.env.PORT || String(DEFAULT_PORT), 10);
 
   return {
@@ -29,4 +36,16 @@ export function loadConfig(): AppConfig {
     allowRemote,
     rendererDist: path.resolve('dist/renderer'),
   };
+}
+
+export function resolveListenHost(allowRemote: boolean): '0.0.0.0' | '127.0.0.1' {
+  return allowRemote ? '0.0.0.0' : '127.0.0.1';
+}
+
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
 }

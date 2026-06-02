@@ -6,6 +6,7 @@ export type RemoteAccessPanelProps = {
   loading?: boolean;
   error?: string;
   onRefresh: () => Promise<void>;
+  onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
 export function RemoteAccessPanel({
@@ -13,8 +14,11 @@ export function RemoteAccessPanel({
   loading,
   error,
   onRefresh,
+  onSetRemoteAccess,
 }: RemoteAccessPanelProps): React.ReactElement {
   const urls = Array.isArray(serverInfo?.urls) ? serverInfo.urls : [];
+  const allowRemote = serverInfo?.allowRemote ?? false;
+  const switching = loading || serverInfo?.restarting;
 
   return (
     <section className="settings-card">
@@ -22,9 +26,11 @@ export function RemoteAccessPanel({
         <div>
           <h3>远程访问</h3>
           <p className="muted">
-            {serverInfo?.allowRemote
-              ? '已允许局域网 / Tailscale 内访问。'
-              : '当前仅允许本机访问。'}
+            {serverInfo?.restarting
+              ? '正在切换监听地址...'
+              : allowRemote
+                ? '已允许局域网 / Tailscale 内访问。'
+                : '当前仅允许本机访问。'}
           </p>
         </div>
 
@@ -32,6 +38,16 @@ export function RemoteAccessPanel({
           {loading ? '刷新中...' : '刷新'}
         </button>
       </div>
+
+      <label className="remote-toggle-row">
+        <input
+          type="checkbox"
+          checked={allowRemote}
+          disabled={!serverInfo || switching}
+          onChange={(event) => void onSetRemoteAccess(event.currentTarget.checked)}
+        />
+        <span>允许局域网 / Tailscale 访问</span>
+      </label>
 
       {error ? <p className="error-text">{error}</p> : null}
 
@@ -49,12 +65,7 @@ export function RemoteAccessPanel({
             在其他设备浏览器中打开以上地址，然后使用当前账号密码登录。
           </p>
 
-          {!serverInfo.allowRemote ? (
-            <p className="muted">
-              如需允许局域网或 Tailscale 访问，请使用 HOST=0.0.0.0 或
-              ALLOW_REMOTE=true 启动服务。
-            </p>
-          ) : null}
+          <p className="muted">切换远程访问会短暂重启 HTTP/WebSocket 监听，页面会自动重连。</p>
         </>
       )}
     </section>

@@ -345,10 +345,12 @@ export function normalizeServerInfo(value: unknown): ServerInfo | null {
   const host = asString(input.host);
   const port = asNumber(input.port, Number.NaN);
   if (!host || !Number.isFinite(port)) return null;
+  const restarting = asBoolean(input.restarting, false);
   return {
     host,
     port,
     allowRemote: asBoolean(input.allowRemote, false),
+    ...(restarting ? { restarting } : {}),
     urls: Array.isArray(input.urls) ? input.urls.map((url) => asString(url)).filter(Boolean) : [],
   };
 }

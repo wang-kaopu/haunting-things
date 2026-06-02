@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { parse as parseCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import crypto from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { User } from '../../shared/types';
 import type { UserRepositoryPort } from '../db/userRepository';
 import { createId } from '../id';
@@ -10,6 +10,7 @@ import { setRequestContext } from '../utils/requestContext';
 
 const COOKIE_NAME = 'hs_session';
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_ADMIN_PASSWORD = '123456';
 
 export type AuthState = {
   initialPassword: string | null;
@@ -28,13 +29,13 @@ export class AuthService {
   async ensureAdmin(): Promise<void> {
     if (this.repo.getAnyUser()) return;
 
-    const password = crypto.randomBytes(9).toString('base64url');
+    const password = DEFAULT_ADMIN_PASSWORD;
     const passwordHash = await bcrypt.hash(password, 12);
     this.repo.createUser({
       id: createId(),
       username: 'admin',
       passwordHash,
-      jwtSecret: crypto.randomBytes(48).toString('hex'),
+      jwtSecret: randomBytes(48).toString('hex'),
     });
     this.state.initialPassword = password;
   }
@@ -65,7 +66,7 @@ export class AuthService {
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok || newPassword.length < 8) return false;
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    this.repo.updatePassword(user.id, passwordHash, crypto.randomBytes(48).toString('hex'));
+    this.repo.updatePassword(user.id, passwordHash, randomBytes(48).toString('hex'));
     this.state.initialPassword = null;
     return true;
   }

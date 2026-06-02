@@ -1,4 +1,4 @@
-import type { AgentBackend } from '../../../shared/types';
+import type { AgentBackend, ServerInfo } from '../../../shared/types';
 import type { AttachmentRepositoryPort } from '../../db/attachmentRepository';
 import { toAttachmentRef } from '../../db/mappers';
 import { healthAgent, listAgents } from '../../runtime/agentRegistry';
@@ -13,12 +13,8 @@ export function registerBridgeHandlers(input: {
   attachmentService: AttachmentService;
   conversations: ConversationService;
   teams: TeamService;
-  serverInfo: () => {
-    host: string;
-    port: number;
-    allowRemote: boolean;
-    urls: string[];
-  };
+  serverInfo: () => ServerInfo;
+  setRemoteAccess: (params: { allowRemote: boolean }) => ServerInfo;
 }): void {
   const { bridge, attachments, attachmentService, conversations, teams } = input;
 
@@ -78,4 +74,5 @@ export function registerBridgeHandlers(input: {
     return { stopped: true };
   });
   bridge.register('server.info', input.serverInfo);
+  bridge.register('server.setRemoteAccess', input.setRemoteAccess);
 }
