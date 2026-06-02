@@ -1,23 +1,25 @@
 import type React from 'react';
-import type { AgentTurnPhase, ChatMessage } from '../../../../shared/types';
+import type { AgentTurnPhase, ChatMessage, TeamAgent } from '../../../../shared/types';
 import { getMessageFallbackText } from '../../../shared/utils/format';
 import { isWrappedTeamPrompt } from '../../../shared/utils/guards';
+import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 
 /** 单条聊天消息的展示输入。 */
 export type MessageBubbleProps = {
   message: ChatMessage;
   activePhase?: AgentTurnPhase;
+  assistantAgent?: TeamAgent | null;
 };
 
 /**
  * GPT 风格消息气泡。
  *
- * - Assistant 消息：头像 + 正文流，无卡片背景。
+ * - Assistant 消息：后端图标 + 正文流，无卡片背景。
  * - User 消息：靠右浅灰圆角气泡。
  * - Team wrapper prompt 默认折叠。
  */
-export function MessageBubble({ message, activePhase }: MessageBubbleProps): React.ReactElement {
+export function MessageBubble({ message, activePhase, assistantAgent }: MessageBubbleProps): React.ReactElement {
   const wrappedPrompt = message.role === 'user' && isWrappedTeamPrompt(message.content);
   const content = getMessageFallbackText(message, activePhase);
   const isError = message.status === 'error';
@@ -51,9 +53,26 @@ export function MessageBubble({ message, activePhase }: MessageBubbleProps): Rea
     );
   }
 
+  const showAssistantIcon = message.role === 'assistant';
+  const assistantIconSrc = showAssistantIcon
+    ? getAgentIconSrc(assistantAgent?.backend)
+    : null;
+  const assistantIconAlt = showAssistantIcon
+    ? getAgentIconAlt(assistantAgent?.backend)
+    : '';
+
   return (
     <article className={`message message--assistant${isError ? ' message--error' : ''}`}>
-      <div className="message__avatar">AI</div>
+      {assistantIconSrc ? (
+        <img
+          className="message__avatar-icon"
+          src={assistantIconSrc}
+          alt={assistantIconAlt}
+          title={assistantAgent?.name ?? assistantIconAlt}
+        />
+      ) : (
+        <div className="message__avatar">AI</div>
+      )}
       <div className="message__content">
         {wrappedPrompt ? (
           <details className="debug-prompt-inline">

@@ -583,6 +583,14 @@ label,
   user-select: none;
 }
 
+.message__avatar-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .message__content {
   min-width: 0;
   flex: 1;

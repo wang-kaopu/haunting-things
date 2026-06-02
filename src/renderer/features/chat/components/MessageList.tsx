@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import type { AgentTurnPhase, ChatMessage } from '../../../../shared/types';
+import type { AgentTurnPhase, ChatMessage, TeamAgent } from '../../../../shared/types';
 import { MessageBubble } from './MessageBubble';
 
 export type MessageListProps = {
   messages: ChatMessage[];
   activePhase?: AgentTurnPhase;
+  agents?: TeamAgent[];
+  activeAgent?: TeamAgent | null;
 };
 
 /** GPT 风格居中消息流，保留滚动定位和新消息提示逻辑。 */
-export function MessageList({ messages, activePhase }: MessageListProps): React.ReactElement {
+export function MessageList({ messages, activePhase, agents = [], activeAgent }: MessageListProps): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastLengthRef = useRef(messages.length);
   const [pinnedToBottom, setPinnedToBottom] = useState(true);
@@ -49,9 +51,25 @@ export function MessageList({ messages, activePhase }: MessageListProps): React.
       >
         <div className="messages__inner">
           {messages.length === 0 ? <p className="empty-inline">暂无消息。</p> : null}
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} activePhase={activePhase} />
-          ))}
+          {messages.map((message) => {
+            const assistantAgent =
+              message.role === 'assistant'
+                ? (agents.find(
+                    (agent) => agent.conversationId === message.conversationId,
+                  ) ??
+                  activeAgent ??
+                  null)
+                : null;
+
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                activePhase={activePhase}
+                assistantAgent={assistantAgent}
+              />
+            );
+          })}
         </div>
       </div>
       {!pinnedToBottom && newMessageCount > 0 ? (

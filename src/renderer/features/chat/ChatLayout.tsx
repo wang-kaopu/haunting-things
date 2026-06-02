@@ -69,7 +69,12 @@ export function ChatLayout({
       {messages.length === 0 ? (
         <ChatEmpty />
       ) : (
-        <MessageList messages={messages} activePhase={activePhase} />
+        <MessageList
+          messages={messages}
+          activePhase={activePhase}
+          agents={team.agents}
+          activeAgent={activeAgent}
+        />
       )}
       <SendBox
         disabled={!team || !activeAgent}

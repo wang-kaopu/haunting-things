@@ -1,14 +1,6 @@
 import type React from 'react';
-import type { AgentBackend } from '../../../../shared/types/agent';
 import type { AgentTurnPhase, TeamAgent } from '../../../../shared/types';
-
-import claudeIcon from '../../../assets/icons/agents/claude.svg';
-import openaiIcon from '../../../assets/icons/agents/openai.svg';
-
-const AGENT_ICON_MAP: Record<AgentBackend, string> = {
-  claude: claudeIcon,
-  codex: openaiIcon,
-};
+import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
 
 export type SidebarAgentListProps = {
   agents: TeamAgent[];
@@ -54,8 +46,8 @@ export function SidebarAgentList({
             />
             <img
               className="sidebar-agent-icon"
-              src={AGENT_ICON_MAP[agent.backend]}
-              alt={agent.backend}
+              src={getAgentIconSrc(agent.backend)}
+              alt={getAgentIconAlt(agent.backend)}
             />
             <span className="sidebar-agent-name">{agent.name}</span>
           </button>
