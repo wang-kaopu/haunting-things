@@ -216,8 +216,12 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
       {settingsOpen ? (
         <div className="modal-backdrop">
           <div className="modal settings-dialog">
-            <div className="modal-header">
-              <h2>设置</h2>
+            <div className="modal-header settings-dialog-header">
+              <div>
+                <h2>设置</h2>
+                <p>管理本地服务和远程访问。</p>
+              </div>
+
               <button
                 type="button"
                 className="modal-close-button"

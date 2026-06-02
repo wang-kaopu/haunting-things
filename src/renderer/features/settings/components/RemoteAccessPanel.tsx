@@ -10,7 +10,7 @@ export type RemoteAccessPanelProps = {
 };
 
 /**
- * 远程访问设置面板。
+ * GPT 风格远程访问设置面板。
  *
  * 切换后服务会短暂重启监听地址，面板保留当前状态并提示用户等待自动重连。
  */
@@ -26,20 +26,17 @@ export function RemoteAccessPanel({
 
   return (
     <section className="settings-card">
-      <div className="settings-card-header">
-        <div>
-          <h3>远程访问</h3>
-        </div>
-      </div>
-
       <label className="remote-toggle-row">
+        <span>
+          <strong>允许远程访问</strong>
+          <small>允许同一网络或 Tailscale 设备访问当前服务。</small>
+        </span>
         <input
           type="checkbox"
           checked={allowRemote}
           disabled={!serverInfo || switching}
           onChange={(event) => void onSetRemoteAccess(event.currentTarget.checked)}
         />
-        <span>允许局域网/Tailscale连接</span>
       </label>
 
       {error ? <p className="error-text">{error}</p> : null}
@@ -77,6 +74,7 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
 
       <button
         type="button"
+        className="settings-copy-button"
         onClick={() => void navigator.clipboard.writeText(url)}
       >
         复制

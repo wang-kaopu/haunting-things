@@ -45,7 +45,6 @@ export function Sidebar({
     <aside className="sidebar">
       <div className="sidebar__brand">
         <strong>Haunting Things</strong>
-        <span>{username ?? 'admin'}</span>
       </div>
 
       <section className="sidebar-section sidebar-members-section">
