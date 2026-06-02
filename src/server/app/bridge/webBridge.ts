@@ -149,8 +149,9 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
         filesCount: Array.isArray(input.files) ? input.files.length : 0,
       };
     case 'conversation.setModel':
+    case 'conversation.setMode':
     case 'team.setAgentModel':
-      return pick(input, ['conversationId', 'teamId', 'slotId', 'model']);
+      return pick(input, ['conversationId', 'teamId', 'slotId', 'model', 'mode']);
     case 'conversation.confirmPermission':
       return pick(input, ['conversationId', 'callId', 'optionId']);
     case 'team.create':
@@ -189,19 +190,9 @@ function pick(input: Record<string, unknown>, keys: string[]): Record<string, un
   return Object.fromEntries(keys.filter((key) => key in input).map((key) => [key, input[key]]));
 }
 
-/** 记录任意结果对象时截断过长字符串和数组。 */
+/** 记录任意结果对象时保留完整字段，便于排查 bridge 返回内容。 */
 function summarizeObject(input: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => {
-      if (typeof value === 'string' && value.length > 160) {
-        return [key, `${value.slice(0, 157)}...`];
-      }
-      if (Array.isArray(value)) {
-        return [key, { count: value.length }];
-      }
-      return [key, value];
-    })
-  );
+  return Object.fromEntries(Object.entries(input));
 }
 
 /** 从任意 invoke payload 日志中脱敏明显的凭据字段。 */

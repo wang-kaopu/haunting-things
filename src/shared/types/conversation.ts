@@ -65,10 +65,13 @@ export type ConversationCommands = {
   updatedAt: number;
 };
 
+/** ACP 权限模式。 */
+export type PermissionModeId = 'read-only' | 'auto' | 'full-access' | 'bypassPermissions' | string;
+
 /** Conversation 的实时模式快照。 */
 export type ConversationMode = {
   conversationId: string;
-  mode: string;
+  mode: PermissionModeId;
   updatedAt: number;
 };
 

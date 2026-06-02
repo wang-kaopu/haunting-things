@@ -106,17 +106,15 @@ export function sanitizeLogFields(fields: LogFields, reveal: string[] = []): Log
   }
 }
 
-/** 将任意日志值压缩成单行安全文本，避免超长对象破坏日志可读性。 */
+/** 将任意日志值转换成单行安全文本，保留完整内容用于排查问题。 */
 export function formatValue(value: unknown): string {
   if (value == null) return String(value);
   if (typeof value === 'string') {
-    if (value.length > 160) return JSON.stringify(`${value.slice(0, 157)}...`);
     return JSON.stringify(value);
   }
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   try {
-    const text = JSON.stringify(value);
-    return text.length > 220 ? `${text.slice(0, 217)}...` : text;
+    return JSON.stringify(value);
   } catch {
     return '[unserializable]';
   }

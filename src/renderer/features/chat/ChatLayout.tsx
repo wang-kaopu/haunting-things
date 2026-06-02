@@ -26,6 +26,7 @@ export type ChatLayoutProps = {
   onAddAgentClick: () => void;
   onSendMessage: (payload: SendBoxPayload) => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
+  onSetMode: (mode: string) => Promise<void>;
 };
 
 /**
@@ -45,6 +46,7 @@ export function ChatLayout({
   onAddAgentClick,
   onSendMessage,
   onSetModel,
+  onSetMode,
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
     return <section className="chat-layout empty">先创建一个团队开始。</section>;
@@ -69,6 +71,7 @@ export function ChatLayout({
         mode={mode}
         onSend={onSendMessage}
         onSetModel={onSetModel}
+        onSetMode={onSetMode}
       />
     </section>
   );

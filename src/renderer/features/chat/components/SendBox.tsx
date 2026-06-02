@@ -32,6 +32,7 @@ export type SendBoxProps = {
   mode?: ConversationMode | null;
   onSend: (payload: SendBoxPayload) => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
+  onSetMode: (mode: string) => Promise<void>;
 };
 
 /**
@@ -48,6 +49,7 @@ export function SendBox({
   mode,
   onSend,
   onSetModel,
+  onSetMode,
 }: SendBoxProps): React.ReactElement {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<AttachmentRef[]>([]);
@@ -153,6 +155,7 @@ export function SendBox({
           models={models}
           mode={mode}
           onSetModel={onSetModel}
+          onSetMode={onSetMode}
           imagePicker={
             <ImageAttachmentPicker
               disabled={disabled || sending}

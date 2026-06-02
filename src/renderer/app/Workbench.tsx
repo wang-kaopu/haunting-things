@@ -112,6 +112,17 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.push({ title: '模型已切换', message: model.trim(), level: 'success' });
   }
 
+  async function setMode(mode: string): Promise<void> {
+    if (!active.activeAgent?.conversationId) return;
+    const nextMode = mode.trim();
+    if (!nextMode || snapshots.mode?.mode === nextMode) return;
+    await bridge.invoke('conversation.setMode', {
+      conversationId: active.activeAgent.conversationId,
+      mode: nextMode,
+    });
+    notifications.push({ title: '权限模式已切换', message: nextMode, level: 'success' });
+  }
+
   /** 将权限请求加入队列，避免连续请求互相覆盖导致后端挂起。 */
   function enqueuePermission(request: PermissionRequest): void {
     setPermissionQueue((current) => {
@@ -179,6 +190,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onAddAgentClick={() => setAddAgentOpen(true)}
         onSendMessage={conversation.sendTeamMessage}
         onSetModel={setModel}
+        onSetMode={setMode}
       />
       <TeamDrawer
         open={drawer.open}

@@ -29,6 +29,7 @@ export type ComposerRuntimeTools = {
   agent?: TeamAgent | null;
   snapshots: RuntimeSnapshots;
   onSetModel: (model: string) => Promise<void>;
+  onSetMode: (mode: string) => Promise<void>;
 };
 
 export type AppNotificationLevel = 'info' | 'success' | 'warning' | 'error';

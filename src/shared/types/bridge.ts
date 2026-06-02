@@ -59,6 +59,10 @@ export type InvokeMap = {
     params: { conversationId: string; model: string };
     result: Conversation;
   };
+  'conversation.setMode': {
+    params: { conversationId: string; mode: string };
+    result: ConversationMode;
+  };
   'conversation.list': { params: void; result: Conversation[] };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
   'conversation.agentEvents': { params: { conversationId: string; limit?: number }; result: AgentEvent[] };

@@ -1,11 +1,24 @@
-# 权限模式默认 auto 与前端选择器编码方案
+# 权限模式默认值与前端选择器编码方案
 
 ## 目标
 
 实现两个功能：
 
-1. Claude 和 Codex 启动 ACP session 后，默认切换到 `auto` 权限模式。
+1. Claude 启动 ACP session 后默认切换到 `default` 权限模式，Codex 启动 ACP session 后默认切换到 `auto` 权限模式。
 2. 在聊天输入框工具栏中，“模型选择”按钮右侧新增一个“权限模式选择”小组件，用于动态切换当前 Claude / Codex 会话的权限模式。
+
+## 实现状态
+
+已实现。当前版本新增了 `conversation.setMode` bridge 调用链，`AcpRuntime` 在 `newSession` 和可选模型切换后会按 backend 默认调用 `setSessionMode()`：Claude 使用 `default`，Codex 使用 `auto`。聊天输入框工具栏会在模型选择右侧展示权限模式选择器。
+
+权限模式仍按运行时状态处理，不写入数据库；模型切换导致 runtime 重启后会重新回到该 backend 的默认权限模式。如果某个 ACP bridge 不支持指定 mode，后端会抛出 `Current ACP bridge does not support session mode switching` 或 bridge 自身错误，前端选择器会在弹层中展示错误。
+
+后端会按 backend 校验允许的 mode id，防止把另一个 backend 的权限模式透传给当前会话：
+
+| Backend | 允许的 mode id |
+| ------- | -------------- |
+| Claude | `default`, `acceptEdits`, `plan`, `dontAsk`, `bypassPermissions` |
+| Codex | `read-only`, `auto`, `full-access` |
 
 ## 一、整体设计
 
@@ -28,10 +41,11 @@
 
 ### 2. 默认模式策略
 
-Claude 和 Codex 均默认使用：
+按 backend 选择默认权限模式：
 
 ```ts
-auto
+claude: 'default';
+codex: 'auto';
 ```
 
 启动顺序建议：
@@ -41,7 +55,7 @@ initialize
 -> newSession
 -> handleNewSessionModels
 -> setSessionModel，如果用户选择了模型
--> setSessionMode('auto')
+-> setSessionMode(getStartupMode())
 ```
 
 原因：某些 bridge 的可用 mode 可能和模型有关，先设置模型再切 mode 更稳。
@@ -84,7 +98,12 @@ src/shared/types/conversation.ts
 
 ```ts
 /** ACP 权限模式。 */
-export type PermissionModeId = 'read-only' | 'auto' | 'full-access' | 'bypassPermissions' | string;
+export type PermissionModeId =
+  | "read-only"
+  | "auto"
+  | "full-access"
+  | "bypassPermissions"
+  | string;
 ```
 
 然后修改 `ConversationMode`：
@@ -120,7 +139,7 @@ src/shared/types/bridge.ts
 位置建议放在：
 
 ```ts
-'conversation.setModel'
+"conversation.setModel";
 ```
 
 后面，和 `conversation.mode` 保持语义接近。
@@ -143,6 +162,7 @@ src/server/runtime/acpRuntime.ts
 private getStartupMode(): string {
   switch (this.input.backend) {
     case 'claude':
+      return 'default';
     case 'codex':
       return 'auto';
     default:
@@ -244,9 +264,9 @@ async setSessionMode(mode: string): Promise<ConversationMode> {
 
 注意点：
 
-* 方法需要是 `public`，因为 `ConversationService` 要调用。
-* 内部先 `ensureStarted()`，这样用户在未发送第一条消息前切换权限模式时，也能自动启动 runtime。
-* 同时兼容 `unstable_setSessionMode`、`setSessionMode`、`setSessionConfigOption(configId: 'mode')` 三种可能接口。
+- 方法需要是 `public`，因为 `ConversationService` 要调用。
+- 内部先 `ensureStarted()`，这样用户在未发送第一条消息前切换权限模式时，也能自动启动 runtime。
+- 同时兼容 `unstable_setSessionMode`、`setSessionMode`、`setSessionConfigOption(configId: 'mode')` 三种可能接口。
 
 ### 4. 修正 mode update 字段兼容
 
@@ -321,11 +341,11 @@ async setMode(input: { conversationId: string; mode: string }): Promise<Conversa
 
 理由：
 
-* 本需求是“启动默认 auto”，不是“每个会话记住上次权限模式”。
-* 权限模式属于运行时状态，强持久化后容易出现重启后误进入高权限模式的问题。
-* UI 切换只影响当前 runtime session，更安全。
+- 本需求是“启动时使用 backend 默认权限模式”，不是“每个会话记住上次权限模式”。
+- 权限模式属于运行时状态，强持久化后容易出现重启后误进入YOLO模式的问题。
+- UI 切换只影响当前 runtime session，更安全。
 
-如果后续确实要记忆用户选择，可以单独加配置项，例如 `preferredPermissionMode`，并且只允许保存 `read-only` / `auto`，不默认保存 YOLO 模式。
+如果后续确实要记忆用户选择，可以单独加配置项，例如 `preferredPermissionMode`，并且只允许保存普通权限模式，不默认保存 YOLO 模式。
 
 ---
 
@@ -340,7 +360,9 @@ src/server/app/bridge/registerBridgeHandlers.ts
 新增：
 
 ```ts
-bridge.register('conversation.setMode', (params) => conversations.setMode(params));
+bridge.register("conversation.setMode", (params) =>
+  conversations.setMode(params),
+);
 ```
 
 建议放在：
@@ -352,10 +374,16 @@ bridge.register('conversation.setModel', ...)
 后面：
 
 ```ts
-bridge.register('conversation.create', (params) => conversations.create(params));
-bridge.register('conversation.setModel', (params) => conversations.setModel(params));
-bridge.register('conversation.setMode', (params) => conversations.setMode(params));
-bridge.register('conversation.list', () => conversations.list());
+bridge.register("conversation.create", (params) =>
+  conversations.create(params),
+);
+bridge.register("conversation.setModel", (params) =>
+  conversations.setModel(params),
+);
+bridge.register("conversation.setMode", (params) =>
+  conversations.setMode(params),
+);
+bridge.register("conversation.list", () => conversations.list());
 ```
 
 ---
@@ -432,7 +460,7 @@ src/renderer/features/chat/components/ComposerTools.tsx
 新增 import：
 
 ```ts
-import { PermissionModePicker } from './PermissionModePicker';
+import { PermissionModePicker } from "./PermissionModePicker";
 ```
 
 Props 新增：
@@ -456,7 +484,9 @@ onSetMode: (mode: string) => Promise<void>;
 删除原来的：
 
 ```tsx
-{mode?.mode ? <span className="mode-chip">模式：{mode.mode}</span> : null}
+{
+  mode?.mode ? <span className="mode-chip">模式：{mode.mode}</span> : null;
+}
 ```
 
 ---
@@ -472,9 +502,9 @@ src/renderer/features/chat/components/PermissionModePicker.tsx
 建议实现：
 
 ```tsx
-import { useEffect, useMemo, useState } from 'react';
-import type React from 'react';
-import type { ConversationMode, TeamAgent } from '../../../../shared/types';
+import { useEffect, useMemo, useState } from "react";
+import type React from "react";
+import type { ConversationMode, TeamAgent } from "../../../../shared/types";
 
 type PermissionModeOption = {
   id: string;
@@ -485,38 +515,48 @@ type PermissionModeOption = {
 
 const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
   {
-    id: 'read-only',
-    label: '只读',
-    description: '只允许读取和分析，不主动修改文件或执行高风险操作。',
+    id: "default",
+    label: "default",
+    description: "Claude Code 标准权限行为，危险操作会请求确认。",
   },
   {
-    id: 'auto',
-    label: '自动',
-    description: '默认推荐。自动执行低风险操作，高风险操作仍需要确认。',
+    id: "acceptEdits",
+    label: "acceptEdits",
+    description: "自动接受文件编辑操作，其他高风险操作仍按权限策略处理。",
   },
   {
-    id: 'bypassPermissions',
-    label: '完全放行',
-    description: '跳过权限确认，仅建议在隔离环境中使用。',
+    id: "plan",
+    label: "plan",
+    description: "规划模式，不执行实际工具操作。",
+  },
+  {
+    id: "dontAsk",
+    label: "dontAsk",
+    description: "不弹权限确认，未预批准的工具会直接拒绝。",
+  },
+  {
+    id: "bypassPermissions",
+    label: "bypassPermissions",
+    description: "跳过权限确认，仅建议在隔离环境中使用。",
     danger: true,
   },
 ];
 
 const CODEX_MODE_OPTIONS: PermissionModeOption[] = [
   {
-    id: 'read-only',
-    label: '只读',
-    description: '只允许读取和分析。',
+    id: "read-only",
+    label: "read-only",
+    description: "只允许读取和分析。",
   },
   {
-    id: 'auto',
-    label: '自动',
-    description: '默认推荐。允许在工作区内自动执行常见开发操作。',
+    id: "auto",
+    label: "auto",
+    description: "默认推荐。允许在工作区内自动执行常见开发操作。",
   },
   {
-    id: 'full-access',
-    label: '完全访问',
-    description: '高权限模式，仅建议在可信工作区或隔离环境中使用。',
+    id: "full-access",
+    label: "full-access",
+    description: "YOLO模式，仅建议在可信工作区或隔离环境中使用。",
     danger: true,
   },
 ];
@@ -534,20 +574,21 @@ export function PermissionModePicker({
 }: PermissionModePickerProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const options = useMemo(() => {
-    if (agent?.backend === 'claude') return CLAUDE_MODE_OPTIONS;
-    if (agent?.backend === 'codex') return CODEX_MODE_OPTIONS;
+    if (agent?.backend === "claude") return CLAUDE_MODE_OPTIONS;
+    if (agent?.backend === "codex") return CODEX_MODE_OPTIONS;
     return [];
   }, [agent?.backend]);
 
-  const current = mode?.mode || 'auto';
+  const fallbackMode = agent?.backend === "claude" ? "default" : "auto";
+  const current = mode?.mode || fallbackMode;
   const currentOption = options.find((item) => item.id === current);
   const label = currentOption?.label ?? current;
 
   useEffect(() => {
-    setError('');
+    setError("");
     setOpen(false);
   }, [agent?.conversationId]);
 
@@ -560,14 +601,14 @@ export function PermissionModePicker({
     const option = options.find((item) => item.id === nextMode);
     if (option?.danger) {
       const confirmed = window.confirm(
-        `确定要切换到「${option.label}」吗？该模式会放宽权限限制，建议只在隔离环境中使用。`
+        `确定要切换到「${option.label}」吗？该模式会放宽权限限制，建议只在隔离环境中使用。`,
       );
       if (!confirmed) return;
     }
 
     try {
       setSubmitting(true);
-      setError('');
+      setError("");
       await onSetMode(nextMode);
       setOpen(false);
     } catch (err) {
@@ -611,7 +652,13 @@ export function PermissionModePicker({
           </label>
 
           {currentOption?.description ? (
-            <p className={currentOption.danger ? 'warning-text compact' : 'hint-text compact'}>
+            <p
+              className={
+                currentOption.danger
+                  ? "warning-text compact"
+                  : "hint-text compact"
+              }
+            >
               {currentOption.description}
             </p>
           ) : null}
@@ -626,10 +673,10 @@ export function PermissionModePicker({
 
 说明：
 
-* Claude YOLO 模式使用 `bypassPermissions`。
-* Codex YOLO 模式使用 `full-access`。
-* 默认展示 `auto`，即使 bridge 暂时还没上报 mode，也不会显示空状态。
-* YOLO 模式加 `window.confirm` 二次确认，避免误点。
+- Claude YOLO 模式使用 `bypassPermissions`。
+- Codex YOLO 模式使用 `full-access`。
+- 默认展示 `auto`，即使 bridge 暂时还没上报 mode，也不会显示空状态。
+- YOLO 模式加 `window.confirm` 二次确认，避免误点。
 
 ---
 
@@ -643,7 +690,7 @@ export function PermissionModePicker({
 async function setActiveAgentMode(mode: string): Promise<void> {
   if (!activeAgent?.conversationId) return;
 
-  await bridge.invoke('conversation.setMode', {
+  await bridge.invoke("conversation.setMode", {
     conversationId: activeAgent.conversationId,
     mode,
   });
@@ -668,19 +715,21 @@ async function setActiveAgentMode(mode: string): Promise<void> {
 
 ### Claude
 
-| UI 文案 | mode id             | 说明      |
-| ----- | ------------------- | ------- |
-| 只读    | `read-only`         | 尽量只读    |
-| 自动    | `auto`              | 默认模式    |
-| YOLO  | `bypassPermissions` | 跳过确认 |
+| UI 文案 | mode id             | 说明     |
+| ------- | ------------------- | -------- |
+| default | `default`           | 默认模式 |
+| acceptEdits | `acceptEdits`   | 自动接受编辑 |
+| plan | `plan`                 | 规划模式 |
+| dontAsk | `dontAsk`           | 不询问并拒绝未预批准工具 |
+| bypassPermissions | `bypassPermissions` | 跳过确认 |
 
 ### Codex
 
-| UI 文案 | mode id       | 说明   |
-| ----- | ------------- | ---- |
-| 只读    | `read-only`   | 只读   |
-| 自动    | `auto`        | 默认模式 |
-| YOLO  | `full-access` | 跳过确认 |
+| UI 文案 | mode id       | 说明     |
+| ------- | ------------- | -------- |
+| read-only | `read-only`   | 只读     |
+| auto    | `auto`        | 默认模式 |
+| full-access | `full-access` | 跳过确认 |
 
 不要把 Codex 的 `auto-review` 当成 ACP mode。若后续需要“自动 review”，应做成应用层 preset：
 
@@ -713,16 +762,16 @@ Current ACP bridge does not support session mode switching
 
 ```text
 setSessionModel(...)
-setSessionMode('auto')
+setSessionMode(getStartupMode())
 ```
 
-因此模型切换后会回到 `auto` 模式。
+因此模型切换后会回到该 backend 的默认模式。
 
-这是符合本需求的：“claude 和 codex 启动都默认 auto 模式”。
+这是符合本需求的：“Claude 默认 default，Codex 默认 auto”。
 
 ### 4. 不默认进入 YOLO 模式
 
-即使用户上次选过 `full-access` 或 `bypassPermissions`，下次 runtime 启动仍默认 `auto`。
+即使用户上次选过 `full-access` 或 `bypassPermissions`，下次 runtime 启动仍回到 backend 默认权限模式。
 
 ---
 
@@ -738,38 +787,38 @@ tests/acpRuntimeModels.test.ts
 
 测试点：
 
-* `ensureStarted()` 后会调用 `setSessionMode('auto')`。
-* 如果设置了模型，调用顺序是：
-
+- `ensureStarted()` 后会调用 `setSessionMode(getStartupMode())`。
+- 如果设置了模型，调用顺序是：
   1. `setSessionModel(model)`
-  2. `setSessionMode('auto')`
-* `setSessionMode('read-only')` 会 emit `mode` 快照。
-* `current_mode_update` 支持读取 `currentModeId`。
+  2. `setSessionMode(getStartupMode())`
+
+- `setSessionMode('plan')` 会 emit `mode` 快照。
+- `current_mode_update` 支持读取 `currentModeId`。
 
 ### 2. ConversationService 测试
 
 测试点：
 
-* `conversation.setMode` 会调用 runtime 的 `setSessionMode`。
-* 成功后会更新 `modeSnapshots`。
-* 成功后会 emit `conversation.mode`。
+- `conversation.setMode` 会调用 runtime 的 `setSessionMode`。
+- 成功后会更新 `modeSnapshots`。
+- 成功后会 emit `conversation.mode`。
 
 ### 3. 前端组件测试
 
 测试点：
 
-* Claude agent 展示 `read-only / auto / bypassPermissions`。
-* Codex agent 展示 `read-only / auto / full-access`。
-* 点击切换后调用 `onSetMode(mode)`。
-* YOLO 模式触发二次确认。
-* 没有 activeAgent 时按钮 disabled。
+- Claude agent 展示 `default / acceptEdits / plan / dontAsk / bypassPermissions`。
+- Codex agent 展示 `read-only / auto / full-access`。
+- 点击切换后调用 `onSetMode(mode)`。
+- YOLO 模式触发二次确认。
+- 没有 activeAgent 时按钮 disabled。
 
 ---
 
 ## 十二、建议提交信息
 
 ```text
-feat: 添加权限模式选择并默认启用自动模式
+feat: 添加权限模式选择并设置后端默认模式
 ```
 
 ---
@@ -778,7 +827,7 @@ feat: 添加权限模式选择并默认启用自动模式
 
 1. 改 `ConversationMode` 类型，新增 `conversation.setMode` invoke 类型。
 2. 给 `AcpRuntime` 增加 `setSessionMode()`。
-3. 在 `ensureStarted()` 中默认调用 `setSessionMode('auto')`。
+3. 在 `ensureStarted()` 中默认调用 `setSessionMode(getStartupMode())`。
 4. 给 `ConversationService` 增加 `setMode()`。
 5. 在 `registerBridgeHandlers.ts` 注册 `conversation.setMode`。
 6. 新增 `PermissionModePicker.tsx`。

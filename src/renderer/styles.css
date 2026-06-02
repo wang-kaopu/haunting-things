@@ -216,6 +216,7 @@ label,
 
 .team-menu-wrap,
 .model-picker,
+.permission-mode-picker,
 .commands-menu {
   position: relative;
 }
@@ -531,6 +532,16 @@ label,
   background: #ecfdf3;
 }
 
+.hint-text,
+.warning-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.warning-text {
+  color: var(--danger);
+}
+
 .phase-badge.failed,
 .agent-phase.failed {
   color: var(--danger);
@@ -556,6 +567,10 @@ label,
 
 .commands-popover {
   width: min(420px, calc(100vw - 48px));
+}
+
+.permission-mode-popover {
+  width: min(340px, calc(100vw - 48px));
 }
 
 .command-mini {
@@ -590,6 +605,11 @@ label,
 
 .error-text.compact {
   padding: 0;
+  font-size: 12px;
+}
+
+.hint-text.compact,
+.warning-text.compact {
   font-size: 12px;
 }
 

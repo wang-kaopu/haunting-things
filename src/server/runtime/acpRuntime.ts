@@ -392,7 +392,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       if (text) {
         this.logger.warn('bridge_stderr', {
           conversationId: this.input.conversationId,
-          text: text.slice(0, 2000),
+          text,
         });
       }
     });
@@ -497,10 +497,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       conversationId: this.input.conversationId,
       sessionId: this.sessionId,
     });
+    this.handleNewSessionMode(sessionResult);
     this.handleNewSessionModels(sessionResult);
     if (this.input.model?.trim()) {
       await this.setSessionModel(this.input.model.trim());
     }
+    await this.setSessionMode(this.getStartupMode());
   }
 
   /**
@@ -762,6 +764,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   /** 保存并发出 bridge 上报的当前运行模式。 */
   private handleCurrentModeUpdate(update: Record<string, unknown>): void {
     const mode =
+      this.readString(update.currentModeId) ??
+      this.readString(update.current_mode_id) ??
       this.readString(update.mode) ??
       this.readString(update.currentMode) ??
       this.readString(update.current_mode) ??
@@ -779,13 +783,18 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('mode', snapshot);
   }
 
-  /** 处理配置项更新，目前仅关注活跃模型变更。 */
+  /** 处理配置项更新，目前关注权限模式和活跃模型变更。 */
   private handleConfigOptionUpdate(update: Record<string, unknown>): void {
     const configId =
       this.readString(update.configId) ??
       this.readString(update.config_id) ??
       this.readString(update.id) ??
       this.readString(update.name);
+
+    if (configId === 'mode') {
+      this.handleCurrentModeUpdate(update);
+      return;
+    }
 
     if (configId !== 'model') return;
 
@@ -922,6 +931,32 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('commands', snapshot);
   }
 
+  /** 从 `newSession` 结果中提取初始权限模式元数据。 */
+  private handleNewSessionMode(sessionResult: unknown): void {
+    const raw = sessionResult as Record<string, unknown> | null;
+    const modesState = raw?.modes;
+    if (!modesState || typeof modesState !== 'object') return;
+
+    const state = modesState as Record<string, unknown>;
+    const mode =
+      this.readString(state.currentModeId) ??
+      this.readString(state.current_mode_id) ??
+      this.readString(state.mode) ??
+      this.readString(state.currentMode) ??
+      this.readString(state.current_mode);
+
+    if (!mode) return;
+
+    const snapshot: ConversationMode = {
+      conversationId: this.input.conversationId,
+      mode,
+      updatedAt: Date.now(),
+    };
+
+    this.modeSnapshot = snapshot;
+    this.emit('mode', snapshot);
+  }
+
   /** 从 `newSession` 结果中提取初始模型元数据。 */
   private handleNewSessionModels(sessionResult: unknown): void {
     const raw = sessionResult as Record<string, unknown> | null;
@@ -966,6 +1001,18 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('models', snapshot);
   }
 
+  /** 返回新建 ACP session 后应使用的默认权限模式。 */
+  private getStartupMode(): string {
+    switch (this.input.backend) {
+      case 'claude':
+        return 'default';
+      case 'codex':
+        return 'auto';
+      default:
+        return 'auto';
+    }
+  }
+
   /** 当 bridge 支持 unstable model API 时设置活跃模型。 */
   private async setSessionModel(modelId: string): Promise<void> {
     if (!this.connection || !this.sessionId) return;
@@ -998,6 +1045,59 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     this.modelsSnapshot = snapshot;
     this.emit('models', snapshot);
+  }
+
+  /** 切换当前 ACP session 的权限模式，并立即广播本地快照。 */
+  async setSessionMode(mode: string): Promise<ConversationMode> {
+    const modeId = mode.trim();
+    if (!modeId) throw new Error('mode is required');
+
+    await this.ensureStarted();
+
+    if (!this.connection || !this.sessionId) {
+      throw new Error('ACP session is not ready');
+    }
+
+    const connection = this.connection as ClientSideConnection & {
+      unstable_setSessionMode?: (params: { sessionId: string; modeId: string }) => Promise<unknown>;
+      setSessionMode?: (params: { sessionId: string; modeId: string }) => Promise<unknown>;
+      setSessionConfigOption?: (params: {
+        sessionId: string;
+        configId: string;
+        value: string;
+      }) => Promise<unknown>;
+    };
+
+    const setMode = connection.unstable_setSessionMode ?? connection.setSessionMode;
+
+    if (typeof setMode === 'function') {
+      await this.runConnectionRequest(() =>
+        setMode.call(connection, {
+          sessionId: this.sessionId!,
+          modeId,
+        })
+      );
+    } else if (typeof connection.setSessionConfigOption === 'function') {
+      await this.runConnectionRequest(() =>
+        connection.setSessionConfigOption!.call(connection, {
+          sessionId: this.sessionId!,
+          configId: 'mode',
+          value: modeId,
+        })
+      );
+    } else {
+      throw new Error('Current ACP bridge does not support session mode switching');
+    }
+
+    const snapshot: ConversationMode = {
+      conversationId: this.input.conversationId,
+      mode: modeId,
+      updatedAt: Date.now(),
+    };
+
+    this.modeSnapshot = snapshot;
+    this.emit('mode', snapshot);
+    return snapshot;
   }
 
   /**

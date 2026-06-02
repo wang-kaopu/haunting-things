@@ -22,6 +22,11 @@ import { createLogger } from '../utils/logger';
 import type { AttachmentService } from './attachmentService';
 import { AcpRuntime } from '../runtime/acpRuntime';
 
+const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
+  claude: ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'],
+  codex: ['read-only', 'auto', 'full-access'],
+};
+
 /**
  * 管理所有 Conversation 的创建、消息收发和 ACP 运行时生命周期。
  *
@@ -382,6 +387,40 @@ export class ConversationService {
     });
 
     return this.repo.getConversation(conversation.id) ?? { ...conversation, model, updatedAt: now };
+  }
+
+  /** 切换指定 Conversation 当前运行时的权限模式，不持久化到数据库。 */
+  async setMode(input: { conversationId: string; mode: string }): Promise<ConversationMode> {
+    const conversation = this.repo.getConversation(input.conversationId);
+    if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+
+    const mode = input.mode.trim();
+    if (!mode) throw new Error('mode is required');
+    this.assertPermissionModeAllowed(conversation.backend, mode);
+
+    this.logger.info('conversation_mode_set', {
+      conversationId: conversation.id,
+      backend: conversation.backend,
+      mode,
+    });
+
+    const runtime = this.getRuntime(conversation);
+    const snapshot = await runtime.setSessionMode(mode);
+
+    if (this.modeSnapshots.get(conversation.id) !== snapshot) {
+      this.modeSnapshots.set(conversation.id, snapshot);
+      this.events.emit('conversation.mode', snapshot);
+    }
+
+    return snapshot;
+  }
+
+  /** 校验权限模式是否属于指定后端实际支持的 mode id。 */
+  private assertPermissionModeAllowed(backend: AgentBackend, mode: string): void {
+    const allowed = ALLOWED_PERMISSION_MODES[backend];
+    if (!allowed.includes(mode)) {
+      throw new Error(`Unsupported permission mode for ${backend}: ${mode}. Allowed modes: ${allowed.join(', ')}`);
+    }
   }
 
   /**

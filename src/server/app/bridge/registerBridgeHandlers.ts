@@ -37,6 +37,7 @@ export function registerBridgeHandlers(input: {
   bridge.register('agent.health', ({ backend }: { backend: AgentBackend }) => healthAgent(backend));
   bridge.register('conversation.create', (params) => conversations.create(params));
   bridge.register('conversation.setModel', (params) => conversations.setModel(params));
+  bridge.register('conversation.setMode', (params) => conversations.setMode(params));
   bridge.register('conversation.list', () => conversations.list());
   bridge.register('conversation.messages', ({ conversationId }) => conversations.messages(conversationId));
   bridge.register('conversation.agentEvents', ({ conversationId, limit }) =>

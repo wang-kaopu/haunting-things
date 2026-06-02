@@ -35,7 +35,7 @@ describe('AcpRuntime plan and mode mappings', () => {
     runtime['handleSessionUpdate']({
       update: {
         sessionUpdate: 'current_mode_update',
-        mode: 'review',
+        currentModeId: 'review',
       },
     } as SessionNotification);
 

@@ -60,7 +60,7 @@ describe('ConversationService mode snapshots', () => {
     runtime['handleSessionUpdate']({
       update: {
         sessionUpdate: 'current_mode_update',
-        mode: 'review',
+        currentModeId: 'review',
       },
     } as any);
 
@@ -70,5 +70,68 @@ describe('ConversationService mode snapshots', () => {
       mode: 'review',
     });
     expect(conversations.mode(conversation.id)).toEqual(emitted[0]);
+  });
+
+  it('switches conversation mode through the runtime and emits a snapshot', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
+    const runtime = (conversations as any).getRuntime(conversation);
+    const snapshot = {
+      conversationId: conversation.id,
+      mode: 'plan',
+      updatedAt: Date.now(),
+    };
+    runtime.setSessionMode = vi.fn(async () => snapshot);
+
+    const emitted: unknown[] = [];
+    vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+      if (name === 'conversation.mode') emitted.push(data);
+    });
+
+    const result = await conversations.setMode({ conversationId: conversation.id, mode: 'plan' });
+
+    expect(runtime.setSessionMode).toHaveBeenCalledWith('plan');
+    expect(result).toEqual(snapshot);
+    expect(emitted).toEqual([snapshot]);
+    expect(conversations.mode(conversation.id)).toEqual(snapshot);
+  });
+
+  it('rejects permission modes that do not belong to the conversation backend', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const claude = conversations.create({ backend: 'claude', name: 'Claude' });
+    const codex = conversations.create({ backend: 'codex', name: 'Codex' });
+
+    await expect(conversations.setMode({ conversationId: claude.id, mode: 'full-access' })).rejects.toThrow(
+      'Unsupported permission mode for claude: full-access'
+    );
+    await expect(conversations.setMode({ conversationId: claude.id, mode: 'auto' })).rejects.toThrow(
+      'Unsupported permission mode for claude: auto'
+    );
+    await expect(conversations.setMode({ conversationId: codex.id, mode: 'bypassPermissions' })).rejects.toThrow(
+      'Unsupported permission mode for codex: bypassPermissions'
+    );
+  });
+
+  it('allows Codex-specific permission modes', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversation = conversations.create({ backend: 'codex', name: 'Codex' });
+    const runtime = (conversations as any).getRuntime(conversation);
+    const snapshot = {
+      conversationId: conversation.id,
+      mode: 'full-access',
+      updatedAt: Date.now(),
+    };
+    runtime.setSessionMode = vi.fn(async () => snapshot);
+
+    const result = await conversations.setMode({ conversationId: conversation.id, mode: 'full-access' });
+
+    expect(runtime.setSessionMode).toHaveBeenCalledWith('full-access');
+    expect(result).toEqual(snapshot);
   });
 });
