@@ -65,7 +65,6 @@ export function ChatLayout({
       <SendBox
         disabled={!team || !activeAgent}
         activeAgent={activeAgent}
-        usage={usage}
         commands={commands}
         models={models}
         mode={mode}

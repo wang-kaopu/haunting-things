@@ -3,22 +3,21 @@ import type {
   ConversationCommands,
   ConversationMode,
   ConversationModels,
-  ConversationUsage,
   TeamAgent,
 } from '../../../../shared/types';
 import { AgentCommandsMenu } from './AgentCommandsMenu';
 import { ModelPicker } from './ModelPicker';
 import { PermissionModePicker } from './PermissionModePicker';
-import { UsageChip } from './UsageChip';
 
 /** Composer 工具栏展示所需的运行时状态。 */
 export type ComposerToolsProps = {
   activeAgent?: TeamAgent | null;
-  usage?: ConversationUsage | null;
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
   imagePicker?: React.ReactNode;
+  disabled?: boolean;
+  onSelectCommand: (commandName: string) => void;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
 };
@@ -26,15 +25,16 @@ export type ComposerToolsProps = {
 /**
  * 消息输入框的工具栏。
  *
- * 模型、图片、usage、命令和模式状态放在同一行，方便发送前调整运行时上下文。
+ * 模型、图片、命令和模式状态放在同一行，方便发送前调整运行时上下文。
  */
 export function ComposerTools({
   activeAgent,
-  usage,
   commands,
   models,
   mode,
   imagePicker,
+  disabled,
+  onSelectCommand,
   onSetModel,
   onSetMode,
 }: ComposerToolsProps): React.ReactElement {
@@ -43,8 +43,7 @@ export function ComposerTools({
       <ModelPicker agent={activeAgent} models={models} onSetModel={onSetModel} />
       <PermissionModePicker agent={activeAgent} mode={mode} onSetMode={onSetMode} />
       {imagePicker}
-      <UsageChip usage={usage} />
-      <AgentCommandsMenu commands={commands} />
+      <AgentCommandsMenu commands={commands} disabled={disabled} onSelectCommand={onSelectCommand} />
     </div>
   );
 }

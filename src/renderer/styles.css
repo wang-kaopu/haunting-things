@@ -418,8 +418,7 @@ label,
   display: none;
 }
 
-.debug-prompt-inline pre,
-.command-mini pre {
+.debug-prompt-inline pre {
   margin: 0;
   padding: 10px 12px;
   max-height: 220px;
@@ -583,6 +582,10 @@ label,
   max-width: 190px;
 }
 
+.command-select {
+  max-width: 160px;
+}
+
 .toolbar-select-error {
   max-width: 260px;
 }
@@ -618,34 +621,6 @@ label,
   padding: 10px;
   display: grid;
   gap: 10px;
-}
-
-.commands-popover {
-  width: min(420px, calc(100vw - 48px));
-}
-
-.command-mini {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--panel-muted);
-}
-
-.command-mini summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 9px 10px;
-  display: grid;
-  gap: 3px;
-}
-
-.command-mini summary::-webkit-details-marker {
-  display: none;
-}
-
-.command-mini span {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .inline-form.horizontal {

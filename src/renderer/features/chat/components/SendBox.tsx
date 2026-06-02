@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type React from 'react';
 import type {
   AttachmentRef,
   ConversationCommands,
   ConversationMode,
   ConversationModels,
-  ConversationUsage,
   TeamAgent,
 } from '../../../../shared/types';
 import { bridge } from '../../../shared/bridgeClient';
@@ -26,7 +25,6 @@ export type SendBoxPayload = {
 export type SendBoxProps = {
   disabled?: boolean;
   activeAgent?: TeamAgent | null;
-  usage?: ConversationUsage | null;
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
@@ -43,7 +41,6 @@ export type SendBoxProps = {
 export function SendBox({
   disabled,
   activeAgent,
-  usage,
   commands,
   models,
   mode,
@@ -51,6 +48,7 @@ export function SendBox({
   onSetModel,
   onSetMode,
 }: SendBoxProps): React.ReactElement {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<AttachmentRef[]>([]);
   const [sending, setSending] = useState(false);
@@ -128,6 +126,18 @@ export function SendBox({
     }
   }
 
+  /** 把命令插入到消息框最前面，格式固定为 `/{command_name} `。 */
+  function insertCommand(commandName: string): void {
+    const normalized = commandName.trim().replace(/^\/+/, '');
+    if (!normalized || disabled || sending) return;
+    const prefix = `/${normalized} `;
+    setContent((current) => `${prefix}${current}`);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(prefix.length, prefix.length);
+    });
+  }
+
   return (
     <div className="composer">
       <ImageAttachmentPreview
@@ -135,6 +145,7 @@ export function SendBox({
         onRemove={(id) => void removeAttachment(id)}
       />
       <textarea
+        ref={textareaRef}
         value={content}
         disabled={disabled || sending}
         placeholder={disabled ? '请选择团队' : '给团队发送消息'}
@@ -150,12 +161,13 @@ export function SendBox({
       <div className="composer-footer">
         <ComposerTools
           activeAgent={activeAgent}
-          usage={usage}
           commands={commands}
           models={models}
           mode={mode}
           onSetModel={onSetModel}
           onSetMode={onSetMode}
+          disabled={disabled || sending}
+          onSelectCommand={insertCommand}
           imagePicker={
             <ImageAttachmentPicker
               disabled={disabled || sending}

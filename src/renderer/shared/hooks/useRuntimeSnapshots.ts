@@ -7,6 +7,7 @@ import type {
   TeamAgent,
 } from '../../../shared/types';
 import { bridge } from '../bridgeClient';
+import { readCachedCommands, writeCachedCommands } from '../commandCache';
 import { readCachedModels, writeCachedModels } from '../modelCache';
 import {
   normalizeConversationCommands,
@@ -37,7 +38,7 @@ export type UseRuntimeSnapshotsResult = {
 /**
  * 订阅 ACP runtime 上报的 usage、命令、模型和模式快照。
  *
- * 模型列表会写入本地缓存，避免切换 Agent 时工具栏短暂变空。
+ * 模型列表和可用命令会写入本地缓存，避免切换 Agent 时工具栏短暂变空。
  */
 export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): UseRuntimeSnapshotsResult {
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
@@ -55,6 +56,8 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       const snapshot = normalizeConversationCommands(payload);
       if (!snapshot) return;
       setCommandsByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
+      const backend = activeAgent?.conversationId === snapshot.conversationId ? activeAgent.backend : undefined;
+      if (backend) writeCachedCommands(backend, snapshot);
     });
     const unsubModels = bridge.on('conversation.models', (payload) => {
       const snapshot = normalizeConversationModels(payload);
@@ -85,7 +88,13 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       .invoke('conversation.commands', { conversationId })
       .then((value) => {
         const snapshot = normalizeConversationCommands(value);
-        if (snapshot) setCommandsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
+        if (snapshot) {
+          setCommandsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
+          writeCachedCommands(activeAgent.backend, snapshot);
+        } else {
+          const cached = readCachedCommands(activeAgent.backend, conversationId);
+          if (cached) setCommandsByConversation((prev) => ({ ...prev, [conversationId]: cached }));
+        }
       })
       .catch(() => {});
     bridge
