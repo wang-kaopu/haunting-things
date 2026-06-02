@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { AgentEvent, AgentTurnPhase, ChatMessage, Team, TeamAgent } from '../../../shared/types';
 import { bridge } from '../bridgeClient';
 import { resolveTeamSendInvocation } from '../../features/teams/teamViewModel';
+import type { SendBoxPayload } from '../../features/chat/components/SendBox';
 import { normalizeAgentEvent, normalizeAgentEventList, normalizeConversationStream, normalizeMessageList } from '../utils/backendData';
 import { phaseFromAgentEvent } from '../utils/format';
 
@@ -17,7 +18,7 @@ export type UseConversationStreamResult = {
   agentEvents: AgentEvent[];
   loading: boolean;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  sendTeamMessage: (content: string) => Promise<void>;
+  sendTeamMessage: (payload: SendBoxPayload) => Promise<void>;
   phaseByConversation: Record<string, AgentTurnPhase>;
 };
 
@@ -128,8 +129,8 @@ export function useConversationStream({
   }, [activeAgent?.conversationId]);
 
   const sendTeamMessage = useCallback(
-    async (content: string) => {
-      const invocation = resolveTeamSendInvocation(activeTeam ?? undefined, activeAgent?.slotId, content);
+    async (payload: SendBoxPayload) => {
+      const invocation = resolveTeamSendInvocation(activeTeam ?? undefined, activeAgent?.slotId, payload);
       if (!invocation) return;
       await bridge.invoke(invocation.name, invocation.params);
     },

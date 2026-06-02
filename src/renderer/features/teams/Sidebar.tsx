@@ -26,7 +26,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <strong>Haunting Souls</strong>
+        <strong>Haunting Things</strong>
         <span>{username ?? 'admin'}</span>
       </div>
       <button type="button" onClick={onCreateTeamClick}>

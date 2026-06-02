@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgent, TeamTask } from '../../shared/types';
 import { createId } from '../id';
-import { createLogger } from '../logger';
+import { createLogger } from '../utils/logger';
 
 type TcpRequest = {
   authToken?: string;
@@ -53,7 +53,7 @@ export class TeamMcpServer {
     private readonly teamId: string,
     private readonly getTeam: () => Team | null,
     private readonly callbacks: TeamCallbacks
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
     if (this.server) return;
@@ -80,7 +80,7 @@ export class TeamMcpServer {
     const team = this.resolveTeam();
     const invocation = resolveTeamMcpStdioInvocation();
     const config = {
-      name: `haunting-souls-team-${team.id}`,
+      name: `Haunting-things-team-${team.id}`,
       command: invocation.command,
       args: invocation.args,
       env: {

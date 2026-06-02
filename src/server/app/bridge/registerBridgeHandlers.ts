@@ -1,11 +1,16 @@
 import type { AgentBackend } from '../../../shared/types';
+import type { AttachmentRepositoryPort } from '../../db/attachmentRepository';
+import { toAttachmentRef } from '../../db/mappers';
 import { healthAgent, listAgents } from '../../runtime/agentRegistry';
+import type { AttachmentService } from '../../services/attachmentService';
 import type { ConversationService } from '../../services/conversationService';
 import type { TeamService } from '../../services/teamService';
 import type { WebBridge } from './webBridge';
 
 export function registerBridgeHandlers(input: {
   bridge: WebBridge;
+  attachments: AttachmentRepositoryPort;
+  attachmentService: AttachmentService;
   conversations: ConversationService;
   teams: TeamService;
   serverInfo: () => {
@@ -15,8 +20,18 @@ export function registerBridgeHandlers(input: {
     urls: string[];
   };
 }): void {
-  const { bridge, conversations, teams } = input;
+  const { bridge, attachments, attachmentService, conversations, teams } = input;
 
+  bridge.register('attachment.upload', async (params) => {
+    const saved = await attachmentService.saveImage(params);
+    const stored = attachments.createAttachment(saved);
+    return toAttachmentRef(stored);
+  });
+  bridge.register('attachment.delete', async ({ attachmentId }) => {
+    const deleted = attachments.deleteAttachment(attachmentId);
+    await attachmentService.deleteStoredFiles(deleted);
+    return { deleted: true };
+  });
   bridge.register('agent.list', () => listAgents());
   bridge.register('agent.health', ({ backend }: { backend: AgentBackend }) => healthAgent(backend));
   bridge.register('conversation.create', (params) => conversations.create(params));
@@ -37,6 +52,8 @@ export function registerBridgeHandlers(input: {
     conversations.confirmPermission(params);
     return { accepted: true };
   });
+  bridge.register('conversation.deleteMessage', (params) => conversations.deleteMessage(params));
+  bridge.register('conversation.deleteMessageAttachment', (params) => conversations.deleteMessageAttachment(params));
   bridge.register('team.create', (params) => teams.create(params));
   bridge.register('team.delete', ({ teamId }) => teams.delete(teamId));
   bridge.register('team.addAgent', (params) => teams.addAgent(params));

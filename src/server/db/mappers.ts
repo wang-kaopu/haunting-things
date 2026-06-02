@@ -1,4 +1,13 @@
-import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamTask } from '../../shared/types';
+import type {
+  AgentEvent,
+  AttachmentRef,
+  ChatMessage,
+  Conversation,
+  MailboxMessage,
+  StoredAttachment,
+  Team,
+  TeamTask,
+} from '../../shared/types';
 
 export function rowToConversation(row: any): Conversation {
   return {
@@ -27,6 +36,32 @@ export function rowToMessage(row: any): ChatMessage {
 
 export function rowToAgentEvent(row: any): AgentEvent {
   return JSON.parse(row.payload) as AgentEvent;
+}
+
+export function rowToStoredAttachment(row: any): StoredAttachment {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    mimeType: row.mime_type,
+    size: row.size,
+    path: row.path,
+    url: row.url,
+    sha256: row.sha256 ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function toAttachmentRef(attachment: StoredAttachment): AttachmentRef {
+  return {
+    id: attachment.id,
+    kind: attachment.kind,
+    name: attachment.name,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    url: attachment.url,
+    createdAt: attachment.createdAt,
+  };
 }
 
 export function rowToTeam(row: any): Team {

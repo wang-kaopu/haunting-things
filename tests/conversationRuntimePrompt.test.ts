@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationService } from '../src/server/services/conversationService';
 import { EventBus } from '../src/server/events';
-import type { AgentBackend, ChatMessage, Conversation, AgentEvent } from '../src/shared/types';
+import { ConversationService } from '../src/server/services/conversationService';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '../src/shared/types';
 
 const runtimeInstances: Array<{ send: ReturnType<typeof vi.fn> }> = [];
 
@@ -78,7 +78,7 @@ describe('ConversationService runtime prompt separation', () => {
   it('stores displayMessage and sends the wrapped prompt to runtime', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/haunting-souls-test');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
     await conversations.sendRuntimePrompt({

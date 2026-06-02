@@ -26,6 +26,18 @@ export function MessageBubble({ message, activePhase }: MessageBubbleProps): Rea
         <MarkdownMessage content={content} />
       )}
 
+      {message.attachments?.length ? (
+        <div className="message-attachments">
+          {message.attachments.map((attachment) =>
+            attachment.kind === 'image' ? (
+              <a href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}>
+                <img src={attachment.url} alt={attachment.name} />
+              </a>
+            ) : null
+          )}
+        </div>
+      ) : null}
+
       {message.status === 'error' ? (
         <p className="message-error">本轮回复失败，请查看通知详情。</p>
       ) : null}

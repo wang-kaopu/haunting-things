@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationService } from '../src/server/services/conversationService';
 import { EventBus } from '../src/server/events';
+import { ConversationService } from '../src/server/services/conversationService';
 import type { AgentEvent, Conversation } from '../src/shared/types';
 
 function createFakeRepository() {
@@ -53,7 +53,7 @@ describe('ConversationService agent event policy', () => {
   it('does not persist streaming deltas but persists final and completed tool events', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/haunting-souls-test');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
     const runtime = (conversations as any).getRuntime(conversation);
     (runtime as any).activeTurnId = 'turn-1';

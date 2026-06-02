@@ -8,19 +8,25 @@ import type {
   TeamMailboxEntry,
   TeamTask,
 } from '../../shared/types';
+import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
 import type { MailboxRepositoryPort } from '../db/mailboxRepository';
 import type { TaskRepositoryPort } from '../db/taskRepository';
 import type { TeamRepositoryPort } from '../db/teamRepository';
 import type { ConversationService } from './conversationService';
+import type { AttachmentService } from './attachmentService';
 import type { EventBus } from '../events';
 import { createId } from '../id';
-import { createLogger } from '../logger';
+import { createLogger } from '../utils/logger';
 import { TeamMcpServer } from '../mcp/teamMcpServer';
 
 /** 运行时 Team 会话：持有 Team 快照和对应的 MCP TCP 服务。 */
 type TeamSession = {
   team: Team;
   mcpServer: TeamMcpServer;
+};
+
+type DeliverMailboxMessage = MailboxMessage & {
+  attachmentIds?: string[];
 };
 
 /**
@@ -52,7 +58,9 @@ export class TeamService {
     private readonly mailboxRepo: MailboxRepositoryPort,
     private readonly tasksRepo: TaskRepositoryPort,
     private readonly conversations: ConversationService,
-    private readonly events: EventBus
+    private readonly events: EventBus,
+    private readonly attachmentsRepo?: AttachmentRepositoryPort,
+    private readonly attachmentService?: AttachmentService
   ) {
     const onAgentEvent = (this.conversations as ConversationService & {
       onAgentEvent?: (handler: (event: AgentEvent) => void | Promise<void>) => () => void;
@@ -155,10 +163,16 @@ export class TeamService {
       this.pendingWakeups.delete(`${teamId}:${agent.slotId}`);
       this.activeWakeups.delete(`${teamId}:${agent.slotId}`);
     }
+    const attachments = this.attachmentsRepo?.deleteTeamAttachments(
+      team.id,
+      team.agents.map((agent) => agent.conversationId)
+    ) ?? [];
     this.teamsRepo.deleteTeam(teamId);
+    await this.attachmentService?.deleteStoredFiles(attachments);
     this.logger.info('team_delete_done', {
       teamId,
       memberCount: team.agents.length,
+      deletedFilesCount: attachments.length,
     });
     return { deleted: true };
   }
@@ -400,6 +414,7 @@ export class TeamService {
       toAgentId: team.leaderSlotId,
       fromAgentId: 'user',
       content: input.content,
+      attachmentIds: input.files ?? [],
       read: false,
       createdAt: Date.now(),
       id: createId(),
@@ -419,6 +434,7 @@ export class TeamService {
       toAgentId: input.slotId,
       fromAgentId: 'user',
       content: input.content,
+      attachmentIds: input.files ?? [],
       read: false,
       createdAt: Date.now(),
       id: createId(),
@@ -506,21 +522,38 @@ export class TeamService {
    */
   timeline(teamId: string): TeamMailboxEntry[] {
     const team = this.requireTeam(teamId);
-    return this.mailboxRepo.listMailbox(teamId).map((message) => this.buildMailboxEntry(team, message));
+    return this.withMailboxAttachments(this.mailboxRepo.listMailbox(teamId)).map((message) =>
+      this.buildMailboxEntry(team, message)
+    );
   }
 
   /**
    * 将消息写入 mailbox 并立即唤醒目标 Agent。
    */
-  private async deliver(message: MailboxMessage): Promise<void> {
+  private async deliver(message: DeliverMailboxMessage): Promise<void> {
     const team = this.requireTeam(message.teamId);
     await this.ensureSession(team.id);
+    const { attachmentIds, ...mailboxMessage } = message;
+    const attachments = this.attachmentsRepo?.listAttachments(attachmentIds ?? []) ?? [];
+    const emittedMessage: MailboxMessage = {
+      ...mailboxMessage,
+      attachments: attachments.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        name: item.name,
+        mimeType: item.mimeType,
+        size: item.size,
+        url: item.url,
+        createdAt: item.createdAt,
+      })),
+    };
     this.logger.info('mailbox_deliver', {
       teamId: message.teamId,
       messageId: message.id,
       fromAgentId: message.fromAgentId,
       toAgentId: message.toAgentId,
       contentLength: message.content.length,
+      filesCount: attachments.length,
     });
     const fromAgent = team.agents.find((agent) => agent.slotId === message.fromAgentId);
 
@@ -532,10 +565,14 @@ export class TeamService {
       this.explicitRepliedTurns.set(fromAgent.conversationId, true);
     }
 
-    this.mailboxRepo.writeMailbox(message);
+    this.mailboxRepo.writeMailbox(mailboxMessage);
+    this.attachmentsRepo?.linkMailboxAttachments(
+      message.id,
+      attachments.map((item) => item.id)
+    );
     this.events.emit('team.agent.message', {
       teamId: message.teamId,
-      entry: this.buildMailboxEntry(team, message),
+      entry: this.buildMailboxEntry(team, emittedMessage),
     });
     this.scheduleWakeAgent(message.teamId, message.toAgentId);
   }
@@ -605,7 +642,7 @@ export class TeamService {
     this.explicitRepliedTurns.set(agent.conversationId, false);
 
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
-    const messages = this.mailboxRepo.readUnreadAndMark(teamId, slotId);
+    const messages = this.withMailboxAttachments(this.mailboxRepo.readUnreadAndMark(teamId, slotId));
     for (const message of messages) {
       this.events.emit('team.agent.message', {
         teamId,
@@ -614,6 +651,7 @@ export class TeamService {
     }
     const prompt = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
     const displayMessage = formatMailboxDisplay(messages, team);
+    const attachmentIds = [...new Set(messages.flatMap((message) => message.attachments?.map((item) => item.id) ?? []))];
     this.events.emit('team.agent.prompt', {
       teamId,
       slotId,
@@ -627,12 +665,14 @@ export class TeamService {
       unreadCount: messages.length,
       promptLength: prompt.length,
       displayMessageLength: displayMessage.length,
+      filesCount: attachmentIds.length,
     });
     try {
       await this.conversations.sendRuntimePrompt({
         conversationId: agent.conversationId,
         prompt,
         displayMessage,
+        ...(attachmentIds.length > 0 ? { files: attachmentIds } : {}),
       });
       this.events.emit('team.turn.finished', { teamId, slotId });
       this.events.emit('team.agent.status', { teamId, slotId, status: 'idle' });
@@ -746,6 +786,15 @@ export class TeamService {
     }
     return null;
   }
+
+  private withMailboxAttachments(messages: MailboxMessage[]): MailboxMessage[] {
+    if (!this.attachmentsRepo || messages.length === 0) return messages;
+    const byMessageId = this.attachmentsRepo.listMailboxAttachmentsForMessages(messages.map((item) => item.id));
+    return messages.map((message) => ({
+      ...message,
+      attachments: byMessageId[message.id] ?? [],
+    }));
+  }
 }
 
 /**
@@ -777,7 +826,8 @@ function formatMailbox(
             message.fromAgentId === 'user'
               ? 'user'
               : team.agents.find((item) => item.slotId === message.fromAgentId)?.name || message.fromAgentId;
-          return `- From ${from}: ${message.content}`;
+          const attachmentNote = formatAttachmentNote(message, 'en');
+          return `- From ${from}: ${message.content}${attachmentNote ? ` ${attachmentNote}` : ''}`;
         });
 
   return [
@@ -808,11 +858,17 @@ function formatMailboxDisplay(messages: MailboxMessage[], team: Team): string {
   }
 
   return messages
-    .map((message) => `${formatMailboxSender(message.fromAgentId, team)}: ${message.content}`)
+    .map((message) => `${formatMailboxSender(message.fromAgentId, team)}: ${message.content}${formatAttachmentNote(message, 'zh')}`)
     .join('\n');
 }
 
 function formatMailboxSender(agentId: string, team: Team): string {
   if (agentId === 'user') return 'user';
   return team.agents.find((item) => item.slotId === agentId)?.name ?? agentId;
+}
+
+function formatAttachmentNote(message: MailboxMessage, locale: 'en' | 'zh'): string {
+  const imageCount = message.attachments?.filter((item) => item.kind === 'image').length ?? 0;
+  if (imageCount === 0) return '';
+  return locale === 'zh' ? ` [图片附件 ${imageCount} 张]` : `[image attachments: ${imageCount}]`;
 }

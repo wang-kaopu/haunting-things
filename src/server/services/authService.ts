@@ -1,11 +1,12 @@
-import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import type { Request, Response, NextFunction } from 'express';
 import { parse as parseCookie } from 'cookie';
-import type { UserRepositoryPort } from '../db/userRepository';
+import type { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import type { User } from '../../shared/types';
+import type { UserRepositoryPort } from '../db/userRepository';
 import { createId } from '../id';
+import { setRequestContext } from '../utils/requestContext';
 
 const COOKIE_NAME = 'hs_session';
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -22,7 +23,7 @@ type TokenPayload = {
 export class AuthService {
   readonly state: AuthState = { initialPassword: null };
 
-  constructor(private readonly repo: UserRepositoryPort) {}
+  constructor(private readonly repo: UserRepositoryPort) { }
 
   async ensureAdmin(): Promise<void> {
     if (this.repo.getAnyUser()) return;
@@ -52,8 +53,8 @@ export class AuthService {
     this.repo.updateLastLogin(user.id);
     const token = jwt.sign({ userId: user.id, username: user.username } satisfies TokenPayload, user.jwtSecret, {
       expiresIn: '7d',
-      issuer: 'haunting-souls',
-      audience: 'haunting-souls-web',
+      issuer: 'Haunting-things',
+      audience: 'Haunting-things-web',
     });
     return { user: { id: user.id, username: user.username }, token };
   }
@@ -69,15 +70,10 @@ export class AuthService {
     return true;
   }
 
-  /** 为命令行重置流程生成新的管理员密码。 */
-  async resetAdminPassword(): Promise<string> {
-    const user = this.repo.getAnyUser();
-    if (!user) throw new Error('No admin user exists');
-    const password = crypto.randomBytes(9).toString('base64url');
-    const passwordHash = await bcrypt.hash(password, 12);
-    this.repo.updatePassword(user.id, passwordHash, crypto.randomBytes(48).toString('hex'));
-    this.state.initialPassword = password;
-    return password;
+  /** 清除本地管理员密码状态；下次启动会重新创建初始 admin。 */
+  clearAdminPassword(): number {
+    this.state.initialPassword = null;
+    return this.repo.deleteAllUsers();
   }
 
   /** 使用用户当前 JWT secret 解码并校验会话 token。 */
@@ -88,7 +84,7 @@ export class AuthService {
     const user = this.repo.getUserByUsername(decoded.username);
     if (!user) return null;
     try {
-      jwt.verify(token, user.jwtSecret, { issuer: 'haunting-souls', audience: 'haunting-souls-web' });
+      jwt.verify(token, user.jwtSecret, { issuer: 'Haunting-things', audience: 'Haunting-things-web' });
       return { id: user.id, username: user.username };
     } catch {
       return null;
@@ -108,6 +104,7 @@ export class AuthService {
       return;
     }
     (req as Request & { user: User }).user = user;
+    setRequestContext({ userId: user.id });
     next();
   };
 

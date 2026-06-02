@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationService } from '../src/server/services/conversationService';
 import { EventBus } from '../src/server/events';
+import { ConversationService } from '../src/server/services/conversationService';
 import type { Conversation } from '../src/shared/types';
 
 function createFakeRepository() {
@@ -48,7 +48,7 @@ describe('ConversationService model snapshots', () => {
   it('updates the conversation model and clears cached runtime snapshots', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/haunting-souls-test');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha', model: 'old-model' });
 
     (conversations as any).commandSnapshots.set(conversation.id, {

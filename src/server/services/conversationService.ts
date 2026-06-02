@@ -9,12 +9,16 @@ import type {
   ConversationModels,
   ConversationMode,
   ConversationUsage,
+  StoredAttachment,
 } from '../../shared/types';
 import { classifyAgentEvent } from '../agentEventPolicy';
+import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
 import type { ConversationRepositoryPort } from '../db/conversationRepository';
+import { toAttachmentRef } from '../db/mappers';
 import type { EventBus } from '../events';
 import { createId } from '../id';
-import { createLogger } from '../logger';
+import { createLogger } from '../utils/logger';
+import type { AttachmentService } from './attachmentService';
 import { AcpRuntime } from '../runtime/acpRuntime';
 
 /**
@@ -48,7 +52,9 @@ export class ConversationService {
   constructor(
     private readonly repo: ConversationRepositoryPort,
     private readonly events: EventBus,
-    private readonly dataDir: string
+    private readonly dataDir: string,
+    private readonly attachmentsRepo?: AttachmentRepositoryPort,
+    private readonly attachmentService?: AttachmentService
   ) {}
 
   /**
@@ -105,7 +111,7 @@ export class ConversationService {
 
   /** 返回指定 Conversation 的历史消息。 */
   messages(conversationId: string): ChatMessage[] {
-    return this.repo.listMessages(conversationId);
+    return this.withMessageAttachments(this.repo.listMessages(conversationId));
   }
 
   /** 返回指定 Conversation 的标准化 Agent 事件历史，默认最近 200 条。 */
@@ -167,6 +173,7 @@ export class ConversationService {
       contentLength: input.content.length,
       filesCount: input.files?.length ?? 0,
     });
+    const attachments = this.resolveAttachments(input.files ?? []);
 
     const userMessage = this.repo.addMessage({
       id: createId(),
@@ -176,11 +183,18 @@ export class ConversationService {
       createdAt: Date.now(),
       status: 'done',
     });
-    this.events.emit('conversation.stream', { conversationId: conversation.id, message: userMessage });
+    this.attachmentsRepo?.linkMessageAttachments(
+      userMessage.id,
+      attachments.map((item) => item.id)
+    );
+    this.events.emit('conversation.stream', {
+      conversationId: conversation.id,
+      message: { ...userMessage, attachments: attachments.map(toAttachmentRef) },
+    });
 
     try {
       const runtime = this.getRuntime(conversation);
-      await runtime.send(input.content);
+      await runtime.send(attachments.length > 0 ? { text: input.content, attachments } : input.content);
       this.logger.info('conversation_send_done', {
         conversationId: conversation.id,
         ms: Date.now() - startedAt,
@@ -220,21 +234,29 @@ export class ConversationService {
     });
 
     const visibleMessage = input.displayMessage?.trim();
-    if (visibleMessage) {
+    const attachments = this.resolveAttachments(input.files ?? []);
+    if (visibleMessage || attachments.length > 0) {
       const userMessage = this.repo.addMessage({
         id: createId(),
         conversationId: conversation.id,
         role: 'user',
-        content: visibleMessage,
+        content: visibleMessage ?? '',
         createdAt: Date.now(),
         status: 'done',
       });
-      this.events.emit('conversation.stream', { conversationId: conversation.id, message: userMessage });
+      this.attachmentsRepo?.linkMessageAttachments(
+        userMessage.id,
+        attachments.map((item) => item.id)
+      );
+      this.events.emit('conversation.stream', {
+        conversationId: conversation.id,
+        message: { ...userMessage, attachments: attachments.map(toAttachmentRef) },
+      });
     }
 
     try {
       const runtime = this.getRuntime(conversation);
-      await runtime.send(input.prompt);
+      await runtime.send(attachments.length > 0 ? { text: input.prompt, attachments } : input.prompt);
       this.logger.info('runtime_prompt_send_done', {
         conversationId: conversation.id,
         ms: Date.now() - startedAt,
@@ -254,6 +276,18 @@ export class ConversationService {
    */
   confirmPermission(input: { conversationId: string; callId: string; optionId: string }): void {
     this.runtimes.get(input.conversationId)?.confirmPermission(input.callId, input.optionId);
+  }
+
+  async deleteMessage(input: { messageId: string }): Promise<{ deleted: true }> {
+    const attachments = this.attachmentsRepo?.deleteMessage(input.messageId) ?? [];
+    await this.attachmentService?.deleteStoredFiles(attachments);
+    return { deleted: true };
+  }
+
+  async deleteMessageAttachment(input: { messageId: string; attachmentId: string }): Promise<{ deleted: true }> {
+    const attachments = this.attachmentsRepo?.deleteMessageAttachment(input.messageId, input.attachmentId) ?? [];
+    await this.attachmentService?.deleteStoredFiles(attachments);
+    return { deleted: true };
   }
 
   /**
@@ -408,6 +442,19 @@ export class ConversationService {
     });
     this.runtimes.set(conversation.id, runtime);
     return runtime;
+  }
+
+  private resolveAttachments(ids: string[]): StoredAttachment[] {
+    return this.attachmentsRepo?.listAttachments(ids) ?? [];
+  }
+
+  private withMessageAttachments(messages: ChatMessage[]): ChatMessage[] {
+    if (!this.attachmentsRepo || messages.length === 0) return messages;
+    const byMessageId = this.attachmentsRepo.listMessageAttachmentsForMessages(messages.map((item) => item.id));
+    return messages.map((message) => ({
+      ...message,
+      attachments: byMessageId[message.id] ?? [],
+    }));
   }
 }
 

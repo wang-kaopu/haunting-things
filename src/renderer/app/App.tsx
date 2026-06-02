@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { normalizeAuthResponse, normalizeAuthUser, readJsonResponse } from '../shared/utils/backendData';
 import { Workbench } from './Workbench';
 
@@ -55,7 +55,7 @@ function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactE
   return (
     <main className="login">
       <form className="panel login-panel" onSubmit={submit}>
-        <h1>Haunting Souls</h1>
+        <h1>Haunting Things</h1>
         <label>
           Username
           <input value={username} onChange={(event) => setUsername(event.target.value)} />

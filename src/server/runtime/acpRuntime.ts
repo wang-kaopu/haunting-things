@@ -1,7 +1,3 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { EventEmitter } from 'node:events';
 import {
   ClientSideConnection,
   PROTOCOL_VERSION,
@@ -9,23 +5,28 @@ import {
   type RequestPermissionResponse,
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import type {
-  AgentBackend,
-  AgentEvent,
   AcpAvailableCommand,
   AcpModelInfo,
+  AgentBackend,
+  AgentEvent,
   AgentTurnPhase,
   ChatMessage,
-  ConversationStatus,
   ConversationCommands,
-  ConversationModels,
   ConversationMode,
+  ConversationModels,
+  ConversationStatus,
   ConversationUsage,
   PermissionRequest,
+  StoredAttachment,
 } from '../../shared/types';
-import { getBridgePackageVersioned } from './agentRegistry';
 import { createId } from '../id';
-import { createLogger } from '../logger';
+import { createLogger } from '../utils/logger';
+import { getBridgePackageVersioned } from './agentRegistry';
 import { ndjsonFromChildProcess } from './ndjsonTransport';
 
 type AcpRuntimeEvents = {
@@ -47,51 +48,51 @@ type AcpRuntimeAgentEventInput =
   | { type: 'agent.reply.delta'; messageId: string; delta: string }
   | { type: 'agent.reply.done'; messageId: string; content: string }
   | {
-      type: 'agent.tool.call';
-      toolCallId: string;
-      toolName: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      input?: unknown;
-      raw?: unknown;
-    }
+    type: 'agent.tool.call';
+    toolCallId: string;
+    toolName: string;
+    title?: string;
+    kind?: string;
+    status?: string;
+    input?: unknown;
+    raw?: unknown;
+  }
   | {
-      type: 'agent.tool.update';
-      toolCallId: string;
-      toolName?: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      content?: unknown;
-      raw?: unknown;
-    }
+    type: 'agent.tool.update';
+    toolCallId: string;
+    toolName?: string;
+    title?: string;
+    kind?: string;
+    status?: string;
+    content?: unknown;
+    raw?: unknown;
+  }
   | {
-      type: 'agent.tool.result';
-      toolCallId: string;
-      toolName?: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      output?: unknown;
-      isError?: boolean;
-      raw?: unknown;
-    }
+    type: 'agent.tool.result';
+    toolCallId: string;
+    toolName?: string;
+    title?: string;
+    kind?: string;
+    status?: string;
+    output?: unknown;
+    isError?: boolean;
+    raw?: unknown;
+  }
   | {
-      type: 'agent.permission.request';
-      callId: string;
-      title: string;
-      body?: string;
-      options: PermissionRequest['options'];
-      toolCall?: unknown;
-      rawInput?: unknown;
-    }
+    type: 'agent.permission.request';
+    callId: string;
+    title: string;
+    body?: string;
+    options: PermissionRequest['options'];
+    toolCall?: unknown;
+    rawInput?: unknown;
+  }
   | {
-      type: 'agent.error';
-      source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
-      message: string;
-      detail?: unknown;
-    }
+    type: 'agent.error';
+    source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
+    message: string;
+    detail?: unknown;
+  }
   | { type: 'agent.done'; status: ConversationStatus };
 
 /** 面向 ACP SDK 的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
@@ -107,6 +108,15 @@ type PendingRequest = {
   settled: boolean;
   reject: (error: unknown) => void;
 };
+
+export type RuntimePromptInput = {
+  text: string;
+  attachments?: StoredAttachment[];
+};
+
+type AcpPromptBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
 
 /**
  * 管理单个 Agent（Claude / Codex）的完整生命周期：
@@ -166,9 +176,10 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
    * 首次调用时会自动启动代理进程并完成 ACP 握手。
    * 流式文本块通过 `message` 事件逐步推送，轮次结束后 emit `finish`。
    *
-   * @param content - 用户消息的纯文本内容
+   * @param input - 用户消息文本，或带图片附件的运行时 prompt
    */
-  async send(content: string): Promise<void> {
+  async send(input: string | RuntimePromptInput): Promise<void> {
+    const runtimeInput = typeof input === 'string' ? { text: input, attachments: [] } : input;
     await this.ensureStarted();
     this.activeTurnId = createId();
     this.turnFinalized = false;
@@ -193,13 +204,15 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.logger.info('prompt_start', {
       conversationId: this.input.conversationId,
       turnId: this.activeTurnId,
-      contentLength: content.length,
+      contentLength: runtimeInput.text.length,
+      attachmentCount: runtimeInput.attachments?.length ?? 0,
     });
     try {
+      const prompt = await this.buildPromptBlocks(runtimeInput);
       await this.runConnectionRequest(() =>
         this.connection!.prompt({
           sessionId: this.sessionId!,
-          prompt: [{ type: 'text', text: content }],
+          prompt,
         })
       );
     } catch (err) {
@@ -256,6 +269,23 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
     this.activeTurnId = null;
     this.emit('finish', 'idle');
+  }
+
+  private async buildPromptBlocks(input: RuntimePromptInput): Promise<AcpPromptBlock[]> {
+    const blocks: AcpPromptBlock[] = [];
+    if (input.text.trim()) {
+      blocks.push({ type: 'text', text: input.text });
+    }
+    for (const attachment of input.attachments ?? []) {
+      if (attachment.kind !== 'image') continue;
+      const buffer = await readFile(attachment.path);
+      blocks.push({
+        type: 'image',
+        data: buffer.toString('base64'),
+        mimeType: attachment.mimeType,
+      });
+    }
+    return blocks.length > 0 ? blocks : [{ type: 'text', text: input.text }];
   }
 
   /** 返回 ACP bridge 最近一次上报的上下文窗口用量快照。 */
@@ -418,7 +448,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       initResult = await Promise.race([
         this.runConnectionRequest(() =>
           connection.initialize({
-            clientInfo: { name: 'haunting-souls', version: '0.1.0' },
+            clientInfo: { name: 'Haunting-things', version: '0.1.0' },
             protocolVersion: PROTOCOL_VERSION,
             clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } },
           })

@@ -2,7 +2,8 @@ import type { IncomingMessage } from 'node:http';
 import type { WebSocketServer, WebSocket } from 'ws';
 import type { AuthService } from '../../services/authService';
 import type { BridgeClientMessage, BridgeHandler, BridgeInvokeName, BridgeResultMessage } from '../../../shared/bridge';
-import { createLogger } from '../../logger';
+import { createLogger } from '../../utils/logger';
+import { createRequestId, runWithRequestContext } from '../../utils/requestContext';
 
 /**
  * 渲染端与服务端之间的已认证 WebSocket RPC bridge。
@@ -35,7 +36,10 @@ export class WebBridge {
       }
 
       onConnection(socket);
-      socket.on('message', (raw) => void this.handleMessage(socket, raw.toString()));
+      socket.on('message', (raw) => {
+        const requestId = createRequestId();
+        void runWithRequestContext({ requestId, userId: user.id }, () => this.handleMessage(socket, raw.toString()));
+      });
       socket.on('close', () => onClose(socket));
       socket.on('error', () => onClose(socket));
     });
@@ -65,28 +69,26 @@ export class WebBridge {
     }
 
     const startedAt = Date.now();
-    this.logger.info('invoke_start', {
-      invokeId: message.id,
-      name: message.name,
-      params: summarizeInvokeParams(message.name, message.data),
-    });
+    this.logger.info(
+      `bridge request: name=${message.name}, invoke_id=${message.id}, params=${formatBridgeValue(
+        summarizeInvokeParams(message.name, message.data)
+      )}`
+    );
 
     try {
       const data = await handler(message.data as never);
-      this.logger.info('invoke_success', {
-        invokeId: message.id,
-        name: message.name,
-        ms: Date.now() - startedAt,
-        result: summarizeInvokeResult(message.name, data),
-      });
+      this.logger.info(
+        `bridge response: name=${message.name}, invoke_id=${message.id}, status=ok, result=${formatBridgeValue(
+          summarizeInvokeResult(message.name, data)
+        )} - ${Date.now() - startedAt}ms`
+      );
       this.send(socket, { id: message.id, type: 'result', name: message.name, data } as BridgeResultMessage);
     } catch (error) {
-      this.logger.warn('invoke_error', {
-        invokeId: message.id,
-        name: message.name,
-        ms: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.logger.warn(
+        `bridge response: name=${message.name}, invoke_id=${message.id}, status=error, error=${formatBridgeValue(
+          error instanceof Error ? error.message : String(error)
+        )} - ${Date.now() - startedAt}ms`
+      );
       this.send(socket, {
         id: message.id,
         type: 'result',
@@ -109,6 +111,18 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
   const input = data as Record<string, unknown>;
 
   switch (name) {
+    case 'attachment.upload':
+      return {
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        dataBase64Length: typeof input.dataBase64 === 'string' ? input.dataBase64.length : undefined,
+      };
+    case 'attachment.delete':
+      return pick(input, ['attachmentId']);
+    case 'conversation.deleteMessage':
+      return pick(input, ['messageId']);
+    case 'conversation.deleteMessageAttachment':
+      return pick(input, ['messageId', 'attachmentId']);
     case 'conversation.sendMessage':
     case 'team.sendMessage':
     case 'team.sendMessageToAgent':
@@ -177,4 +191,14 @@ function summarizeObject(input: Record<string, unknown>): Record<string, unknown
 function redactObject(input: Record<string, unknown>): Record<string, unknown> {
   const blocked = new Set(['password', 'currentPassword', 'newPassword', 'token', 'authorization']);
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, blocked.has(key) ? '***' : value]));
+}
+
+function formatBridgeValue(value: unknown): string {
+  if (value == null) return String(value);
+  if (typeof value === 'string') return JSON.stringify(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable]';
+  }
 }

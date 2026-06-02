@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationService } from '../src/server/services/conversationService';
 import { EventBus } from '../src/server/events';
+import { ConversationService } from '../src/server/services/conversationService';
 import type { Conversation } from '../src/shared/types';
 
 function createFakeRepository() {
@@ -48,7 +48,7 @@ describe('ConversationService mode snapshots', () => {
   it('forwards current_mode_update as conversation.mode without persisting an agent event', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/haunting-souls-test');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
     const runtime = (conversations as any).getRuntime(conversation);
 

@@ -45,9 +45,14 @@ export class UserRepository {
       .prepare('UPDATE users SET password_hash = ?, jwt_secret = ?, updated_at = ? WHERE id = ?')
       .run(passwordHash, jwtSecret, Date.now(), userId);
   }
+
+  /** 清除所有本地用户，用于 CLI reset 后重新走首次初始化流程。 */
+  deleteAllUsers(): number {
+    return this.db.prepare('DELETE FROM users').run().changes;
+  }
 }
 
 export type UserRepositoryPort = Pick<
   UserRepository,
-  'getUserByUsername' | 'getAnyUser' | 'createUser' | 'updateLastLogin' | 'updatePassword'
+  'getUserByUsername' | 'getAnyUser' | 'createUser' | 'updateLastLogin' | 'updatePassword' | 'deleteAllUsers'
 >;

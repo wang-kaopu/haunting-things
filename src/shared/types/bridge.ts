@@ -6,6 +6,7 @@ import type {
   PermissionRequest,
 } from './agent';
 import type {
+  AttachmentRef,
   ChatMessage,
   Conversation,
   ConversationCommands,
@@ -41,6 +42,11 @@ export type User = {
  * key 为 API 名称，value 包含 `params`（请求参数）和 `result`（返回值）类型。
  */
 export type InvokeMap = {
+  'attachment.upload': {
+    params: { fileName: string; mimeType: string; dataBase64: string };
+    result: AttachmentRef;
+  };
+  'attachment.delete': { params: { attachmentId: string }; result: { deleted: true } };
   'agent.list': { params: void; result: AgentInfo[] };
   'agent.health': { params: { backend: AgentBackend }; result: AgentHealth };
   'conversation.create': {
@@ -60,6 +66,11 @@ export type InvokeMap = {
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
+  };
+  'conversation.deleteMessage': { params: { messageId: string }; result: { deleted: true } };
+  'conversation.deleteMessageAttachment': {
+    params: { messageId: string; attachmentId: string };
+    result: { deleted: true };
   };
   'conversation.confirmPermission': {
     params: { conversationId: string; callId: string; optionId: string };

@@ -14,7 +14,7 @@ export type AppConfig = {
 };
 
 export function loadConfig(): AppConfig {
-  const dataDir = process.env.DATA_DIR?.trim() || path.join(homedir(), '.haunting-souls');
+  const dataDir = process.env.DATA_DIR?.trim() || path.join(homedir(), '.Haunting-things');
   mkdirSync(dataDir, { recursive: true });
 
   const allowRemote = process.env.ALLOW_REMOTE === 'true' || process.env.HOST === '0.0.0.0';

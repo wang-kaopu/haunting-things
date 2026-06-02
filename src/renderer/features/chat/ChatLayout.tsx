@@ -11,7 +11,7 @@ import type {
 } from '../../../shared/types';
 import { ChatHeader } from './components/ChatHeader';
 import { MessageList } from './components/MessageList';
-import { SendBox } from './components/SendBox';
+import { SendBox, type SendBoxPayload } from './components/SendBox';
 
 export type ChatLayoutProps = {
   team: Team | null;
@@ -23,7 +23,7 @@ export type ChatLayoutProps = {
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
   onAddAgentClick: () => void;
-  onSendMessage: (content: string) => Promise<void>;
+  onSendMessage: (payload: SendBoxPayload) => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
 };
 

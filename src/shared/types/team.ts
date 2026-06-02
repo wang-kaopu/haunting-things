@@ -1,4 +1,5 @@
 import type { AgentBackend } from './agent';
+import type { AttachmentRef } from './conversation';
 
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
@@ -33,6 +34,7 @@ export type MailboxMessage = {
   fromAgentId: string;
   content: string;
   summary?: string;
+  attachments?: AttachmentRef[];
   read: boolean;
   createdAt: number;
 };

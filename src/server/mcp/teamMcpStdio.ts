@@ -1,6 +1,6 @@
-import net from 'node:net';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import net from 'node:net';
 import { z } from 'zod';
 
 const port = Number.parseInt(process.env.TEAM_MCP_PORT || '0', 10);
@@ -16,7 +16,7 @@ process.stderr.write(
   `[teamMcpStdio] starting pid=${process.pid} port=${port} slot=${fromSlotId || 'unknown'}\n`
 );
 
-const server = new McpServer({ name: 'haunting-souls-team', version: '0.1.0' }, { capabilities: { tools: {} } });
+const server = new McpServer({ name: 'Haunting-things-team', version: '0.1.0' }, { capabilities: { tools: {} } });
 
 server.tool(
   'team_members',

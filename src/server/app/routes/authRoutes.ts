@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AuthService } from '../../services/authService';
-import type { Logger } from '../../logger';
+import type { Logger } from '../../utils/logger';
+import { setRequestContext } from '../../utils/requestContext';
 
 export function createAuthRoutes(auth: AuthService, logger: Logger): Router {
   const router = Router();
@@ -22,6 +23,7 @@ export function createAuthRoutes(auth: AuthService, logger: Logger): Router {
       res.status(401).json({ success: false, error: 'Invalid username or password' });
       return;
     }
+    setRequestContext({ userId: result.user.id });
     auth.setCookie(res, result.token);
     logger.info('auth_login_success', {
       username: result.user.username,

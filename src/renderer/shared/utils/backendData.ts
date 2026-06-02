@@ -2,6 +2,8 @@ import type {
   AgentBackend,
   AgentEvent,
   AgentTurnPhase,
+  AttachmentKind,
+  AttachmentRef,
   ChatMessage,
   ChatRole,
   ConversationCommands,
@@ -25,6 +27,7 @@ type RecordValue = Record<string, unknown>;
 const agentBackends = new Set<AgentBackend>(['claude', 'codex']);
 const agentRoles = new Set<TeamAgent['role']>(['leader', 'teammate']);
 const agentStatuses = new Set<TeamAgentStatus>(['idle', 'active', 'failed', 'stopped']);
+const attachmentKinds = new Set<AttachmentKind>(['image']);
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
 
@@ -109,8 +112,26 @@ export function normalizeChatMessage(value: unknown): ChatMessage | null {
     conversationId,
     role: enumValue(input.role, chatRoles, 'assistant'),
     content: asString(input.content),
+    attachments: normalizeArray(input.attachments, normalizeAttachmentRef),
     createdAt: asNumber(input.createdAt, Date.now()),
     status: enumValue(input.status, new Set(['streaming', 'done', 'error'] as const), undefined),
+  };
+}
+
+export function normalizeAttachmentRef(value: unknown): AttachmentRef | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const url = asString(input.url);
+  if (!id || !url) return null;
+  return {
+    id,
+    kind: enumValue(input.kind, attachmentKinds, 'image'),
+    name: asString(input.name, 'image'),
+    mimeType: asString(input.mimeType, 'image/png'),
+    size: asNumber(input.size, 0),
+    url,
+    createdAt: asNumber(input.createdAt, Date.now()),
   };
 }
 
@@ -347,6 +368,7 @@ function normalizeMailboxMessage(value: unknown): MailboxMessage | null {
     fromAgentId,
     content: asString(input.content),
     summary: optionalString(input.summary),
+    attachments: normalizeArray(input.attachments, normalizeAttachmentRef),
     read: asBoolean(input.read, false),
     createdAt: asNumber(input.createdAt, Date.now()),
   };

@@ -64,6 +64,32 @@ export function initializeSchema(db: Db): void {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      path TEXT NOT NULL,
+      url TEXT NOT NULL,
+      sha256 TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS message_attachments (
+      message_id TEXT NOT NULL,
+      attachment_id TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (message_id, attachment_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS mailbox_attachments (
+      mailbox_message_id TEXT NOT NULL,
+      attachment_id TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (mailbox_message_id, attachment_id)
+    );
+
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       team_id TEXT NOT NULL,
@@ -93,6 +119,12 @@ export function initializeSchema(db: Db): void {
     CREATE INDEX IF NOT EXISTS idx_agent_events_conversation ON agent_events(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_agent_events_turn ON agent_events(turn_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
+    CREATE INDEX IF NOT EXISTS idx_attachments_kind ON attachments(kind);
+    CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at);
+    CREATE INDEX IF NOT EXISTS idx_message_attachments_message_id ON message_attachments(message_id);
+    CREATE INDEX IF NOT EXISTS idx_message_attachments_attachment_id ON message_attachments(attachment_id);
+    CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_message_id ON mailbox_attachments(mailbox_message_id);
+    CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_attachment_id ON mailbox_attachments(attachment_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
   `);
 }

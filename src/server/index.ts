@@ -1,53 +1,64 @@
 import http from 'node:http';
 import { networkInterfaces } from 'node:os';
+import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { createApp } from './app/createApp';
 import { registerBridgeHandlers } from './app/bridge/registerBridgeHandlers';
 import { WebBridge } from './app/bridge/webBridge';
 import { loadConfig } from './config';
 import { openDatabase } from './db/connection';
+import { AttachmentRepository } from './db/attachmentRepository';
 import { ConversationRepository } from './db/conversationRepository';
 import { MailboxRepository } from './db/mailboxRepository';
 import { TaskRepository } from './db/taskRepository';
 import { TeamRepository } from './db/teamRepository';
 import { UserRepository } from './db/userRepository';
 import { AuthService } from './services/authService';
+import { AttachmentService } from './services/attachmentService';
 import { EventBus } from './events';
 import { ConversationService } from './services/conversationService';
-import { createLogger } from './logger';
+import { createLogger } from './utils/logger';
+import { installRpcLogger } from './utils/rpcLogger';
 import { TeamService } from './services/teamService';
+
+installRpcLogger();
 
 const config = loadConfig();
 const logger = createLogger('server');
 const db = openDatabase(config.dbPath);
 const usersRepo = new UserRepository(db);
+const attachmentsRepo = new AttachmentRepository(db);
 const conversationsRepo = new ConversationRepository(db);
 const teamsRepo = new TeamRepository(db);
 const mailboxRepo = new MailboxRepository(db);
 const tasksRepo = new TaskRepository(db);
 const auth = new AuthService(usersRepo);
-await auth.ensureAdmin();
 
 if (process.argv.includes('--reset-password')) {
-  const password = await auth.resetAdminPassword();
-  logger.info('admin_password_reset', {
+  const deletedUsers = auth.clearAdminPassword();
+  logger.info('admin_password_cleared', {
     username: 'admin',
-    password,
+    deletedUsers,
   });
   db.close();
   process.exit(0);
 }
 
+await auth.ensureAdmin();
+
 const events = new EventBus();
-const conversations = new ConversationService(conversationsRepo, events, config.dataDir);
-const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events);
-const app = createApp({ auth, logger, rendererDist: config.rendererDist });
+const attachmentService = new AttachmentService(path.join(config.dataDir, 'attachments'));
+const conversations = new ConversationService(conversationsRepo, events, config.dataDir, attachmentsRepo, attachmentService);
+const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events, attachmentsRepo, attachmentService);
+const app = createApp({ auth, logger, rendererDist: config.rendererDist, attachments: attachmentsRepo });
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const bridge = new WebBridge(wss, auth);
 
 registerBridgeHandlers({
   bridge,
+  attachments: attachmentsRepo,
+  attachmentService,
   conversations,
   teams,
   serverInfo: () => ({
@@ -73,7 +84,7 @@ server.listen(config.port, config.host, () => {
     logger.info('initial_admin_credentials', {
       username: 'admin',
       password: auth.state.initialPassword,
-    });
+    }, { reveal: ['password'] });
   }
 });
 

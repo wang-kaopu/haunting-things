@@ -1,7 +1,7 @@
+import Database from 'better-sqlite3';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import { describe, expect, test } from 'vitest';
 import { openDatabase } from '../src/server/db/connection';
 import { MailboxRepository } from '../src/server/db/mailboxRepository';
@@ -9,7 +9,7 @@ import { TeamRepository } from '../src/server/db/teamRepository';
 
 describe('mailbox repository', () => {
   test('readUnreadAndMark returns unread messages once', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'haunting-souls-test-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
     const db = openDatabase(path.join(dir, 'test.sqlite'));
     const teamsRepo = new TeamRepository(db);
     const mailboxRepo = new MailboxRepository(db);
@@ -53,7 +53,7 @@ describe('mailbox repository', () => {
   });
 
   test('openDatabase migrates legacy mailbox tables before creating unread index', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'haunting-souls-test-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
     const dbPath = path.join(dir, 'legacy.sqlite');
     const legacyDb = new Database(dbPath);
     legacyDb.exec(`
@@ -78,7 +78,7 @@ describe('mailbox repository', () => {
   });
 
   test('openDatabase migrates legacy team tables with missing agents json', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'haunting-souls-test-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
     const dbPath = path.join(dir, 'legacy-team.sqlite');
     const legacyDb = new Database(dbPath);
     legacyDb.exec(`
