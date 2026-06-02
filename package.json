@@ -16,7 +16,7 @@
     "preinstall": "node scripts/check-node-version.mjs",
     "postinstall": "node scripts/ensure-native-deps.mjs",
     "predev:web": "npm run check:node && npm run ensure:native",
-    "dev:web": "npm run build:renderer && tsx src/server/index.ts",
+    "dev:web": "npm run build:renderer && tsx watch src/server/index.ts",
     "predev:remote": "npm run check:node && npm run ensure:native",
     "dev:remote": "npm run build:renderer && ALLOW_REMOTE=true tsx src/server/index.ts",
     "predev:desktop": "npm run check:node && npm run ensure:native",

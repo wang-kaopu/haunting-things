@@ -42,7 +42,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     serverInfo,
     loading: serverInfoLoading,
     error: serverInfoError,
-    refreshServerInfo,
     setRemoteAccess,
   } = useServerInfo();
 
@@ -173,7 +172,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
               serverInfo={serverInfo}
               loading={serverInfoLoading}
               error={serverInfoError}
-              onRefresh={refreshServerInfo}
               onSetRemoteAccess={setRemoteAccess}
             />
           </div>

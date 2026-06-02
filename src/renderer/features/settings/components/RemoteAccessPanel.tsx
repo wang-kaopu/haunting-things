@@ -5,7 +5,6 @@ export type RemoteAccessPanelProps = {
   serverInfo: ServerInfo | null;
   loading?: boolean;
   error?: string;
-  onRefresh: () => Promise<void>;
   onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
@@ -13,7 +12,6 @@ export function RemoteAccessPanel({
   serverInfo,
   loading,
   error,
-  onRefresh,
   onSetRemoteAccess,
 }: RemoteAccessPanelProps): React.ReactElement {
   const urls = Array.isArray(serverInfo?.urls) ? serverInfo.urls : [];
@@ -25,18 +23,7 @@ export function RemoteAccessPanel({
       <div className="settings-card-header">
         <div>
           <h3>远程访问</h3>
-          <p className="muted">
-            {serverInfo?.restarting
-              ? '正在切换监听地址...'
-              : allowRemote
-                ? '已允许局域网 / Tailscale 内访问。'
-                : '当前仅允许本机访问。'}
-          </p>
         </div>
-
-        <button type="button" disabled={loading} onClick={() => void onRefresh()}>
-          {loading ? '刷新中...' : '刷新'}
-        </button>
       </div>
 
       <label className="remote-toggle-row">
@@ -46,7 +33,7 @@ export function RemoteAccessPanel({
           disabled={!serverInfo || switching}
           onChange={(event) => void onSetRemoteAccess(event.currentTarget.checked)}
         />
-        <span>允许局域网 / Tailscale 访问</span>
+        <span>允许局域网/Tailscale连接</span>
       </label>
 
       {error ? <p className="error-text">{error}</p> : null}
@@ -55,15 +42,17 @@ export function RemoteAccessPanel({
         <p className="muted">正在读取服务信息...</p>
       ) : (
         <>
-          <div className="remote-url-list">
-            {urls.map((url) => (
-              <RemoteUrlRow key={url} url={url} />
-            ))}
-          </div>
+          {serverInfo.restarting ? <p className="muted">正在切换监听地址...</p> : null}
 
-          <p className="muted">
-            在其他设备浏览器中打开以上地址，然后使用当前账号密码登录。
-          </p>
+          {urls.length > 0 ? (
+            <div className="remote-url-list">
+              {urls.map((url) => (
+                <RemoteUrlRow key={url} url={url} />
+              ))}
+            </div>
+          ) : null}
+
+          {urls.length > 0 ? <p className="muted">在其他设备浏览器中打开以上地址，然后使用当前账号密码登录。</p> : null}
 
           <p className="muted">切换远程访问会短暂重启 HTTP/WebSocket 监听，页面会自动重连。</p>
         </>
@@ -93,10 +82,6 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
 function formatRemoteUrlLabel(url: string): string {
   try {
     const { hostname } = new URL(url);
-
-    if (hostname === '127.0.0.1' || hostname === 'localhost') {
-      return '本机';
-    }
 
     if (isTailscaleIp(hostname)) {
       return 'Tailscale';

@@ -169,10 +169,9 @@ export class ServerManager {
 }
 
 function getServerUrls(port: number, allowRemote: boolean): string[] {
-  const urls = new Set<string>([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
-  if (allowRemote) {
-    for (const ip of getNonInternalIPv4()) urls.add(`http://${ip}:${port}`);
-  }
+  const urls = new Set<string>();
+  if (!allowRemote) return [];
+  for (const ip of getNonInternalIPv4()) urls.add(`http://${ip}:${port}`);
   return [...urls];
 }
 

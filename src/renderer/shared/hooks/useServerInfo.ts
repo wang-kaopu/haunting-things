@@ -7,7 +7,6 @@ export type UseServerInfoResult = {
   serverInfo: ServerInfo | null;
   loading: boolean;
   error: string;
-  refreshServerInfo: () => Promise<void>;
   setRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
@@ -16,7 +15,7 @@ export function useServerInfo(): UseServerInfoResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const refreshServerInfo = useCallback(async () => {
+  const loadServerInfo = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -42,25 +41,24 @@ export function useServerInfo(): UseServerInfoResult {
         setServerInfo(target);
 
         await delay(1800);
-        await refreshServerInfo();
+        await loadServerInfo();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
     },
-    [refreshServerInfo]
+    [loadServerInfo]
   );
 
   useEffect(() => {
-    void refreshServerInfo();
-  }, [refreshServerInfo]);
+    void loadServerInfo();
+  }, [loadServerInfo]);
 
   return {
     serverInfo,
     loading,
     error,
-    refreshServerInfo,
     setRemoteAccess,
   };
 }
