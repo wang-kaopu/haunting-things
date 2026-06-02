@@ -18,6 +18,7 @@ export type ServerInstance = {
   allowRemote: boolean;
 };
 
+/** 管理 HTTP/WebSocket 服务实例，并支持运行时切换本机/局域网监听。 */
 export class ServerManager {
   private instance: ServerInstance | null = null;
   private restarting = false;
@@ -36,11 +37,13 @@ export class ServerManager {
     }
   ) {}
 
+  /** 启动首个服务实例，并在首次监听成功后触发初始化回调。 */
   async start(): Promise<void> {
     await this.startInstance(this.input.allowRemote);
     this.input.onFirstListen?.();
   }
 
+  /** 返回前端展示所需的服务地址、端口和重启状态快照。 */
   info(override?: { allowRemote?: boolean; restarting?: boolean }): ServerInfo {
     const allowRemote = override?.allowRemote ?? this.instance?.allowRemote ?? this.input.allowRemote;
     const port = this.instance?.port ?? this.input.port;
@@ -54,6 +57,7 @@ export class ServerManager {
     };
   }
 
+  /** 切换远程访问开关，并用异步重启避免阻塞前端设置响应。 */
   setRemoteAccess(allowRemote: boolean): ServerInfo {
     if (allowRemote === (this.instance?.allowRemote ?? this.input.allowRemote) && !this.restarting) {
       return this.info();
@@ -75,6 +79,7 @@ export class ServerManager {
     return target;
   }
 
+  /** 关闭当前 HTTP 和 WebSocket 服务，通常用于进程退出。 */
   async shutdown(): Promise<void> {
     await this.stopInstance(this.instance, 'Server shutting down');
     this.instance = null;

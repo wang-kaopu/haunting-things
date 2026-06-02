@@ -10,6 +10,7 @@ type CachedModels = {
   updatedAt: number;
 };
 
+/** 读取指定后端的模型列表缓存，作为运行时快照到达前的占位数据。 */
 export function readCachedModels(backend: AgentBackend, conversationId: string): ConversationModels | null {
   const cached = readCache()[backend];
   if (!cached) return null;
@@ -21,6 +22,7 @@ export function readCachedModels(backend: AgentBackend, conversationId: string):
   };
 }
 
+/** 写入模型列表缓存，避免切换会话时模型选择器短暂退回空状态。 */
 export function writeCachedModels(backend: AgentBackend, snapshot: ConversationModels): void {
   if (snapshot.models.length === 0 && !snapshot.currentModelId) return;
 

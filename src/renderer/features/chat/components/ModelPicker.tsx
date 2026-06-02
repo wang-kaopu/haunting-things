@@ -8,6 +8,7 @@ export type ModelPickerProps = {
   onSetModel: (model: string) => Promise<void>;
 };
 
+/** 展示当前 Agent 的模型选择器，并把运行时模型切换提交给后端。 */
 export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -23,6 +24,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
     setError('');
   }, [agent?.conversationId, current]);
 
+  /** 提交模型切换请求，并在成功后关闭弹层减少重复操作。 */
   async function submit(model: string): Promise<void> {
     const nextModel = model.trim();
     if (!nextModel || submitting) return;

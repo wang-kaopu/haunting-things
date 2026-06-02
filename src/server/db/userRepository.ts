@@ -1,9 +1,11 @@
 import type { User } from '../../shared/types';
 import type { Db } from './connection';
 
+/** 管理本地管理员账号凭据和会话密钥的数据库访问。 */
 export class UserRepository {
   constructor(private readonly db: Db) {}
 
+  /** 按用户名读取认证所需的私有字段，服务层负责密码校验。 */
   getUserByUsername(username: string): (User & { passwordHash: string; jwtSecret: string }) | null {
     const row = this.db
       .prepare('SELECT id, username, password_hash, jwt_secret FROM users WHERE username = ?')

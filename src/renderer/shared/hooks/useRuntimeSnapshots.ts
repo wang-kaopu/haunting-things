@@ -15,10 +15,12 @@ import {
   normalizeConversationUsage,
 } from '../utils/backendData';
 
+/** 当前活跃 Agent 的运行时快照输入。 */
 export type UseRuntimeSnapshotsInput = {
   activeAgent: TeamAgent | null;
 };
 
+/** 按 conversation 归档的运行时快照状态。 */
 export type UseRuntimeSnapshotsResult = {
   usage?: ConversationUsage | null;
   commands?: ConversationCommands | null;
@@ -32,6 +34,11 @@ export type UseRuntimeSnapshotsResult = {
   clearSnapshots: (conversationId: string) => void;
 };
 
+/**
+ * 订阅 ACP runtime 上报的 usage、命令、模型和模式快照。
+ *
+ * 模型列表会写入本地缓存，避免切换 Agent 时工具栏短暂变空。
+ */
 export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): UseRuntimeSnapshotsResult {
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
@@ -135,6 +142,9 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
   };
 }
 
+/**
+ * 从 conversation 快照映射中移除指定项。
+ */
 function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
   const next = { ...record };
   delete next[key];

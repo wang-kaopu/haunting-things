@@ -2,9 +2,11 @@ import type { TeamTask } from '../../shared/types';
 import type { Db } from './connection';
 import { rowToTask } from './mappers';
 
+/** 负责团队任务的持久化，供 Agent 间协作和任务状态展示使用。 */
 export class TaskRepository {
   constructor(private readonly db: Db) {}
 
+  /** 创建团队任务，并保留创建者、指派者和完成者等协作元数据。 */
   createTask(task: TeamTask): TeamTask {
     this.db
       .prepare(
@@ -47,11 +49,13 @@ export class TaskRepository {
       );
   }
 
+  /** 按任务标识读取单条任务，用于更新前校验和状态回显。 */
   getTask(id: string): TeamTask | null {
     const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
     return row ? rowToTask(row) : null;
   }
 
+  /** 列出团队内任务，按最近更新优先显示。 */
   listTasks(teamId: string): TeamTask[] {
     const rows = this.db.prepare('SELECT * FROM tasks WHERE team_id = ? ORDER BY updated_at DESC').all(teamId) as any[];
     return rows.map(rowToTask);

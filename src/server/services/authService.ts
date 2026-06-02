@@ -21,11 +21,13 @@ type TokenPayload = {
   username: string;
 };
 
+/** 管理本地单管理员认证、会话 token 和 Express 鉴权中间件。 */
 export class AuthService {
   readonly state: AuthState = { initialPassword: null };
 
   constructor(private readonly repo: UserRepositoryPort) { }
 
+  /** 确保首次启动时存在默认管理员，便于无配置状态下进入系统。 */
   async ensureAdmin(): Promise<void> {
     if (this.repo.getAnyUser()) return;
 
@@ -60,6 +62,7 @@ export class AuthService {
     return { user: { id: user.id, username: user.username }, token };
   }
 
+  /** 校验当前密码并轮换 JWT secret，让旧会话在改密后立即失效。 */
   async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
     const user = this.repo.getAnyUser();
     if (!user) return false;
@@ -92,11 +95,13 @@ export class AuthService {
     }
   }
 
+  /** 从浏览器 cookie 头中提取本地会话 token。 */
   extractTokenFromCookieHeader(cookieHeader: string | undefined): string | null {
     if (!cookieHeader) return null;
     return parseCookie(cookieHeader)[COOKIE_NAME] ?? null;
   }
 
+  /** Express 鉴权中间件，成功后把用户写入请求对象和请求上下文。 */
   authenticateRequest = (req: Request, res: Response, next: NextFunction): void => {
     const token = this.extractTokenFromCookieHeader(req.headers.cookie);
     const user = this.verifyToken(token);

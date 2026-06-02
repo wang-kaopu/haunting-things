@@ -2,12 +2,18 @@ import type React from 'react';
 import { useRef, useState } from 'react';
 import type { AttachmentRef } from '../../../../shared/types';
 
+/** 图片选择器的上传行为配置。 */
 export type ImageAttachmentPickerProps = {
   disabled?: boolean;
   uploading?: boolean;
   onAddImages: (files: File[]) => Promise<void>;
 };
 
+/**
+ * 图片选择入口。
+ *
+ * 负责文件选择和拖拽收集；上传、命名和错误状态交给上层 composer 统一处理。
+ */
 export function ImageAttachmentPicker({
   disabled,
   uploading,
@@ -16,6 +22,9 @@ export function ImageAttachmentPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  /**
+   * 从文件选择器或拖拽事件中过滤出图片文件。
+   */
   async function addFiles(files: FileList | File[]): Promise<void> {
     const images = Array.from(files).filter((file) => file.type.startsWith('image/'));
     if (images.length === 0) return;
@@ -64,6 +73,11 @@ export function ImageAttachmentPicker({
   );
 }
 
+/**
+ * 展示待发送图片的横向缩略图预览。
+ *
+ * 预览位于输入框上方，和 ChatGPT 网页版的附件布局保持一致。
+ */
 export function ImageAttachmentPreview({
   attachments,
   onRemove,

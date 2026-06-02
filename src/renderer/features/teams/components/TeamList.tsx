@@ -9,6 +9,7 @@ export type TeamListProps = {
   onDeleteTeam: (teamId: string) => Promise<void>;
 };
 
+/** 渲染团队列表，并把空状态保持在侧边栏本地而不是上层页面。 */
 export function TeamList({ teams, activeTeamId, onSelectTeam, onDeleteTeam }: TeamListProps): React.ReactElement {
   if (teams.length === 0) {
     return <p className="muted">暂无团队。</p>;

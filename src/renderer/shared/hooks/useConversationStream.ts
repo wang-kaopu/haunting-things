@@ -22,6 +22,7 @@ export type UseConversationStreamResult = {
   phaseByConversation: Record<string, AgentTurnPhase>;
 };
 
+/** 订阅当前 Agent 会话的消息流和事件流，并封装团队发送入口。 */
 export function useConversationStream({
   activeTeam,
   activeAgent,

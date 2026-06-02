@@ -4,11 +4,17 @@ import { formatMessageRole, getMessageFallbackText } from '../../../shared/utils
 import { isWrappedTeamPrompt } from '../../../shared/utils/guards';
 import { MarkdownMessage } from './MarkdownMessage';
 
+/** 单条聊天消息的展示输入。 */
 export type MessageBubbleProps = {
   message: ChatMessage;
   activePhase?: AgentTurnPhase;
 };
 
+/**
+ * 渲染聊天消息正文和图片附件。
+ *
+ * Team wrapper prompt 属于运行时上下文，默认折叠，避免干扰用户阅读真实对话。
+ */
 export function MessageBubble({ message, activePhase }: MessageBubbleProps): React.ReactElement {
   const wrappedPrompt = message.role === 'user' && isWrappedTeamPrompt(message.content);
   const content = getMessageFallbackText(message, activePhase);

@@ -13,6 +13,7 @@ import { ChatHeader } from './components/ChatHeader';
 import { MessageList } from './components/MessageList';
 import { SendBox, type SendBoxPayload } from './components/SendBox';
 
+/** 聊天主面板的运行时数据和操作回调。 */
 export type ChatLayoutProps = {
   team: Team | null;
   activeAgent: TeamAgent | null;
@@ -27,6 +28,11 @@ export type ChatLayoutProps = {
   onSetModel: (model: string) => Promise<void>;
 };
 
+/**
+ * 当前 Agent 的聊天主面板。
+ *
+ * Header、消息列表和发送框共享同一个运行时快照，保证模型、命令和消息显示一致。
+ */
 export function ChatLayout({
   team,
   activeAgent,

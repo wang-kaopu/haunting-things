@@ -31,6 +31,11 @@ const attachmentKinds = new Set<AttachmentKind>(['image']);
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
 
+/**
+ * 安全读取 HTTP JSON 响应。
+ *
+ * 登录态失效或 503 这类非 JSON 响应会返回 null，避免调用方在解析阶段崩溃。
+ */
 export async function readJsonResponse(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text.trim()) return null;
@@ -41,6 +46,9 @@ export async function readJsonResponse(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * 归一化当前登录用户信息。
+ */
 export function normalizeAuthUser(value: unknown): User | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -50,6 +58,9 @@ export function normalizeAuthUser(value: unknown): User | null {
   return { id, username };
 }
 
+/**
+ * 归一化认证接口响应。
+ */
 export function normalizeAuthResponse(value: unknown): { user: User | null; error: string } {
   const input = asRecord(value);
   return {
@@ -58,11 +69,19 @@ export function normalizeAuthResponse(value: unknown): { user: User | null; erro
   };
 }
 
+/**
+ * 归一化 Team 列表，过滤不可用的旧数据项。
+ */
 export function normalizeTeamList(value: unknown): Team[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => normalizeTeam(item)).filter((team): team is Team => team !== null);
 }
 
+/**
+ * 归一化 Team 元数据。
+ *
+ * 旧数据可能缺少 leaderSlotId，会优先回退到 leader 成员，保证 UI 仍能选中可用成员。
+ */
 export function normalizeTeam(value: unknown): Team | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -80,6 +99,9 @@ export function normalizeTeam(value: unknown): Team | null {
   };
 }
 
+/**
+ * 归一化 Team 成员。
+ */
 export function normalizeTeamAgent(value: unknown): TeamAgent | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -97,10 +119,18 @@ export function normalizeTeamAgent(value: unknown): TeamAgent | null {
   };
 }
 
+/**
+ * 归一化聊天消息列表。
+ */
 export function normalizeMessageList(value: unknown): ChatMessage[] {
   return normalizeArray(value, normalizeChatMessage);
 }
 
+/**
+ * 归一化单条聊天消息。
+ *
+ * 附件字段来自新关系表聚合结果，缺失时返回空数组以便渲染层统一处理。
+ */
 export function normalizeChatMessage(value: unknown): ChatMessage | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -118,6 +148,9 @@ export function normalizeChatMessage(value: unknown): ChatMessage | null {
   };
 }
 
+/**
+ * 归一化前端可访问的附件引用。
+ */
 export function normalizeAttachmentRef(value: unknown): AttachmentRef | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -135,10 +168,18 @@ export function normalizeAttachmentRef(value: unknown): AttachmentRef | null {
   };
 }
 
+/**
+ * 归一化 Agent 事件列表。
+ */
 export function normalizeAgentEventList(value: unknown): AgentEvent[] {
   return normalizeArray(value, normalizeAgentEvent);
 }
 
+/**
+ * 归一化 ACP bridge 上报的 Agent 事件。
+ *
+ * 不识别的事件类型会被丢弃，避免未知 payload 进入通知和时间线。
+ */
 export function normalizeAgentEvent(value: unknown): AgentEvent | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -224,6 +265,9 @@ export function normalizeAgentEvent(value: unknown): AgentEvent | null {
   }
 }
 
+/**
+ * 归一化 conversation.stream 事件。
+ */
 export function normalizeConversationStream(value: unknown): { conversationId: string; message: ChatMessage } | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -233,6 +277,9 @@ export function normalizeConversationStream(value: unknown): { conversationId: s
   return { conversationId, message };
 }
 
+/**
+ * 归一化上下文窗口使用量快照。
+ */
 export function normalizeConversationUsage(value: unknown): ConversationUsage | null {
   const input = asRecord(value);
   const conversationId = asString(input?.conversationId);
@@ -246,6 +293,9 @@ export function normalizeConversationUsage(value: unknown): ConversationUsage | 
   };
 }
 
+/**
+ * 归一化 Agent 可用命令快照。
+ */
 export function normalizeConversationCommands(value: unknown): ConversationCommands | null {
   const input = asRecord(value);
   const conversationId = asString(input?.conversationId);
@@ -257,6 +307,9 @@ export function normalizeConversationCommands(value: unknown): ConversationComma
   };
 }
 
+/**
+ * 归一化模型列表快照。
+ */
 export function normalizeConversationModels(value: unknown): ConversationModels | null {
   const input = asRecord(value);
   const conversationId = asString(input?.conversationId);
@@ -273,6 +326,9 @@ export function normalizeConversationModels(value: unknown): ConversationModels 
   };
 }
 
+/**
+ * 归一化运行模式快照。
+ */
 export function normalizeConversationMode(value: unknown): ConversationMode | null {
   const input = asRecord(value);
   const conversationId = asString(input?.conversationId);
@@ -284,6 +340,9 @@ export function normalizeConversationMode(value: unknown): ConversationMode | nu
   };
 }
 
+/**
+ * 归一化权限请求事件。
+ */
 export function normalizePermissionRequest(value: unknown): PermissionRequest | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -301,6 +360,9 @@ export function normalizePermissionRequest(value: unknown): PermissionRequest | 
   };
 }
 
+/**
+ * 归一化 Team 成员状态变更事件。
+ */
 export function normalizeTeamAgentStatusEvent(
   value: unknown
 ): { teamId: string; slotId: string; status: TeamAgentStatus; error?: string } | null {
@@ -317,6 +379,9 @@ export function normalizeTeamAgentStatusEvent(
   };
 }
 
+/**
+ * 归一化 Team mailbox 时间线条目。
+ */
 export function normalizeTeamMailboxEntry(value: unknown): TeamMailboxEntry | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -330,6 +395,9 @@ export function normalizeTeamMailboxEntry(value: unknown): TeamMailboxEntry | nu
   };
 }
 
+/**
+ * 归一化 Team mailbox 实时事件。
+ */
 export function normalizeTeamMessageEvent(value: unknown): { teamId: string; entry: TeamMailboxEntry } | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -339,6 +407,9 @@ export function normalizeTeamMessageEvent(value: unknown): { teamId: string; ent
   return { teamId, entry };
 }
 
+/**
+ * 归一化服务监听信息。
+ */
 export function normalizeServerInfo(value: unknown): ServerInfo | null {
   const input = asRecord(value);
   if (!input) return null;

@@ -6,6 +6,7 @@ export type AgentCommandsMenuProps = {
   commands?: ConversationCommands | null;
 };
 
+/** 展示 Agent 上报的可用命令快照，辅助确认当前运行时支持的操作。 */
 export function AgentCommandsMenu({ commands }: AgentCommandsMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const commandList = Array.isArray(commands?.commands) ? commands.commands : [];

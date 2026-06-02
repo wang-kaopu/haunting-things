@@ -7,6 +7,11 @@ import type { ConversationService } from '../../services/conversationService';
 import type { TeamService } from '../../services/teamService';
 import type { WebBridge } from './webBridge';
 
+/**
+ * 注册 renderer 可调用的 bridge RPC。
+ *
+ * 这里只做协议层参数分发；图片上传、消息发送和 Team 操作的业务约束保留在对应 Service 中。
+ */
 export function registerBridgeHandlers(input: {
   bridge: WebBridge;
   attachments: AttachmentRepositoryPort;

@@ -2,9 +2,11 @@ import type { MailboxMessage } from '../../shared/types';
 import type { Db } from './connection';
 import { rowToMailbox } from './mappers';
 
+/** 负责团队内部 Agent 邮箱消息的写入、读取和已读状态推进。 */
 export class MailboxRepository {
   constructor(private readonly db: Db) {}
 
+  /** 写入一条 Agent 间消息，供目标成员稍后读取。 */
   writeMailbox(message: MailboxMessage): MailboxMessage {
     this.db
       .prepare(
@@ -23,6 +25,7 @@ export class MailboxRepository {
     return message;
   }
 
+  /** 原子读取未读消息并标记已读，避免同一轮协作重复消费。 */
   readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[] {
     const tx = this.db.transaction(() => {
       const rows = this.db
@@ -34,6 +37,7 @@ export class MailboxRepository {
     return tx();
   }
 
+  /** 查看目标成员未读消息，不改变已读状态，供前端徽标和预览使用。 */
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM mailbox WHERE team_id = ? AND to_agent_id = ? AND read = 0 ORDER BY created_at ASC')
@@ -41,6 +45,7 @@ export class MailboxRepository {
     return rows.map(rowToMailbox);
   }
 
+  /** 列出团队全部邮箱消息，供团队视图合并展示最近协作内容。 */
   listMailbox(teamId: string): MailboxMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM mailbox WHERE team_id = ? ORDER BY created_at ASC')

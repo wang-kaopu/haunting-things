@@ -9,6 +9,7 @@ export type TeamListItemProps = {
   onDelete: () => Promise<void>;
 };
 
+/** 渲染侧边栏团队条目，并把删除操作收进二级菜单避免误触。 */
 export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);

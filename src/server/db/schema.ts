@@ -1,5 +1,10 @@
 import type { Db } from './connection';
 
+/**
+ * 初始化并迁移应用数据库 schema。
+ *
+ * 迁移逻辑要兼容旧版本缺失字段，避免用户已有本地数据启动失败。
+ */
 export function initializeSchema(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (

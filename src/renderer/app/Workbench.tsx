@@ -24,6 +24,11 @@ export type WorkbenchProps = {
   onLogout: () => void;
 };
 
+/**
+ * 已登录后的主工作台。
+ *
+ * 这里负责组合 Team 列表、当前 conversation、运行时快照、权限弹窗和通知中心。
+ */
 export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElement {
   const teamsState = useTeams();
   const active = useActiveTeam({ teams: teamsState.teams });

@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AgentTurnPhase, ConversationCommands, ConversationMode, Team } from '../../../shared/types';
 import { TeamMemberList } from './components/TeamMemberList';
 
+/** 右侧 Team 成员抽屉输入。 */
 export type TeamDrawerProps = {
   open: boolean;
   team: Team | null;
@@ -13,6 +14,11 @@ export type TeamDrawerProps = {
   onSelectAgent: (slotId: string) => void;
 };
 
+/**
+ * 右侧 Team 成员抽屉。
+ *
+ * 用于快速切换当前 Agent，并展示成员运行阶段、命令和模式快照。
+ */
 export function TeamDrawer({
   open,
   team,

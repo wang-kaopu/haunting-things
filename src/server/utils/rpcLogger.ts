@@ -13,6 +13,7 @@ type FetchFn = typeof fetch;
 
 let originalFetch: FetchFn | null = null;
 
+/** 安装全局 fetch 包装器，让 ACP/RPC 出站请求统一写入脱敏日志。 */
 export function installRpcLogger(): void {
   if (originalFetch) return;
   originalFetch = globalThis.fetch.bind(globalThis) as FetchFn;
@@ -20,6 +21,7 @@ export function installRpcLogger(): void {
     executeLoggedFetch(originalFetch as FetchFn, input, init ?? {})) as FetchFn;
 }
 
+/** 直接发起一次带日志的 fetch，用于不希望替换全局 fetch 的调用点。 */
 export async function loggedFetch(input: FetchInput, init: FetchInit = {}): Promise<Response> {
   return executeLoggedFetch(originalFetch ?? (globalThis.fetch.bind(globalThis) as FetchFn), input, init);
 }

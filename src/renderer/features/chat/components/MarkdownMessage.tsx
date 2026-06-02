@@ -44,6 +44,7 @@ const components: Components = {
   },
 };
 
+/** 渲染 Agent 消息 Markdown，并使用白名单清洗避免不可信 HTML 进入页面。 */
 export function MarkdownMessage({
   content,
   className,

@@ -10,6 +10,11 @@ type AuthUser = {
 
 export type AppProps = {};
 
+/**
+ * 应用入口组件。
+ *
+ * 启动时先确认登录态，未登录展示登录页，已登录进入主工作台。
+ */
 export function App(_props: AppProps): React.ReactElement {
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
 
@@ -33,11 +38,17 @@ export function App(_props: AppProps): React.ReactElement {
   return <Workbench user={user} onLogout={() => setUser(null)} />;
 }
 
+/**
+ * 本地管理员登录表单。
+ */
 function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactElement {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  /**
+   * 提交账号密码并刷新应用登录态。
+   */
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setError('');

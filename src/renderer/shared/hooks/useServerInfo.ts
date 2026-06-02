@@ -3,6 +3,7 @@ import type { ServerInfo } from '../../../shared/types';
 import { bridge } from '../bridgeClient';
 import { normalizeServerInfo } from '../utils/backendData';
 
+/** 服务监听地址和远程访问配置状态。 */
 export type UseServerInfoResult = {
   serverInfo: ServerInfo | null;
   loading: boolean;
@@ -10,6 +11,11 @@ export type UseServerInfoResult = {
   setRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
+/**
+ * 读取和更新服务端监听信息。
+ *
+ * 远程访问切换后会等待服务重启窗口，再重新拉取真实监听地址。
+ */
 export function useServerInfo(): UseServerInfoResult {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +69,9 @@ export function useServerInfo(): UseServerInfoResult {
   };
 }
 
+/**
+ * 等待服务端完成监听地址重启。
+ */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

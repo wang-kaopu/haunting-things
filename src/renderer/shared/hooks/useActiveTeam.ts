@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Team, TeamAgent } from '../../../shared/types';
 
+/** 活跃团队选择 Hook 的输入。 */
 export type UseActiveTeamInput = {
   teams: Team[];
 };
 
+/** 当前团队和成员选择状态。 */
 export type UseActiveTeamResult = {
   activeTeamId: string | null;
   activeSlotId: string | null;
@@ -16,6 +18,11 @@ export type UseActiveTeamResult = {
   selectAgent: (slotId: string) => void;
 };
 
+/**
+ * 管理当前选中的 Team 和 Agent。
+ *
+ * 当列表刷新导致当前选择失效时，会自动回退到可用团队和 leader，避免主界面停留在空状态。
+ */
 export function useActiveTeam({ teams }: UseActiveTeamInput): UseActiveTeamResult {
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);

@@ -6,6 +6,7 @@ export type ToastItemProps = {
   onClose: () => void;
 };
 
+/** 渲染单条全局通知，提供手动关闭入口避免错误提示长期占用界面。 */
 export function ToastItem({ item, onClose }: ToastItemProps): React.ReactElement {
   return (
     <article className={`toast ${item.level}`}>

@@ -31,6 +31,9 @@ export type BridgeHandler<Name extends BridgeInvokeName> = (
   params: InvokeMap[Name]['params']
 ) => Promise<InvokeMap[Name]['result']> | InvokeMap[Name]['result'];
 
+/**
+ * 生成 bridge invoke 的客户端请求 ID。
+ */
 export function createBridgeId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

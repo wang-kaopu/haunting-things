@@ -18,6 +18,7 @@ export type AddAgentFormState = {
   model: string;
 };
 
+/** 添加团队成员弹窗，允许为新 Agent 覆盖默认后端和模型。 */
 export function AddAgentDialog({
   open,
   disabled,

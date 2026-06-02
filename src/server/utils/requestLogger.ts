@@ -3,6 +3,7 @@ import { createLogger } from './logger';
 
 const httpLogger = createLogger('http');
 
+/** 记录每个 HTTP 请求的最终状态和耗时，便于和桥接/RPC 日志对齐排查。 */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const startedAt = Date.now();
   res.on('finish', () => {

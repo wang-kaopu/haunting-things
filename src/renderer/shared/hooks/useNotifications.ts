@@ -5,8 +5,10 @@ import type { AppNotification, PushNotificationInput, RuntimeNotificationContext
 import { normalizeAgentEvent, normalizeTeamMessageEvent } from '../utils/backendData';
 import { formatAgentEvent, shouldShowAgentEventInToast } from '../utils/format';
 
+/** 通知 Hook 需要的运行时上下文。 */
 export type UseNotificationsInput = RuntimeNotificationContext;
 
+/** 前端通知列表和操作方法。 */
 export type UseNotificationsResult = {
   items: AppNotification[];
   push: (input: PushNotificationInput) => void;
@@ -16,6 +18,11 @@ export type UseNotificationsResult = {
 
 const TOAST_TTL_MS = 10_000;
 
+/**
+ * 管理右上角 toast 通知。
+ *
+ * 只把需要用户关注的 Agent 终态事件和未处理 Team 消息推到通知流，避免流式事件刷屏。
+ */
 export function useNotifications({
   activeAgentsByConversation = {},
 }: UseNotificationsInput = {}): UseNotificationsResult {

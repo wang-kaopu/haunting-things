@@ -7,6 +7,9 @@ import type {
   TeamAgent,
 } from '../../../shared/types';
 
+/**
+ * 将 Agent 状态转换为界面文案。
+ */
 export function formatAgentStatus(status: TeamAgent['status']): string {
   const map: Record<TeamAgent['status'], string> = {
     idle: '空闲',
@@ -18,6 +21,9 @@ export function formatAgentStatus(status: TeamAgent['status']): string {
   return map[status] ?? status;
 }
 
+/**
+ * 将 Agent 当前阶段转换为界面文案。
+ */
 export function formatPhase(phase?: AgentTurnPhase): string {
   if (!phase) return '';
 
@@ -35,16 +41,25 @@ export function formatPhase(phase?: AgentTurnPhase): string {
   return map[phase] ?? phase;
 }
 
+/**
+ * 格式化上下文窗口使用百分比。
+ */
 export function formatUsagePercent(usage?: ConversationUsage | null): string {
   if (!usage || usage.size <= 0) return '';
   return `${Math.round((usage.used / usage.size) * 100)}%`;
 }
 
+/**
+ * 格式化上下文窗口使用量摘要。
+ */
 export function formatUsageShort(usage?: ConversationUsage | null): string {
   if (!usage) return 'Usage';
   return `${usage.used.toLocaleString()} / ${usage.size.toLocaleString()}`;
 }
 
+/**
+ * 将标准化 Agent 事件转换为通知和时间线使用的短文案。
+ */
 export function formatAgentEvent(event: AgentEvent): string {
   switch (event.type) {
     case 'agent.turn.started':
@@ -74,6 +89,11 @@ export function formatAgentEvent(event: AgentEvent): string {
   }
 }
 
+/**
+ * 为空的流式消息生成占位文案。
+ *
+ * 这样 assistant 还未吐出文本时，用户仍能看到当前运行阶段。
+ */
 export function getMessageFallbackText(message: ChatMessage, activePhase?: AgentTurnPhase): string {
   if (message.content) return message.content;
   if (message.status !== 'streaming') return message.status === 'error' ? '消息发送失败。' : '';
@@ -85,6 +105,9 @@ export function getMessageFallbackText(message: ChatMessage, activePhase?: Agent
   return '正在回复...';
 }
 
+/**
+ * 格式化消息角色。
+ */
 export function formatMessageRole(role: ChatRole): string {
   const labels: Record<ChatRole, string> = {
     user: '用户',
@@ -95,6 +118,9 @@ export function formatMessageRole(role: ChatRole): string {
   return labels[role];
 }
 
+/**
+ * 从 Agent 事件推导当前 conversation 阶段。
+ */
 export function phaseFromAgentEvent(event: AgentEvent): AgentTurnPhase {
   switch (event.type) {
     case 'agent.turn.started':
@@ -119,6 +145,9 @@ export function phaseFromAgentEvent(event: AgentEvent): AgentTurnPhase {
   }
 }
 
+/**
+ * 判断 Agent 事件是否需要弹出 toast。
+ */
 export function shouldShowAgentEventInToast(event: AgentEvent): boolean {
   return event.type === 'agent.error' || event.type === 'agent.done' || event.type === 'agent.permission.request';
 }

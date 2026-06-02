@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** Team 侧栏展开状态和控制方法。 */
 export type UseTeamDrawerResult = {
   open: boolean;
   toggle: () => void;
@@ -7,6 +8,9 @@ export type UseTeamDrawerResult = {
   closeDrawer: () => void;
 };
 
+/**
+ * 管理 Team 侧栏展开/折叠状态。
+ */
 export function useTeamDrawer(): UseTeamDrawerResult {
   const [open, setOpen] = React.useState(true);
 

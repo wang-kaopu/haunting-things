@@ -2,6 +2,7 @@ import type React from 'react';
 import type { Team } from '../../../shared/types';
 import { TeamList } from './components/TeamList';
 
+/** 左侧 Team 导航栏输入。 */
 export type SidebarProps = {
   username?: string;
   teams: Team[];
@@ -13,6 +14,11 @@ export type SidebarProps = {
   onLogout: () => void;
 };
 
+/**
+ * 应用左侧导航栏。
+ *
+ * 展示当前用户、Team 列表和全局入口，Team 的具体成员状态交给右侧抽屉展示。
+ */
 export function Sidebar({
   username,
   teams,

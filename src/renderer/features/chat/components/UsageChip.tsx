@@ -6,6 +6,7 @@ export type UsageChipProps = {
   usage?: ConversationUsage | null;
 };
 
+/** 以紧凑徽标展示上下文用量，避免占用聊天头部过多空间。 */
 export function UsageChip({ usage }: UsageChipProps): React.ReactElement | null {
   if (!usage) return null;
 

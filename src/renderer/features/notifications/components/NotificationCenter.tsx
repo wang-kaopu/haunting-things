@@ -2,11 +2,15 @@ import type React from 'react';
 import type { AppNotification } from '../../../shared/types/ui';
 import { ToastItem } from './ToastItem';
 
+/** Toast 通知中心输入。 */
 export type NotificationCenterProps = {
   items: AppNotification[];
   onRemove: (id: string) => void;
 };
 
+/**
+ * 渲染全局 toast 通知队列。
+ */
 export function NotificationCenter({ items, onRemove }: NotificationCenterProps): React.ReactElement | null {
   if (items.length === 0) return null;
 

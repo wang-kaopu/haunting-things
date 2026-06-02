@@ -15,6 +15,7 @@ export type CreateTeamFormState = {
   leaderModel: string;
 };
 
+/** 创建团队弹窗，同时收集 leader Agent 的后端和初始模型。 */
 export function CreateTeamDialog({ open, onClose, onSubmit }: CreateTeamDialogProps): React.ReactElement | null {
   const [form, setForm] = useState<CreateTeamFormState>({
     name: '',

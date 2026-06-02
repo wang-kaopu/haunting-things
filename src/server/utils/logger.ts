@@ -70,15 +70,18 @@ export class Logger {
   }
 }
 
+/** 为指定业务域创建 logger，scope 会出现在每一行日志中。 */
 export function createLogger(scope: string): Logger {
   return new Logger(scope);
 }
 
+/** 根据环境变量选择日志输出格式，本地默认保持易读的 pretty 格式。 */
 export function getLogFormat(): LogFormat {
   if (process.env.LOG_FORMAT === 'json') return 'json';
   return 'pretty';
 }
 
+/** 把结构化日志载荷转换成本地开发时易扫读的一行文本。 */
 export function formatPrettyLog(payload: SanitizedPayload): string {
   const time = formatTimestamp(payload.time);
   const level = payload.level.toUpperCase();
@@ -92,6 +95,7 @@ export function formatPrettyLog(payload: SanitizedPayload): string {
   return `${time} - ${payload.scope} - ${level} - ${context} - ${message}`;
 }
 
+/** 对日志字段做密钥脱敏，避免令牌、密码和图片数据泄露到终端。 */
 export function sanitizeLogFields(fields: LogFields, reveal: string[] = []): LogFields {
   try {
     const revealKeys = new Set(reveal.map(normalizeKey));
@@ -102,6 +106,7 @@ export function sanitizeLogFields(fields: LogFields, reveal: string[] = []): Log
   }
 }
 
+/** 将任意日志值压缩成单行安全文本，避免超长对象破坏日志可读性。 */
 export function formatValue(value: unknown): string {
   if (value == null) return String(value);
   if (typeof value === 'string') {

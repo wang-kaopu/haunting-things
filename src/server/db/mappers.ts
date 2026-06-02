@@ -9,6 +9,9 @@ import type {
   TeamTask,
 } from '../../shared/types';
 
+/**
+ * 将 conversation 表行映射为共享领域类型。
+ */
 export function rowToConversation(row: any): Conversation {
   return {
     id: row.id,
@@ -22,7 +25,9 @@ export function rowToConversation(row: any): Conversation {
   };
 }
 
-/** 将 `messages` 表行映射为共享领域类型。 */
+/**
+ * 将 messages 表行映射为共享领域类型。
+ */
 export function rowToMessage(row: any): ChatMessage {
   return {
     id: row.id,
@@ -34,10 +39,16 @@ export function rowToMessage(row: any): ChatMessage {
   };
 }
 
+/**
+ * 还原持久化的 AgentEvent payload。
+ */
 export function rowToAgentEvent(row: any): AgentEvent {
   return JSON.parse(row.payload) as AgentEvent;
 }
 
+/**
+ * 将附件表行映射为服务端完整附件记录。
+ */
 export function rowToStoredAttachment(row: any): StoredAttachment {
   return {
     id: row.id,
@@ -52,6 +63,9 @@ export function rowToStoredAttachment(row: any): StoredAttachment {
   };
 }
 
+/**
+ * 将服务端附件记录裁剪为前端可见引用。
+ */
 export function toAttachmentRef(attachment: StoredAttachment): AttachmentRef {
   return {
     id: attachment.id,
@@ -64,6 +78,9 @@ export function toAttachmentRef(attachment: StoredAttachment): AttachmentRef {
   };
 }
 
+/**
+ * 将 team 表行映射为共享领域类型。
+ */
 export function rowToTeam(row: any): Team {
   return {
     id: row.id,
@@ -76,6 +93,9 @@ export function rowToTeam(row: any): Team {
   };
 }
 
+/**
+ * 将 mailbox 表行映射为共享领域类型。
+ */
 export function rowToMailbox(row: any): MailboxMessage {
   return {
     id: row.id,
@@ -89,6 +109,9 @@ export function rowToMailbox(row: any): MailboxMessage {
   };
 }
 
+/**
+ * 将 task 表行映射为共享领域类型。
+ */
 export function rowToTask(row: any): TeamTask {
   return {
     id: row.id,
@@ -106,6 +129,11 @@ export function rowToTask(row: any): TeamTask {
   };
 }
 
+/**
+ * 解析 Team 成员列表。
+ *
+ * 旧数据可能写入空字符串或非法 JSON，解析失败时返回空数组以保证列表接口可用。
+ */
 function parseTeamAgents(value: unknown): Team['agents'] {
   if (typeof value !== 'string') return [];
   try {

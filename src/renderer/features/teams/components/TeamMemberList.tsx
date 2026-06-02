@@ -11,6 +11,7 @@ export type TeamMemberListProps = {
   onSelectAgent: (slotId: string) => void;
 };
 
+/** 渲染团队成员列表，并按 conversationId 注入运行时阶段、命令和模式快照。 */
 export function TeamMemberList({
   agents,
   activeSlotId,

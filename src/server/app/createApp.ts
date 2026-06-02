@@ -9,6 +9,9 @@ import { requestLogger } from '../utils/requestLogger';
 import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
 import { createAuthRoutes } from './routes/authRoutes';
 
+/**
+ * 创建 Express 应用并挂载认证、附件读取和前端静态资源路由。
+ */
 export function createApp(input: {
   auth: AuthService;
   logger: Logger;
@@ -22,6 +25,7 @@ export function createApp(input: {
   app.use(cookieParser());
   app.use(createAuthRoutes(input.auth, input.logger));
   if (input.attachments) {
+    // 路由中的 name 只用于浏览器 URL，可访问的真实路径只来自数据库中的附件记录。
     app.get('/api/attachments/:id/:name', input.auth.authenticateRequest, (req, res) => {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const attachment = input.attachments?.getAttachment(id);
@@ -38,6 +42,7 @@ export function createApp(input: {
         return;
       }
       res.type(attachment.mimeType);
+      // 历史剪贴板缓存可能以 `.jpg` 这类点文件名存在，读取附件时需要显式允许。
       res.sendFile(attachment.path, { dotfiles: 'allow' }, (error) => {
         if (!error) return;
         input.logger.warn('attachment_send_failed', {

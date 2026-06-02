@@ -11,6 +11,7 @@ export type TeamMemberCardProps = {
   onSelect: () => void;
 };
 
+/** 渲染单个 Agent 卡片，合并展示状态、模型、命令数量和当前运行阶段。 */
 export function TeamMemberCard({
   agent,
   active,

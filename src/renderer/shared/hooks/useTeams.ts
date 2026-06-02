@@ -4,6 +4,7 @@ import { bridge } from '../bridgeClient';
 import type { AddAgentInput, CreateTeamInput } from '../types/ui';
 import { normalizeTeam, normalizeTeamAgent, normalizeTeamAgentStatusEvent, normalizeTeamList } from '../utils/backendData';
 
+/** Team 列表和成员变更操作状态。 */
 export type UseTeamsResult = {
   teams: Team[];
   loading: boolean;
@@ -15,6 +16,11 @@ export type UseTeamsResult = {
   updateTeam: (team: Team) => void;
 };
 
+/**
+ * 同步 Team 列表并处理成员状态事件。
+ *
+ * 创建、删除和添加成员后都会刷新列表；运行中状态则通过 bridge 事件局部更新。
+ */
 export function useTeams(): UseTeamsResult {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);

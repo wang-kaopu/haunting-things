@@ -11,6 +11,7 @@ export type ChatHeaderProps = {
   onAddAgentClick: () => void;
 };
 
+/** 渲染当前团队和 Agent 的顶部状态栏，集中展示模型、用量和运行阶段。 */
 export function ChatHeader({
   team,
   activeAgent,

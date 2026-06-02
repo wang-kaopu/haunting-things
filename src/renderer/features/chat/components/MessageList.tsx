@@ -8,6 +8,7 @@ export type MessageListProps = {
   activePhase?: AgentTurnPhase;
 };
 
+/** 渲染聊天消息流，并在用户离开底部时保留阅读位置和新消息提示。 */
 export function MessageList({ messages, activePhase }: MessageListProps): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastLengthRef = useRef(messages.length);
@@ -70,10 +71,12 @@ export function MessageList({ messages, activePhase }: MessageListProps): React.
   );
 }
 
+/** 判断滚动区域是否接近底部，避免流式更新打断用户阅读历史消息。 */
 function isNearBottom(element: HTMLDivElement): boolean {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 80;
 }
 
+/** 平滑回到底部，匹配聊天流持续追加内容的阅读习惯。 */
 function jumpToBottom(element: HTMLDivElement): void {
   element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
 }
