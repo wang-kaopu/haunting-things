@@ -22,9 +22,15 @@ class BrowserBridge {
     const id = createBridgeId();
     this.connect();
     const payload = JSON.stringify({ id, type: 'invoke', name, data });
+    console.info('[diag] bridge invoke queued', {
+      id,
+      name,
+      socketState: this.socket?.readyState,
+      at: new Date().toISOString(),
+    });
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-      this.send(payload);
+      this.send(payload, { id, name });
     });
   }
 
@@ -45,18 +51,49 @@ class BrowserBridge {
     }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.socket = new WebSocket(`${protocol}//${window.location.host}`);
+    this.socket.addEventListener('open', () => {
+      console.info('[diag] bridge socket open', {
+        url: this.socket?.url,
+        at: new Date().toISOString(),
+      });
+    });
     this.socket.addEventListener('message', (event) => this.handleMessage(String(event.data)));
-    this.socket.addEventListener('close', () => this.scheduleReconnect());
+    this.socket.addEventListener('close', (event) => {
+      console.info('[diag] bridge socket close', {
+        code: event.code,
+        reason: event.reason,
+        at: new Date().toISOString(),
+      });
+      this.scheduleReconnect();
+    });
   }
 
-  private send(payload: string): void {
+  private send(payload: string, meta: { id: string; name: string }): void {
     const socket = this.socket;
     if (!socket) return;
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(payload);
+      console.info('[diag] bridge invoke sent', {
+        id: meta.id,
+        name: meta.name,
+        socketState: socket.readyState,
+        at: new Date().toISOString(),
+      });
       return;
     }
-    socket.addEventListener('open', () => socket.send(payload), { once: true });
+    socket.addEventListener(
+      'open',
+      () => {
+        socket.send(payload);
+        console.info('[diag] bridge invoke sent', {
+          id: meta.id,
+          name: meta.name,
+          socketState: socket.readyState,
+          at: new Date().toISOString(),
+        });
+      },
+      { once: true }
+    );
   }
 
   private handleMessage(raw: string): void {

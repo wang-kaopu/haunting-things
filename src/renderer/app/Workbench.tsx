@@ -57,6 +57,13 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const notifications = useNotifications({ activeAgentsByConversation });
 
   useEffect(() => {
+    console.info('[diag] workbench mounted', {
+      userId: user.id,
+      at: new Date().toISOString(),
+    });
+  }, [user.id]);
+
+  useEffect(() => {
     const unsubPermission = bridge.on('conversation.permission', (payload) => {
       const request = normalizePermissionRequest(payload);
       if (request) setPermission(request);

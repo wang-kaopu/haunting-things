@@ -10,11 +10,14 @@ export type ModelPickerProps = {
 
 export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): React.ReactElement {
   const [open, setOpen] = useState(false);
-  const [customModel, setCustomModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const options = Array.isArray(models?.models) ? models.models : [];
   const current = agent?.model ?? models?.currentModelId ?? '';
+  const hasOptions = options.length > 0;
+  const currentLabel = current
+    ? options.find((model) => model.id === current)?.name || current
+    : '默认模型';
 
   useEffect(() => {
     setError('');
@@ -27,7 +30,6 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
       setSubmitting(true);
       setError('');
       await onSetModel(nextModel);
-      setCustomModel('');
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -38,44 +40,28 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
 
   return (
     <div className="model-picker">
-      <button type="button" className="tool-pill" disabled={!agent} onClick={() => setOpen((value) => !value)}>
-        模型：{current || '手动输入'} ▼
+      <button type="button" className="tool-pill" disabled={!agent || !hasOptions} onClick={() => setOpen((value) => !value)}>
+        {hasOptions ? `模型：${currentLabel} ▼` : '默认模型'}
       </button>
-      {open ? (
+      {open && hasOptions ? (
         <div className="tool-popover model-popover">
-          {options.length > 0 ? (
-            <label className="field">
-              <span>模型</span>
-              <select
-                value={current}
-                disabled={submitting}
-                onChange={(event) => {
-                  void submit(event.target.value);
-                }}
-              >
-                {!current ? <option value="">默认</option> : null}
-                {current && !options.some((model) => model.id === current) ? <option value={current}>{current}</option> : null}
-                {options.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name || model.id}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <label className="field">
-            <span>手动模型 ID</span>
-            <div className="inline-form horizontal">
-              <input
-                value={customModel}
-                placeholder={current || '输入模型 ID'}
-                disabled={submitting}
-                onChange={(event) => setCustomModel(event.target.value)}
-              />
-              <button type="button" disabled={submitting || !customModel.trim()} onClick={() => void submit(customModel)}>
-                应用
-              </button>
-            </div>
+            <span>模型</span>
+            <select
+              value={current}
+              disabled={submitting}
+              onChange={(event) => {
+                void submit(event.target.value);
+              }}
+            >
+              {!current ? <option value="">默认模型</option> : null}
+              {current && !options.some((model) => model.id === current) ? <option value={current}>{current}</option> : null}
+              {options.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name || model.id}
+                </option>
+              ))}
+            </select>
           </label>
           {error ? <p className="error-text compact">{error}</p> : null}
         </div>

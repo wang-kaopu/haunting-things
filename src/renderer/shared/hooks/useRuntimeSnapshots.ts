@@ -7,6 +7,7 @@ import type {
   TeamAgent,
 } from '../../../shared/types';
 import { bridge } from '../bridgeClient';
+import { readCachedModels, writeCachedModels } from '../modelCache';
 import {
   normalizeConversationCommands,
   normalizeConversationMode,
@@ -52,6 +53,8 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       const snapshot = normalizeConversationModels(payload);
       if (!snapshot) return;
       setModelsByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
+      const backend = activeAgent?.conversationId === snapshot.conversationId ? activeAgent.backend : undefined;
+      if (backend) writeCachedModels(backend, snapshot);
     });
     const unsubMode = bridge.on('conversation.mode', (payload) => {
       const snapshot = normalizeConversationMode(payload);
@@ -65,7 +68,7 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       unsubModels();
       unsubMode();
     };
-  }, []);
+  }, [activeAgent?.backend, activeAgent?.conversationId]);
 
   useEffect(() => {
     const conversationId = activeAgent?.conversationId;
@@ -82,7 +85,13 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       .invoke('conversation.models', { conversationId })
       .then((value) => {
         const snapshot = normalizeConversationModels(value);
-        if (snapshot) setModelsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
+        if (snapshot) {
+          setModelsByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
+          writeCachedModels(activeAgent.backend, snapshot);
+        } else {
+          const cached = readCachedModels(activeAgent.backend, conversationId);
+          if (cached) setModelsByConversation((prev) => ({ ...prev, [conversationId]: cached }));
+        }
       })
       .catch(() => {});
     bridge
@@ -92,7 +101,7 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
         if (snapshot) setModeByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
       })
       .catch(() => {});
-  }, [activeAgent?.conversationId]);
+  }, [activeAgent?.backend, activeAgent?.conversationId]);
 
   const clearSnapshots = useCallback((conversationId: string) => {
     setUsageByConversation((prev) => omitKey(prev, conversationId));

@@ -132,11 +132,13 @@ export function SendBox({
           models={models}
           mode={mode}
           onSetModel={onSetModel}
-        />
-        <ImageAttachmentPicker
-          disabled={disabled || sending}
-          uploading={uploading}
-          onAddImages={uploadImages}
+          imagePicker={
+            <ImageAttachmentPicker
+              disabled={disabled || sending}
+              uploading={uploading}
+              onAddImages={uploadImages}
+            />
+          }
         />
         <button
           type="button"

@@ -58,7 +58,7 @@ export function ImageAttachmentPicker({
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
       >
-        {uploading ? '图片上传中' : '图片'}
+        {uploading ? '图片上传中' : '添加图片'}
       </button>
     </div>
   );

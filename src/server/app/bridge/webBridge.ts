@@ -35,13 +35,30 @@ export class WebBridge {
         return;
       }
 
+      this.logger.info('websocket_connected', {
+        userId: user.id,
+        remoteAddress: request.socket.remoteAddress,
+      });
       onConnection(socket);
       socket.on('message', (raw) => {
         const requestId = createRequestId();
         void runWithRequestContext({ requestId, userId: user.id }, () => this.handleMessage(socket, raw.toString()));
       });
-      socket.on('close', () => onClose(socket));
-      socket.on('error', () => onClose(socket));
+      socket.on('close', (code, reason) => {
+        this.logger.info('websocket_closed', {
+          userId: user.id,
+          code,
+          reason: reason.toString(),
+        });
+        onClose(socket);
+      });
+      socket.on('error', (error) => {
+        this.logger.warn('websocket_error', {
+          userId: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        onClose(socket);
+      });
     });
   }
 

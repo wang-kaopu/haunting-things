@@ -16,6 +16,7 @@ export type ComposerToolsProps = {
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
+  imagePicker?: React.ReactNode;
   onSetModel: (model: string) => Promise<void>;
 };
 
@@ -25,11 +26,13 @@ export function ComposerTools({
   commands,
   models,
   mode,
+  imagePicker,
   onSetModel,
 }: ComposerToolsProps): React.ReactElement {
   return (
     <div className="composer-tools">
       <ModelPicker agent={activeAgent} models={models} onSetModel={onSetModel} />
+      {imagePicker}
       <UsageChip usage={usage} />
       <AgentCommandsMenu commands={commands} />
       {mode?.mode ? <span className="mode-chip">模式：{mode.mode}</span> : null}

@@ -16,7 +16,15 @@ export function App(_props: AppProps): React.ReactElement {
   useEffect(() => {
     fetch('/api/auth/user', { credentials: 'include' })
       .then((res) => (res.ok ? readJsonResponse(res) : null))
-      .then((data) => setUser(normalizeAuthResponse(data).user))
+      .then((data) => {
+        const nextUser = normalizeAuthResponse(data).user;
+        console.info('[diag] auth:user done', {
+          authenticated: Boolean(nextUser),
+          userId: nextUser?.id,
+          at: new Date().toISOString(),
+        });
+        setUser(nextUser);
+      })
       .catch(() => setUser(null));
   }, []);
 
