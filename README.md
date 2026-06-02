@@ -7,7 +7,7 @@
 [![Node](https://img.shields.io/node/v/haunting-things?label=node)](https://www.npmjs.com/package/haunting-things)
 [![Version](https://img.shields.io/github/v/tag/wang-kaopu/haunting-things?label=Version&color=blue)](https://github.com/wang-kaopu/haunting-things/releases)
 
-Haunting Things 是一个面向团队协作与智能体会话管理的 Web 服务器应用。启动后会在本机提供浏览器访问入口，用户可以通过 Web 页面创建团队、管理智能体成员、发起对话，并在同一个服务中保存会话、附件和运行状态。
+Haunting Things 是一个多智能体会话管理的 Web 服务器应用。启动后会在本机提供浏览器访问入口，用户可以通过 Web 页面创建团队、管理智能体成员、发起对话，并在同一个服务中保存会话、附件和运行状态。
 
 ## 特性
 
