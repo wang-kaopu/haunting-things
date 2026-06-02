@@ -170,3 +170,8 @@ export type PermissionRequest = {
   toolCall?: unknown;
   rawInput?: unknown;
 };
+
+/** 用户对权限请求的响应，可选择一个选项或取消本次授权。 */
+export type PermissionResponse =
+  | { outcome: { outcome: 'selected'; optionId: string } }
+  | { outcome: { outcome: 'cancelled' } };

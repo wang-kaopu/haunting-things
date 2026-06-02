@@ -9,6 +9,7 @@ import type {
   ConversationModels,
   ConversationMode,
   ConversationUsage,
+  PermissionResponse,
   StoredAttachment,
 } from '../../shared/types';
 import { classifyAgentEvent } from '../agentEventPolicy';
@@ -272,10 +273,41 @@ export class ConversationService {
   }
 
   /**
-   * 响应挂起的权限请求，转发给对应 runtime 的 `confirmPermission`。
+   * 响应挂起的权限请求，支持用户选择授权选项或取消本次授权。
    */
-  confirmPermission(input: { conversationId: string; callId: string; optionId: string }): void {
-    this.runtimes.get(input.conversationId)?.confirmPermission(input.callId, input.optionId);
+  respondPermission(input: { conversationId: string; callId: string } & PermissionResponse): { accepted: boolean; error?: string } {
+    const runtime = this.runtimes.get(input.conversationId);
+    if (!runtime) {
+      this.logger.warn('permission_response_runtime_missing', {
+        conversationId: input.conversationId,
+        callId: input.callId,
+        outcome: input.outcome.outcome,
+      });
+      return { accepted: false, error: 'runtime not found' };
+    }
+
+    const accepted = runtime.respondPermission(input.callId, input);
+    if (!accepted) {
+      this.logger.warn('permission_response_call_missing', {
+        conversationId: input.conversationId,
+        callId: input.callId,
+        outcome: input.outcome.outcome,
+      });
+      return { accepted: false, error: 'permission request not found' };
+    }
+
+    return { accepted: true };
+  }
+
+  /**
+   * 兼容旧的确认接口，等价于选择一个权限选项。
+   */
+  confirmPermission(input: { conversationId: string; callId: string; optionId: string }): { accepted: boolean; error?: string } {
+    return this.respondPermission({
+      conversationId: input.conversationId,
+      callId: input.callId,
+      outcome: { outcome: 'selected', optionId: input.optionId },
+    });
   }
 
   async deleteMessage(input: { messageId: string }): Promise<{ deleted: true }> {

@@ -49,10 +49,8 @@ export function registerBridgeHandlers(input: {
     await conversations.sendMessage(params);
     return { accepted: true };
   });
-  bridge.register('conversation.confirmPermission', (params) => {
-    conversations.confirmPermission(params);
-    return { accepted: true };
-  });
+  bridge.register('conversation.confirmPermission', (params) => conversations.confirmPermission(params));
+  bridge.register('conversation.respondPermission', (params) => conversations.respondPermission(params));
   bridge.register('conversation.deleteMessage', (params) => conversations.deleteMessage(params));
   bridge.register('conversation.deleteMessageAttachment', (params) => conversations.deleteMessageAttachment(params));
   bridge.register('team.create', (params) => teams.create(params));

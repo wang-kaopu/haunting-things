@@ -4,6 +4,7 @@ import type {
   AgentHealth,
   AgentInfo,
   PermissionRequest,
+  PermissionResponse,
 } from './agent';
 import type {
   AttachmentRef,
@@ -75,7 +76,11 @@ export type InvokeMap = {
   };
   'conversation.confirmPermission': {
     params: { conversationId: string; callId: string; optionId: string };
-    result: { accepted: true };
+    result: { accepted: boolean; error?: string };
+  };
+  'conversation.respondPermission': {
+    params: { conversationId: string; callId: string } & PermissionResponse;
+    result: { accepted: boolean; error?: string };
   };
   'team.create': {
     params: { name: string; workspace?: string; leaderBackend: AgentBackend; leaderModel?: string };

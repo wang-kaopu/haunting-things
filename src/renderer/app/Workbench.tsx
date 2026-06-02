@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import type { PermissionRequest, TeamAgent } from '../../shared/types';
+import type { PermissionRequest, PermissionResponse, TeamAgent } from '../../shared/types';
 import { bridge } from '../shared/bridgeClient';
 import { ChatLayout } from '../features/chat/ChatLayout';
 import { Sidebar } from '../features/teams/Sidebar';
@@ -41,7 +41,8 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [permission, setPermission] = useState<PermissionRequest | null>(null);
+  const [permissionQueue, setPermissionQueue] = useState<PermissionRequest[]>([]);
+  const permission = permissionQueue[0] ?? null;
 
   const {
     serverInfo,
@@ -71,7 +72,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   useEffect(() => {
     const unsubPermission = bridge.on('conversation.permission', (payload) => {
       const request = normalizePermissionRequest(payload);
-      if (request) setPermission(request);
+      if (request) enqueuePermission(request);
     });
     return () => {
       unsubPermission();
@@ -109,6 +110,49 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     await snapshots.setModel(active.activeTeam.id, active.activeAgent.slotId, model);
     await teamsState.refreshTeams();
     notifications.push({ title: '模型已切换', message: model.trim(), level: 'success' });
+  }
+
+  /** 将权限请求加入队列，避免连续请求互相覆盖导致后端挂起。 */
+  function enqueuePermission(request: PermissionRequest): void {
+    setPermissionQueue((current) => {
+      const index = current.findIndex((item) => item.conversationId === request.conversationId && item.callId === request.callId);
+      if (index < 0) return [...current, request];
+      const next = [...current];
+      next[index] = request;
+      return next;
+    });
+  }
+
+  /** 移除已处理的权限请求，让队列中的下一条请求继续展示。 */
+  function removePermission(request: PermissionRequest): void {
+    setPermissionQueue((current) =>
+      current.filter((item) => item.conversationId !== request.conversationId || item.callId !== request.callId)
+    );
+  }
+
+  /** 向后端提交权限响应；关闭弹窗会明确发送 cancelled，避免 Agent 永久等待。 */
+  async function respondToPermission(request: PermissionRequest, response: PermissionResponse): Promise<void> {
+    try {
+      const result = await bridge.invoke('conversation.respondPermission', {
+        conversationId: request.conversationId,
+        callId: request.callId,
+        ...response,
+      });
+      if (!result.accepted) {
+        notifications.push({
+          title: '权限响应失败',
+          message: result.error ?? '权限请求已失效。',
+          level: 'warning',
+        });
+      }
+      removePermission(request);
+    } catch (error) {
+      notifications.push({
+        title: '权限响应失败',
+        message: error instanceof Error ? error.message : String(error),
+        level: 'error',
+      });
+    }
   }
 
   return (
@@ -158,16 +202,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
       />
       {permission ? (
         <PermissionDialog
+          key={`${permission.conversationId}:${permission.callId}`}
           permission={permission}
           onRespond={(optionId) => {
-            void bridge.invoke('conversation.confirmPermission', {
-              conversationId: permission.conversationId,
-              callId: permission.callId,
-              optionId,
-            });
-            setPermission(null);
+            void respondToPermission(permission, { outcome: { outcome: 'selected', optionId } });
           }}
-          onDismiss={() => setPermission(null)}
+          onDismiss={() => {
+            void respondToPermission(permission, { outcome: { outcome: 'cancelled' } });
+          }}
         />
       ) : null}
       {settingsOpen ? (

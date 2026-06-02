@@ -22,6 +22,7 @@ import type {
   ConversationStatus,
   ConversationUsage,
   PermissionRequest,
+  PermissionResponse,
   StoredAttachment,
 } from '../../shared/types';
 import { createId } from '../id';
@@ -311,18 +312,35 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   /**
    * 响应一条挂起的权限请求。
    *
-   * 对应 `permission` 事件中的 `callId`，用户选择 `optionId` 后调用此方法，
+   * 对应 `permission` 事件中的 `callId`，用户选择或取消后调用此方法，
    * 内部 Promise 被 resolve，ACP 协议层随即收到响应并继续执行。
    *
-   * @param callId   - 权限请求的唯一标识（来自 `PermissionRequest.callId`）
-   * @param optionId - 用户选中的选项 ID（来自 `PermissionOption.id`）
+   * @param callId - 权限请求的唯一标识（来自 `PermissionRequest.callId`）
+   * @param response - 用户选择的选项或取消结果
    */
-  confirmPermission(callId: string, optionId: string): void {
+  respondPermission(callId: string, response: PermissionResponse): boolean {
     const resolve = this.pendingPermissions.get(callId);
-    if (resolve) {
-      this.pendingPermissions.delete(callId);
-      resolve({ outcome: { outcome: 'selected', optionId } });
+    if (!resolve) {
+      this.logger.warn('permission_response_missing', {
+        conversationId: this.input.conversationId,
+        callId,
+        outcome: response.outcome.outcome,
+      });
+      return false;
     }
+
+    this.pendingPermissions.delete(callId);
+    this.turnPhase = 'thinking';
+    this.emitAgentEvent({ type: 'agent.thinking' });
+    resolve(toRequestPermissionResponse(response));
+    return true;
+  }
+
+  /**
+   * 兼容旧的确认接口，等价于选择一个权限选项。
+   */
+  confirmPermission(callId: string, optionId: string): boolean {
+    return this.respondPermission(callId, { outcome: { outcome: 'selected', optionId } });
   }
 
   /**
@@ -1068,4 +1086,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       ...event,
     } as AgentEvent);
   }
+}
+
+/** 将应用层权限响应转换为 ACP SDK 响应格式。 */
+function toRequestPermissionResponse(response: PermissionResponse): RequestPermissionResponse {
+  if (response.outcome.outcome === 'selected') {
+    return { outcome: { outcome: 'selected', optionId: response.outcome.optionId } };
+  }
+  return { outcome: { outcome: 'cancelled' } };
 }
