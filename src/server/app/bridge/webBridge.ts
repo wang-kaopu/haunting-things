@@ -136,6 +136,21 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
       };
     case 'attachment.delete':
       return pick(input, ['attachmentId']);
+    case 'workspace.create':
+    case 'workspace.createTemporary':
+    case 'workspace.get':
+    case 'workspace.tree':
+    case 'workspace.readTextFile':
+    case 'workspace.writeTextFile':
+    case 'workspace.mkdir':
+    case 'workspace.rename':
+    case 'workspace.deleteEntry':
+    case 'workspace.openPath':
+    case 'workspace.revealPath':
+      return {
+        ...pick(input, ['workspaceId', 'name', 'path', 'kind', 'relativePath', 'newName', 'search']),
+        contentLength: typeof input.content === 'string' ? input.content.length : undefined,
+      };
     case 'conversation.deleteMessage':
       return pick(input, ['messageId']);
     case 'conversation.deleteMessageAttachment':
@@ -156,7 +171,7 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
     case 'conversation.confirmPermission':
       return pick(input, ['conversationId', 'callId', 'optionId']);
     case 'team.create':
-      return pick(input, ['name', 'workspace', 'leaderBackend', 'leaderModel']);
+      return pick(input, ['name', 'workspaceId', 'leaderBackend', 'leaderModel']);
     case 'team.addAgent':
       return pick(input, ['teamId', 'name', 'backend', 'model']);
     default:
@@ -176,9 +191,9 @@ function summarizeInvokeResult(name: string, result: unknown): unknown {
 
   switch (name) {
     case 'conversation.create':
-      return pick(output, ['id', 'backend', 'model', 'status']);
+      return pick(output, ['id', 'backend', 'workspaceId', 'model', 'status']);
     case 'team.create':
-      return pick(output, ['id', 'name', 'leaderSlotId']);
+      return pick(output, ['id', 'name', 'workspaceId', 'leaderSlotId']);
     case 'team.addAgent':
       return pick(output, ['slotId', 'conversationId', 'backend', 'model', 'status']);
     default:

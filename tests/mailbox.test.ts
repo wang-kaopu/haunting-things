@@ -13,10 +13,14 @@ describe('mailbox repository', () => {
     const db = openDatabase(path.join(dir, 'test.sqlite'));
     const teamsRepo = new TeamRepository(db);
     const mailboxRepo = new MailboxRepository(db);
+    db.prepare(
+      `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('workspace-1', 'Test Team', dir, 'local', 0, 1, 1, 1);
     teamsRepo.createTeam({
       id: 'team-1',
       name: 'Test Team',
-      workspace: dir,
+      workspaceId: 'workspace-1',
       leaderSlotId: 'agent-1',
       agents: [
         {
@@ -77,7 +81,7 @@ describe('mailbox repository', () => {
     db.close();
   });
 
-  test('openDatabase migrates legacy team tables with missing agents json', () => {
+  test('openDatabase rejects legacy team workspace schema instead of migrating it', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
     const dbPath = path.join(dir, 'legacy-team.sqlite');
     const legacyDb = new Database(dbPath);
@@ -95,14 +99,6 @@ describe('mailbox repository', () => {
     `);
     legacyDb.close();
 
-    const db = openDatabase(dbPath);
-    const teamsRepo = new TeamRepository(db);
-    const teams = teamsRepo.listTeams();
-
-    expect(teams).toHaveLength(1);
-    expect(teams[0].leaderSlotId).toBe('leader');
-    expect(teams[0].agents).toEqual([]);
-
-    db.close();
+    expect(() => openDatabase(dbPath)).toThrow('legacy workspace TEXT column detected');
   });
 });

@@ -5,6 +5,7 @@ import { healthAgent, listAgents } from '@server/runtime/agentRegistry';
 import type { AttachmentService } from '@server/services/attachmentService';
 import type { ConversationService } from '@server/services/conversationService';
 import type { TeamService } from '@server/services/teamService';
+import type { WorkspaceService } from '@server/services/workspaceService';
 import type { WebBridge } from '@server/app/bridge/webBridge';
 
 /**
@@ -18,10 +19,11 @@ export function registerBridgeHandlers(input: {
   attachmentService: AttachmentService;
   conversations: ConversationService;
   teams: TeamService;
+  workspaces: WorkspaceService;
   serverInfo: () => ServerInfo;
   setRemoteAccess: (params: { allowRemote: boolean }) => ServerInfo;
 }): void {
-  const { bridge, attachments, attachmentService, conversations, teams } = input;
+  const { bridge, attachments, attachmentService, conversations, teams, workspaces } = input;
 
   bridge.register('attachment.upload', async (params) => {
     const saved = await attachmentService.saveImage(params);
@@ -35,7 +37,20 @@ export function registerBridgeHandlers(input: {
   });
   bridge.register('agent.list', () => listAgents());
   bridge.register('agent.health', ({ backend }: { backend: AgentBackend }) => healthAgent(backend));
+  bridge.register('workspace.create', (params) => workspaces.create(params));
+  bridge.register('workspace.createTemporary', (params) => workspaces.createTemporary(params));
+  bridge.register('workspace.list', () => workspaces.list());
+  bridge.register('workspace.get', ({ workspaceId }) => workspaces.get(workspaceId));
+  bridge.register('workspace.tree', (params) => workspaces.tree(params));
+  bridge.register('workspace.readTextFile', (params) => workspaces.readTextFile(params));
+  bridge.register('workspace.writeTextFile', (params) => workspaces.writeTextFile(params));
+  bridge.register('workspace.mkdir', (params) => workspaces.mkdir(params));
+  bridge.register('workspace.rename', (params) => workspaces.rename(params));
+  bridge.register('workspace.deleteEntry', (params) => workspaces.deleteEntry(params));
+  bridge.register('workspace.openPath', (params) => workspaces.openPath(params));
+  bridge.register('workspace.revealPath', (params) => workspaces.revealPath(params));
   bridge.register('conversation.create', (params) => conversations.create(params));
+  bridge.register('conversation.setWorkspace', (params) => conversations.setConversationWorkspace(params));
   bridge.register('conversation.setModel', (params) => conversations.setModel(params));
   bridge.register('conversation.setMode', (params) => conversations.setMode(params));
   bridge.register('conversation.list', () => conversations.list());

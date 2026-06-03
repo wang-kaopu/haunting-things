@@ -64,13 +64,17 @@ describe('AttachmentRepository', () => {
     const now = Date.now();
 
     db.prepare(
-      `INSERT INTO teams (id, name, workspace, leader_slot_id, agents, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run('team-1', 'Alpha', dir, 'leader', '[]', now, now);
+      `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('workspace-1', 'Alpha', dir, 'local', 0, 1, now, now);
     db.prepare(
-      `INSERT INTO conversations (id, backend, name, workspace, status, created_at, updated_at)
+      `INSERT INTO teams (id, name, workspace_id, leader_slot_id, agents, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run('conversation-1', 'codex', 'Alpha', dir, 'idle', now, now);
+    ).run('team-1', 'Alpha', 'workspace-1', 'leader', '[]', now, now);
+    db.prepare(
+      `INSERT INTO conversations (id, backend, name, workspace_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run('conversation-1', 'codex', 'Alpha', 'workspace-1', 'idle', now, now);
     db.prepare(
       `INSERT INTO mailbox (id, team_id, to_agent_id, from_agent_id, content, read, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`

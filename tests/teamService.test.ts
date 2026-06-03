@@ -155,11 +155,11 @@ describe('TeamService', () => {
     agentEventHandler = null;
     conversationMessages = new Map();
     conversations = {
-      create: vi.fn((input: { backend: string; workspace?: string; name?: string }): Conversation => ({
+      create: vi.fn((input: { backend: string; workspaceId?: string; name?: string }): Conversation => ({
         id: `conv-${mockInstances.length + 1}`,
         backend: input.backend as Conversation['backend'],
         name: input.name ?? 'conversation',
-        workspace: input.workspace ?? '/tmp/workspace',
+        workspaceId: input.workspaceId ?? 'workspace-test',
         model: undefined,
         status: 'idle',
         createdAt: Date.now(),
@@ -170,7 +170,7 @@ describe('TeamService', () => {
         id: input.conversationId,
         backend: 'claude',
         name: 'conversation',
-        workspace: '/tmp/workspace',
+        workspaceId: 'workspace-test',
         model: input.model,
         status: 'idle',
         createdAt: Date.now(),

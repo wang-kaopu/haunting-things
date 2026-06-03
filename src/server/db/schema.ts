@@ -3,10 +3,24 @@ import type { Db } from '@server/db/connection';
 /**
  * 初始化并迁移应用数据库 schema。
  *
- * 迁移逻辑要兼容旧版本缺失字段，避免用户已有本地数据启动失败。
+ * 当前 workspace_id 方案不兼容旧 workspace TEXT schema，检测到旧列时直接失败。
  */
 export function initializeSchema(db: Db): void {
+  assertNoLegacyWorkspaceSchema(db);
+
   db.exec(`
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL,
+      is_temporary INTEGER NOT NULL DEFAULT 0,
+      exists_on_disk INTEGER NOT NULL DEFAULT 1,
+      last_opened_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
@@ -21,7 +35,7 @@ export function initializeSchema(db: Db): void {
       id TEXT PRIMARY KEY,
       backend TEXT NOT NULL,
       name TEXT NOT NULL,
-      workspace TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
       model TEXT,
       status TEXT NOT NULL,
       acp_session_id TEXT,
@@ -39,7 +53,8 @@ export function initializeSchema(db: Db): void {
       session_restore_error TEXT,
       session_restored_at INTEGER,
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -79,11 +94,12 @@ export function initializeSchema(db: Db): void {
     CREATE TABLE IF NOT EXISTS teams (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      workspace TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
       leader_slot_id TEXT NOT NULL,
       agents TEXT NOT NULL,
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT
     );
 
     CREATE TABLE IF NOT EXISTS mailbox (
@@ -215,6 +231,7 @@ export function initializeSchema(db: Db): void {
   ensureColumn(db, 'mailbox', 'read', 'INTEGER NOT NULL DEFAULT 0');
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_workspace_id ON conversations(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_acp_session_id ON conversations(acp_session_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_last_turn_id ON conversations(last_turn_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_session_restore ON conversations(session_restore_status, session_restored_at);
@@ -237,12 +254,38 @@ export function initializeSchema(db: Db): void {
     CREATE INDEX IF NOT EXISTS idx_message_attachments_attachment_id ON message_attachments(attachment_id);
     CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_message_id ON mailbox_attachments(mailbox_message_id);
     CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_attachment_id ON mailbox_attachments(attachment_id);
+    CREATE INDEX IF NOT EXISTS idx_workspaces_kind_updated ON workspaces(kind, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_workspaces_last_opened ON workspaces(last_opened_at);
+    CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);
+    CREATE INDEX IF NOT EXISTS idx_teams_workspace_id ON teams(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_conversation_mcp_servers_conversation ON conversation_mcp_servers(conversation_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_conversation_commands_conversation ON conversation_commands(conversation_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_conversation_models_conversation ON conversation_models(conversation_id, is_current, updated_at);
     CREATE INDEX IF NOT EXISTS idx_conversation_modes_conversation ON conversation_modes(conversation_id, is_current, updated_at);
   `);
+}
+
+/**
+ * 当前分支不支持旧 workspace TEXT schema 自动迁移。
+ *
+ * 旧库需要由开发者删除后重新初始化，避免把旧路径数据静默回填成新工作区实体。
+ */
+function assertNoLegacyWorkspaceSchema(db: Db): void {
+  const conversationColumns = db.prepare('PRAGMA table_info(conversations)').all() as Array<{ name: string }>;
+  const teamColumns = db.prepare('PRAGMA table_info(teams)').all() as Array<{ name: string }>;
+  const hasLegacyConversationWorkspace = conversationColumns.some((column) => column.name === 'workspace');
+  const hasLegacyTeamWorkspace = teamColumns.some((column) => column.name === 'workspace');
+
+  if (!hasLegacyConversationWorkspace && !hasLegacyTeamWorkspace) return;
+
+  throw new Error(
+    [
+      'Incompatible database schema: legacy workspace TEXT column detected.',
+      'This branch does not support workspace schema migration.',
+      'Delete the local database and restart the app.',
+    ].join(' ')
+  );
 }
 
 function ensureColumn(db: Db, table: string, column: string, definition: string): void {

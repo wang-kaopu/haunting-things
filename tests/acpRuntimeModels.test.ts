@@ -88,7 +88,7 @@ describe('AcpRuntime models', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
       model: 'sonnet-4',
     });
 
@@ -107,7 +107,7 @@ describe('AcpRuntime models', () => {
     expect(connectionMock.initialize).toHaveBeenCalledTimes(1);
     expect(connectionMock.newSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        cwd: '/tmp/workspace',
+        cwd: process.cwd(),
         mcpServers: [],
       })
     );
@@ -154,7 +154,7 @@ describe('AcpRuntime models', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
     });
 
     const modes: ConversationMode[] = [];
@@ -185,7 +185,7 @@ describe('AcpRuntime models', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
       resumeSessionId: 'session-old',
     });
 
@@ -195,7 +195,7 @@ describe('AcpRuntime models', () => {
     await (runtime as any).ensureStarted();
 
     expect(connectionMock.loadSession).toHaveBeenCalledWith({
-      cwd: '/tmp/workspace',
+      cwd: process.cwd(),
       mcpServers: [],
       sessionId: 'session-old',
     });
@@ -220,7 +220,7 @@ describe('AcpRuntime models', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
       resumeSessionId: 'session-old',
     });
 
@@ -230,12 +230,12 @@ describe('AcpRuntime models', () => {
     await (runtime as any).ensureStarted();
 
     expect(connectionMock.loadSession).toHaveBeenCalledWith({
-      cwd: '/tmp/workspace',
+      cwd: process.cwd(),
       mcpServers: [],
       sessionId: 'session-old',
     });
     expect(connectionMock.newSession).toHaveBeenCalledWith({
-      cwd: '/tmp/workspace',
+      cwd: process.cwd(),
       mcpServers: [],
     });
     expect(connectionMock.setSessionMode).toHaveBeenCalledWith({
@@ -256,14 +256,14 @@ describe('AcpRuntime models', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
       resumeSessionId: 'session-old',
     });
 
     await (runtime as any).ensureStarted();
 
     expect(connectionMock.unstable_resumeSession).toHaveBeenCalledWith({
-      cwd: '/tmp/workspace',
+      cwd: process.cwd(),
       mcpServers: [],
       sessionId: 'session-old',
     });

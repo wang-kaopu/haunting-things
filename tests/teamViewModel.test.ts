@@ -6,7 +6,7 @@ function makeTeam(): Team {
   return {
     id: 'team-1',
     name: 'Team',
-    workspace: '/tmp/work',
+    workspaceId: 'workspace-1',
     leaderSlotId: 'slot-lead',
     agents: [
       {

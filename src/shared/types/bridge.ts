@@ -13,8 +13,10 @@ import type {
   ConversationCommands,
   ConversationMode,
   ConversationModels,
+  ConversationMcpServer,
   ConversationStatus,
   ConversationUsage,
+  ConversationWithWorkspace,
 } from '@shared/types/conversation';
 import type {
   Team,
@@ -22,7 +24,9 @@ import type {
   TeamAgentStatus,
   TeamMailboxEntry,
   TeamTask,
+  TeamWithWorkspace,
 } from '@shared/types/team';
+import type { Workspace, WorkspaceEntry, WorkspaceKind } from '@shared/types/workspace';
 
 /** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {
@@ -51,9 +55,49 @@ export type InvokeMap = {
   'attachment.delete': { params: { attachmentId: string }; result: { deleted: true } };
   'agent.list': { params: void; result: AgentInfo[] };
   'agent.health': { params: { backend: AgentBackend }; result: AgentHealth };
+  'workspace.create': {
+    params: { name?: string; path?: string; kind?: WorkspaceKind };
+    result: Workspace;
+  };
+  'workspace.createTemporary': { params: { name?: string }; result: Workspace };
+  'workspace.list': { params: void; result: Workspace[] };
+  'workspace.get': { params: { workspaceId: string }; result: Workspace | null };
+  'workspace.tree': {
+    params: { workspaceId: string; relativePath?: string; search?: string };
+    result: WorkspaceEntry[];
+  };
+  'workspace.readTextFile': {
+    params: { workspaceId: string; relativePath: string };
+    result: { content: string };
+  };
+  'workspace.writeTextFile': {
+    params: { workspaceId: string; relativePath: string; content: string };
+    result: { written: true };
+  };
+  'workspace.mkdir': { params: { workspaceId: string; relativePath: string }; result: { created: true } };
+  'workspace.rename': {
+    params: { workspaceId: string; relativePath: string; newName: string };
+    result: { renamed: true };
+  };
+  'workspace.deleteEntry': {
+    params: { workspaceId: string; relativePath: string };
+    result: { deleted: true };
+  };
+  'workspace.openPath': {
+    params: { workspaceId: string; relativePath?: string };
+    result: { opened: true };
+  };
+  'workspace.revealPath': {
+    params: { workspaceId: string; relativePath?: string };
+    result: { revealed: true };
+  };
   'conversation.create': {
-    params: { backend: AgentBackend; workspace?: string; name?: string; model?: string };
-    result: Conversation;
+    params: { backend: AgentBackend; workspaceId?: string; name?: string; model?: string; mcpServers?: ConversationMcpServer[] };
+    result: ConversationWithWorkspace;
+  };
+  'conversation.setWorkspace': {
+    params: { conversationId: string; workspaceId: string };
+    result: ConversationWithWorkspace;
   };
   'conversation.setModel': {
     params: { conversationId: string; model: string };
@@ -92,8 +136,8 @@ export type InvokeMap = {
     result: { accepted: boolean; error?: string };
   };
   'team.create': {
-    params: { name: string; workspace?: string; leaderBackend: AgentBackend; leaderModel?: string };
-    result: Team;
+    params: { name: string; workspaceId?: string; leaderBackend: AgentBackend; leaderModel?: string };
+    result: TeamWithWorkspace | Team;
   };
   'team.delete': { params: { teamId: string }; result: { deleted: true } };
   'team.addAgent': { params: { teamId: string; name: string; backend: AgentBackend; model?: string }; result: TeamAgent };

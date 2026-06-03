@@ -82,12 +82,12 @@ export class TeamService {
    * 创建新 Team，自动建立 Leader conversation 并启动 MCP 服务。
    *
    * @param input.name          - Team 名称
-   * @param input.workspace     - 工作目录（不传则由 ConversationService 自动创建）
+   * @param input.workspaceId   - 工作区 ID（不传则由 ConversationService 自动创建临时工作区）
    * @param input.leaderBackend - Leader Agent 使用的后端（claude / codex）
    */
   async create(input: {
     name: string;
-    workspace?: string;
+    workspaceId?: string;
     leaderBackend: AgentBackend;
     leaderModel?: string;
   }): Promise<Team> {
@@ -95,12 +95,12 @@ export class TeamService {
       name: input.name,
       leaderBackend: input.leaderBackend,
       leaderModel: input.leaderModel,
-      hasWorkspace: Boolean(input.workspace),
+      hasWorkspace: Boolean(input.workspaceId),
     });
     const leaderConversation = this.conversations.create({
       backend: input.leaderBackend,
       model: input.leaderModel,
-      workspace: input.workspace,
+      workspaceId: input.workspaceId,
       name: `${input.name} - Leader`,
     });
     const leader: TeamAgent = {
@@ -116,7 +116,7 @@ export class TeamService {
     const team = this.teamsRepo.createTeam({
       id: createId(),
       name: input.name,
-      workspace: leaderConversation.workspace,
+      workspaceId: leaderConversation.workspaceId,
       leaderSlotId: leader.slotId,
       agents: [leader],
       createdAt: now,
@@ -126,7 +126,7 @@ export class TeamService {
     this.logger.info('team_create_done', {
       teamId: team.id,
       leaderSlotId: leader.slotId,
-      workspace: team.workspace,
+      workspaceId: team.workspaceId,
     });
     return team;
   }
@@ -196,7 +196,7 @@ export class TeamService {
     const conversation = this.conversations.create({
       backend: input.backend,
       model: input.model,
-      workspace: team.workspace,
+      workspaceId: team.workspaceId,
       name: `${team.name} - ${input.name}`,
     });
     const agent: TeamAgent = {

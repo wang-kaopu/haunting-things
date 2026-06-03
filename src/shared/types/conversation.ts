@@ -1,4 +1,5 @@
 import type { AcpAvailableCommand, AgentBackend } from '@shared/types/agent';
+import type { Workspace } from '@shared/types/workspace';
 
 /** Conversation 当前状态。 */
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
@@ -27,7 +28,7 @@ export type Conversation = {
   id: string;
   backend: AgentBackend;
   name: string;
-  workspace: string;
+  workspaceId: string;
   model?: string;
   status: ConversationStatus;
   acpSessionId?: string;
@@ -46,6 +47,11 @@ export type Conversation = {
   sessionRestoredAt?: number;
   createdAt: number;
   updatedAt: number;
+};
+
+/** 附带工作区详情的会话视图。 */
+export type ConversationWithWorkspace = Conversation & {
+  workspace: Workspace;
 };
 
 /** 聊天消息的发送者角色。 */

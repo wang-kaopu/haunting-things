@@ -23,6 +23,9 @@ import type {
   TeamAgentStatus,
   TeamMailboxEntry,
   User,
+  Workspace,
+  WorkspaceEntry,
+  WorkspaceKind,
 } from '@shared/types';
 
 type RecordValue = Record<string, unknown>;
@@ -35,6 +38,7 @@ const chatMessageTypes = new Set<ChatMessageType>(['text', 'thinking', 'tool_cal
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
 const stopReasons = new Set<StopReason>(['done', 'cancelled', 'failed', 'stopped']);
+const workspaceKinds = new Set<WorkspaceKind>(['local', 'temporary', 'managed']);
 
 /**
  * 安全读取 HTTP JSON 响应。
@@ -91,7 +95,7 @@ export function normalizeConversation(value: unknown): Conversation | null {
     id,
     backend,
     name: asString(input.name),
-    workspace: asString(input.workspace),
+    workspaceId: asString(input.workspaceId),
     model: optionalString(input.model),
     status,
     acpSessionId: optionalString(input.acpSessionId),
@@ -106,6 +110,52 @@ export function normalizeConversation(value: unknown): Conversation | null {
     usageUpdatedAt: optionalNumber(input.usageUpdatedAt),
     createdAt,
     updatedAt,
+  };
+}
+
+/** 归一化 Workspace 快照。 */
+export function normalizeWorkspace(value: unknown): Workspace | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const workspacePath = asString(input.path);
+  const createdAt = asRequiredNumber(input.createdAt);
+  const updatedAt = asRequiredNumber(input.updatedAt);
+  if (!id || !workspacePath || createdAt === null || updatedAt === null) return null;
+  return {
+    id,
+    name: asString(input.name, workspacePath),
+    path: workspacePath,
+    kind: enumValue(input.kind, workspaceKinds, 'local'),
+    isTemporary: Boolean(input.isTemporary),
+    existsOnDisk: input.existsOnDisk !== false,
+    lastOpenedAt: optionalNumber(input.lastOpenedAt),
+    createdAt,
+    updatedAt,
+  };
+}
+
+/** 归一化工作区文件树。 */
+export function normalizeWorkspaceEntryList(value: unknown): WorkspaceEntry[] {
+  return normalizeArray(value, normalizeWorkspaceEntry);
+}
+
+function normalizeWorkspaceEntry(value: unknown): WorkspaceEntry | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const name = asString(input.name);
+  const fullPath = asString(input.fullPath);
+  const relativePath = asString(input.relativePath);
+  if (!name || !fullPath || !relativePath) return null;
+  return {
+    name,
+    fullPath,
+    relativePath,
+    isDir: Boolean(input.isDir),
+    isFile: Boolean(input.isFile),
+    size: optionalNumber(input.size),
+    modifiedAt: optionalNumber(input.modifiedAt),
+    children: normalizeWorkspaceEntryList(input.children),
   };
 }
 
@@ -131,7 +181,7 @@ export function normalizeTeam(value: unknown): Team | null {
   return {
     id,
     name: asString(input.name, '未命名团队'),
-    workspace: asString(input.workspace),
+    workspaceId: asString(input.workspaceId),
     leaderSlotId: asString(input.leaderSlotId, agents.find((agent) => agent.role === 'leader')?.slotId ?? agents[0]?.slotId ?? ''),
     agents,
     createdAt: asNumber(input.createdAt, Date.now()),

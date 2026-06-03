@@ -7,7 +7,7 @@ function createRuntime(): AcpRuntime {
   const runtime = new AcpRuntime({
     conversationId: 'conv-1',
     backend: 'claude',
-    workspace: '/tmp/workspace',
+    workspacePath: process.cwd(),
   });
 
   (runtime as any).activeTurnId = 'turn-1';

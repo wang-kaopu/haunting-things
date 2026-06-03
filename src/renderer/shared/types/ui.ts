@@ -49,6 +49,7 @@ export type TeamDrawerState = {
 
 export type CreateTeamInput = {
   name: string;
+  workspaceId?: string;
   leaderBackend: AgentBackend;
   leaderModel?: string;
 };

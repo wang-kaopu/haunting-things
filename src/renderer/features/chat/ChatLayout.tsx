@@ -12,6 +12,7 @@ import type {
 import { ChatHeader } from '@renderer/features/chat/components/ChatHeader';
 import { MessageList } from '@renderer/features/chat/components/MessageList';
 import { SendBox, type SendBoxPayload } from '@renderer/features/chat/components/SendBox';
+import { WorkspacePanel } from '@renderer/features/workspace/WorkspacePanel';
 
 /** 聊天主面板的运行时数据和操作回调。 */
 export type ChatLayoutProps = {
@@ -68,16 +69,21 @@ export function ChatLayout({
         usage={usage}
         onOpenSidebar={onOpenSidebar}
       />
-      {messages.length === 0 ? (
-        <ChatEmpty />
-      ) : (
-        <MessageList
-          messages={messages}
-          activePhase={activePhase}
-          agents={team.agents}
-          activeAgent={activeAgent}
-        />
-      )}
+      <div className="chat-workspace-shell">
+        <div className="chat-workspace-shell__main">
+          {messages.length === 0 ? (
+            <ChatEmpty />
+          ) : (
+            <MessageList
+              messages={messages}
+              activePhase={activePhase}
+              agents={team.agents}
+              activeAgent={activeAgent}
+            />
+          )}
+        </div>
+        <WorkspacePanel team={team} />
+      </div>
       <SendBox
         disabled={!team || !activeAgent}
         activeAgent={activeAgent}

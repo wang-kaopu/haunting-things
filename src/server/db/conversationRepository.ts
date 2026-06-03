@@ -7,13 +7,14 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationWithWorkspace,
   ConversationMcpServer,
   ConversationMode,
   ConversationModels,
   StopReason,
 } from '@shared/types';
 import type { Db } from '@server/db/connection';
-import { rowToAgentEvent, rowToConversation, rowToMessage } from '@server/db/mappers';
+import { rowToAgentEvent, rowToConversation, rowToConversationWithWorkspace, rowToMessage } from '@server/db/mappers';
 
 /** 负责会话、消息和 Agent 事件的持久化，是聊天流恢复的主仓库。 */
 export class ConversationRepository {
@@ -24,7 +25,7 @@ export class ConversationRepository {
     this.db
       .prepare(
         `INSERT INTO conversations (
-          id, backend, name, workspace, model, status,
+          id, backend, name, workspace_id, model, status,
           acp_session_id, session_mode, current_model_id,
           last_turn_id, last_stop_reason, last_error,
           usage_size, usage_used, usage_ratio, usage_updated_at,
@@ -37,7 +38,7 @@ export class ConversationRepository {
         conversation.id,
         conversation.backend,
         conversation.name,
-        conversation.workspace,
+        conversation.workspaceId,
         conversation.model ?? null,
         conversation.status,
         conversation.acpSessionId ?? null,
@@ -203,6 +204,38 @@ export class ConversationRepository {
   getConversation(id: string): Conversation | null {
     const row = this.db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as any;
     return row ? rowToConversation(row) : null;
+  }
+
+  /** 读取带工作区详情的单个会话。 */
+  getConversationWithWorkspace(id: string): ConversationWithWorkspace | null {
+    const row = this.db.prepare(conversationWithWorkspaceSql('WHERE c.id = ?')).get(id) as any;
+    return row ? rowToConversationWithWorkspace(row) : null;
+  }
+
+  /** 列出带工作区详情的会话，按最近更新时间优先。 */
+  listConversationsWithWorkspace(): ConversationWithWorkspace[] {
+    const rows = this.db.prepare(conversationWithWorkspaceSql('ORDER BY c.updated_at DESC')).all() as any[];
+    return rows.map(rowToConversationWithWorkspace);
+  }
+
+  /** 切换会话工作区，并重置依赖 cwd 的 ACP session 状态。 */
+  updateConversationWorkspace(input: { conversationId: string; workspaceId: string }): Conversation | null {
+    this.db
+      .prepare(
+        `UPDATE conversations
+         SET workspace_id = ?,
+             acp_session_id = NULL,
+             session_restore_status = NULL,
+             session_restore_method = NULL,
+             session_restore_error = NULL,
+             session_restored_at = NULL,
+             last_stop_reason = 'stopped',
+             last_error = 'Workspace changed; ACP session was reset',
+             updated_at = ?
+         WHERE id = ?`
+      )
+      .run(input.workspaceId, Date.now(), input.conversationId);
+    return this.getConversation(input.conversationId);
   }
 
   /** 将异常退出的会话标记为已停止，并记录停止原因。 */
@@ -651,6 +684,9 @@ export type ConversationRepositoryPort = Pick<
   | 'listConversations'
   | 'listConversationsByStatus'
   | 'getConversation'
+  | 'getConversationWithWorkspace'
+  | 'listConversationsWithWorkspace'
+  | 'updateConversationWorkspace'
   | 'finalizeInterruptedConversation'
   | 'finalizeStreamingMessages'
   | 'addMessage'
@@ -668,3 +704,23 @@ export type ConversationRepositoryPort = Pick<
   | 'replaceConversationMode'
   | 'getConversationMode'
 >;
+
+/** 构造会话与工作区 join 查询，避免多个读取方法重复列清单。 */
+function conversationWithWorkspaceSql(tail: string): string {
+  return `
+    SELECT
+      c.*,
+      w.id AS workspace__id,
+      w.name AS workspace__name,
+      w.path AS workspace__path,
+      w.kind AS workspace__kind,
+      w.is_temporary AS workspace__is_temporary,
+      w.exists_on_disk AS workspace__exists_on_disk,
+      w.last_opened_at AS workspace__last_opened_at,
+      w.created_at AS workspace__created_at,
+      w.updated_at AS workspace__updated_at
+    FROM conversations c
+    JOIN workspaces w ON w.id = c.workspace_id
+    ${tail}
+  `;
+}
