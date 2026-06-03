@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationMcpServer,
   ConversationModels,
   ConversationMode,
   ConversationUsage,
@@ -22,6 +23,7 @@ import { createId } from '../id';
 import { createLogger } from '../utils/logger';
 import type { AttachmentService } from './attachmentService';
 import { AcpRuntime } from '../runtime/acpRuntime';
+import { MemoryContextService } from './memoryContextService';
 
 const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
   claude: ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'],
@@ -39,10 +41,11 @@ const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
  */
 export class ConversationService {
   private readonly logger = createLogger('conversation');
+  private readonly memoryContext: MemoryContextService;
   /** 以 `conversationId` 映射运行时实例（懒加载）。 */
   private readonly runtimes = new Map<string, AcpRuntime>();
   /** 以 `conversationId` 映射待注入的 MCP server 配置列表。 */
-  private readonly mcpServers = new Map<string, any[]>();
+  private readonly mcpServers = new Map<string, ConversationMcpServer[]>();
   /** 以 `conversationId` 映射可用命令快照。 */
   private readonly commandSnapshots = new Map<string, ConversationCommands>();
   /** 以 `conversationId` 映射模型快照。 */
@@ -62,7 +65,9 @@ export class ConversationService {
     private readonly dataDir: string,
     private readonly attachmentsRepo?: AttachmentRepositoryPort,
     private readonly attachmentService?: AttachmentService
-  ) {}
+  ) {
+    this.memoryContext = new MemoryContextService(repo);
+  }
 
   /**
    * 创建新 Conversation，自动初始化工作目录。
@@ -77,7 +82,7 @@ export class ConversationService {
     workspace?: string;
     name?: string;
     model?: string;
-    mcpServers?: any[];
+    mcpServers?: ConversationMcpServer[];
   }): Conversation {
     const now = Date.now();
     const workspace = input.workspace?.trim() || path.join(this.dataDir, 'workspaces', createId());
@@ -99,10 +104,17 @@ export class ConversationService {
       usageUsed: undefined,
       usageRatio: undefined,
       usageUpdatedAt: undefined,
+      sessionRestoreStatus: undefined,
+      sessionRestoreMethod: undefined,
+      sessionRestoreError: undefined,
+      sessionRestoredAt: undefined,
       createdAt: now,
       updatedAt: now,
     });
-    if (input.mcpServers) this.mcpServers.set(conversation.id, input.mcpServers);
+    if (input.mcpServers?.length) {
+      this.repo.replaceConversationMcpServers(conversation.id, input.mcpServers);
+      this.mcpServers.set(conversation.id, input.mcpServers);
+    }
     this.logger.info('conversation_create', {
       conversationId: conversation.id,
       backend: conversation.backend,
@@ -117,8 +129,34 @@ export class ConversationService {
    * 更新指定 Conversation 的 MCP server 配置。
    * 仅在 runtime 尚未启动时有效；已启动的 runtime 不会重新加载配置。
    */
-  setMcpServers(conversationId: string, mcpServers: any[]): void {
+  setMcpServers(conversationId: string, mcpServers: ConversationMcpServer[]): void {
+    this.repo.replaceConversationMcpServers(conversationId, mcpServers);
     this.mcpServers.set(conversationId, mcpServers);
+  }
+
+  /**
+   * 启动时修复异常退出遗留的运行态，避免 UI 恢复后继续显示不存在的 runtime。
+   */
+  recoverStaleRuntimeState(): void {
+    const running = this.repo.listConversationsByStatus('running');
+    for (const conversation of running) {
+      const message = '应用重启，上一轮运行时已丢失';
+      this.repo.finalizeStreamingMessages({
+        conversationId: conversation.id,
+        stopReason: 'stopped',
+      });
+      this.repo.finalizeInterruptedConversation({
+        conversationId: conversation.id,
+        lastTurnId: conversation.lastTurnId,
+        reason: 'app_restarted',
+        message,
+      });
+      this.events.emit('conversation.status', {
+        conversationId: conversation.id,
+        status: 'stopped',
+        error: message,
+      });
+    }
   }
 
   /** 返回所有 Conversation 列表。 */
@@ -143,13 +181,25 @@ export class ConversationService {
 
   /** 返回指定 Conversation 的可用命令快照。 */
   commands(conversationId: string): ConversationCommands | null {
-    return this.commandSnapshots.get(conversationId) ?? null;
+    const snapshot = this.commandSnapshots.get(conversationId);
+    if (snapshot) return snapshot;
+    if (typeof this.repo.getConversationCommands !== 'function') return null;
+    const persisted = this.repo.getConversationCommands(conversationId);
+    if (persisted) this.commandSnapshots.set(conversationId, persisted);
+    return persisted;
   }
 
   /** 返回指定 Conversation 的模型快照。 */
   models(conversationId: string): ConversationModels | null {
     const snapshot = this.modelSnapshots.get(conversationId);
     if (snapshot) return snapshot;
+    if (typeof this.repo.getConversationModels === 'function') {
+      const persisted = this.repo.getConversationModels(conversationId);
+      if (persisted) {
+        this.modelSnapshots.set(conversationId, persisted);
+        return persisted;
+      }
+    }
     const conversation = this.repo.getConversation(conversationId);
     if (!conversation?.currentModelId) return null;
     return {
@@ -164,6 +214,13 @@ export class ConversationService {
   mode(conversationId: string): ConversationMode | null {
     const snapshot = this.modeSnapshots.get(conversationId);
     if (snapshot) return snapshot;
+    if (typeof this.repo.getConversationMode === 'function') {
+      const persisted = this.repo.getConversationMode(conversationId);
+      if (persisted) {
+        this.modeSnapshots.set(conversationId, persisted);
+        return persisted;
+      }
+    }
     const conversation = this.repo.getConversation(conversationId);
     if (!conversation?.sessionMode) return null;
     return {
@@ -235,7 +292,17 @@ export class ConversationService {
 
     try {
       const runtime = this.getRuntime(conversation);
-      await runtime.send(attachments.length > 0 ? { text: input.content, attachments } : input.content);
+      const restoreContext = this.memoryContext.buildRestoreContext({
+        conversationId: conversation.id,
+        beforeSequence: userMessage.sequence,
+        maxMessages: 20,
+        maxChars: 12000,
+      });
+      await runtime.send({
+        text: input.content,
+        attachments,
+        restoreContext,
+      });
       this.logger.info('conversation_send_done', {
         conversationId: conversation.id,
         ms: Date.now() - startedAt,
@@ -276,6 +343,7 @@ export class ConversationService {
 
     const visibleMessage = input.displayMessage?.trim();
     const attachments = this.resolveAttachments(input.files ?? []);
+    let beforeSequence: number | undefined;
     if (visibleMessage || attachments.length > 0) {
       const userMessage = this.repo.addMessage({
         id: createId(),
@@ -295,11 +363,22 @@ export class ConversationService {
         conversationId: conversation.id,
         message: { ...userMessage, attachments: attachments.map(toAttachmentRef) },
       });
+      beforeSequence = userMessage.sequence;
     }
 
     try {
       const runtime = this.getRuntime(conversation);
-      await runtime.send(attachments.length > 0 ? { text: input.prompt, attachments } : input.prompt);
+      const restoreContext = this.memoryContext.buildRestoreContext({
+        conversationId: conversation.id,
+        beforeSequence,
+        maxMessages: 20,
+        maxChars: 12000,
+      });
+      await runtime.send({
+        text: input.prompt,
+        attachments,
+        restoreContext,
+      });
       this.logger.info('runtime_prompt_send_done', {
         conversationId: conversation.id,
         ms: Date.now() - startedAt,
@@ -361,7 +440,12 @@ export class ConversationService {
       this.logger.warn('conversation_cancel_runtime_missing', {
         conversationId: input.conversationId,
       });
-      this.markConversationIdle(input.conversationId);
+      const conversation = this.repo.getConversation(input.conversationId);
+      if (conversation?.status === 'running') {
+        this.finalizeMissingRuntime(input.conversationId);
+      } else {
+        this.markConversationIdle(input.conversationId);
+      }
       return { accepted: true };
     }
 
@@ -454,6 +538,13 @@ export class ConversationService {
     this.commandSnapshots.delete(conversation.id);
     this.modelSnapshots.delete(conversation.id);
     this.modeSnapshots.delete(conversation.id);
+    this.persistConversationCommands(conversation.id, { conversationId: conversation.id, commands: [], updatedAt: now });
+    this.persistConversationModels(conversation.id, {
+      conversationId: conversation.id,
+      currentModelId: model,
+      models: [],
+      updatedAt: now,
+    });
 
     this.events.emit('conversation.commands', {
       conversationId: conversation.id,
@@ -491,6 +582,7 @@ export class ConversationService {
     this.repo.updateConversationRuntimeState(conversation.id, {
       sessionMode: snapshot.mode,
     });
+    this.persistConversationMode(conversation.id, snapshot);
 
     if (this.modeSnapshots.get(conversation.id) !== snapshot) {
       this.modeSnapshots.set(conversation.id, snapshot);
@@ -522,26 +614,37 @@ export class ConversationService {
     const existing = this.runtimes.get(conversation.id);
     if (existing) return existing;
 
+    const mcpServers = this.getConversationMcpServers(conversation.id);
     this.logger.info('runtime_create', {
       conversationId: conversation.id,
       backend: conversation.backend,
-      model: conversation.model,
+      model: conversation.currentModelId ?? conversation.model,
+      startupMode: conversation.sessionMode,
       workspace: conversation.workspace,
-      mcpServerCount: this.mcpServers.get(conversation.id)?.length ?? 0,
+      mcpServerCount: mcpServers.length,
     });
     const runtime = new AcpRuntime({
       conversationId: conversation.id,
       backend: conversation.backend,
       workspace: conversation.workspace,
-      model: conversation.model,
-      mcpServers: this.mcpServers.get(conversation.id),
+      model: conversation.currentModelId ?? conversation.model,
+      startupMode: conversation.sessionMode,
+      mcpServers,
       resumeSessionId: conversation.acpSessionId,
     });
-    runtime.on('session', ({ sessionId }) => {
-      const updated = this.repo.updateConversationAcpSession(conversation.id, sessionId);
+    runtime.on('session', ({ sessionId, status, method, fallbackReason, updatedAt }) => {
+      const updated = this.repo.updateConversationSessionRestoreState(conversation.id, {
+        acpSessionId: sessionId,
+        sessionRestoreStatus: status,
+        sessionRestoreMethod: method,
+        sessionRestoreError: fallbackReason,
+        sessionRestoredAt: updatedAt,
+      });
       this.logger.info('conversation_acp_session_persisted', {
         conversationId: conversation.id,
         sessionId,
+        sessionRestoreStatus: status,
+        sessionRestoreMethod: method,
       });
       if (updated) {
         this.events.emit('conversation.updated', updated);
@@ -602,6 +705,7 @@ export class ConversationService {
     });
     runtime.on('commands', (snapshot: ConversationCommands) => {
       this.commandSnapshots.set(conversation.id, snapshot);
+      this.persistConversationCommands(conversation.id, snapshot);
       this.events.emit('conversation.commands', snapshot);
     });
     runtime.on('models', (snapshot: ConversationModels) => {
@@ -609,6 +713,7 @@ export class ConversationService {
       this.repo.updateConversationRuntimeState(conversation.id, {
         currentModelId: snapshot.currentModelId,
       });
+      this.persistConversationModels(conversation.id, snapshot);
       this.events.emit('conversation.models', snapshot);
     });
     runtime.on('mode', (snapshot: ConversationMode) => {
@@ -616,6 +721,7 @@ export class ConversationService {
       this.repo.updateConversationRuntimeState(conversation.id, {
         sessionMode: snapshot.mode,
       });
+      this.persistConversationMode(conversation.id, snapshot);
       this.events.emit('conversation.mode', snapshot);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
@@ -652,6 +758,50 @@ export class ConversationService {
       attachments: byMessageId[message.id] ?? [],
     }));
   }
+
+  /** 运行态缺失时结束持久化 running 状态，供重启后取消等兜底路径使用。 */
+  private finalizeMissingRuntime(conversationId: string): void {
+    const message = '运行时已丢失，当前轮次已停止';
+    this.repo.finalizeStreamingMessages({ conversationId, stopReason: 'stopped' });
+    this.repo.finalizeInterruptedConversation({
+      conversationId,
+      reason: 'runtime_missing',
+      message,
+    });
+    this.events.emit('conversation.status', { conversationId, status: 'stopped', error: message });
+  }
+
+  /** 优先使用内存中的 MCP 配置；重启后从数据库快照恢复。 */
+  private getConversationMcpServers(conversationId: string): ConversationMcpServer[] {
+    const memory = this.mcpServers.get(conversationId);
+    if (memory) return memory;
+
+    if (typeof this.repo.listConversationMcpServers !== 'function') return [];
+
+    const persisted = this.repo.listConversationMcpServers(conversationId);
+    if (persisted.length) {
+      this.mcpServers.set(conversationId, persisted);
+    }
+    return persisted;
+  }
+
+  /** 持久化命令快照；测试替身缺少该方法时跳过。 */
+  private persistConversationCommands(conversationId: string, snapshot: ConversationCommands): void {
+    if (typeof this.repo.replaceConversationCommands !== 'function') return;
+    this.repo.replaceConversationCommands(conversationId, snapshot.commands, snapshot.updatedAt);
+  }
+
+  /** 持久化模型快照；测试替身缺少该方法时跳过。 */
+  private persistConversationModels(conversationId: string, snapshot: ConversationModels): void {
+    if (typeof this.repo.replaceConversationModels !== 'function') return;
+    this.repo.replaceConversationModels(conversationId, snapshot);
+  }
+
+  /** 持久化当前模式快照；测试替身缺少该方法时跳过。 */
+  private persistConversationMode(conversationId: string, snapshot: ConversationMode): void {
+    if (typeof this.repo.replaceConversationMode !== 'function') return;
+    this.repo.replaceConversationMode(conversationId, snapshot);
+  }
 }
 
 /** 写入结构化日志前截断过长的 prompt/log 文本。 */
@@ -661,6 +811,7 @@ function summarizeLogText(text: string, maxLength = 240): string {
   return `${trimmed.slice(0, maxLength - 3)}...`;
 }
 
+/** 将 runtime 状态转换为最近一轮 stop reason。 */
 function normalizeStatusToStopReason(status?: string): StopReason {
   if (status === 'failed') return 'failed';
   if (status === 'stopped') return 'stopped';

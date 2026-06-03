@@ -6,6 +6,22 @@ export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
 /** Agent 单轮停止原因。 */
 export type StopReason = 'done' | 'cancelled' | 'failed' | 'stopped';
 
+/** ACP session 启动时的恢复结果。 */
+export type AcpSessionRestoreStatus = 'restored' | 'new' | 'fallback' | 'unavailable' | 'failed';
+
+/** ACP session 启动使用的协议方法。 */
+export type AcpSessionRestoreMethod = 'session/load' | 'session/resume' | 'session/new';
+
+/** 会话级 MCP server 快照，用于重启后恢复工具环境。 */
+export type ConversationMcpServer = {
+  id?: string;
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Array<{ name: string; value: string }>;
+  enabled?: boolean;
+};
+
 /** 单个 Conversation 的元数据。 */
 export type Conversation = {
   id: string;
@@ -24,6 +40,10 @@ export type Conversation = {
   usageUsed?: number;
   usageRatio?: number;
   usageUpdatedAt?: number;
+  sessionRestoreStatus?: AcpSessionRestoreStatus;
+  sessionRestoreMethod?: AcpSessionRestoreMethod;
+  sessionRestoreError?: string;
+  sessionRestoredAt?: number;
   createdAt: number;
   updatedAt: number;
 };

@@ -34,6 +34,10 @@ export function initializeSchema(db: Db): void {
       usage_used INTEGER,
       usage_ratio REAL,
       usage_updated_at INTEGER,
+      session_restore_status TEXT,
+      session_restore_method TEXT,
+      session_restore_error TEXT,
+      session_restored_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -135,8 +139,74 @@ export function initializeSchema(db: Db): void {
       completed_at INTEGER,
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS conversation_mcp_servers (
+      conversation_id TEXT NOT NULL,
+      server_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      command TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (conversation_id, server_id),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_mcp_server_args (
+      conversation_id TEXT NOT NULL,
+      server_id TEXT NOT NULL,
+      arg_index INTEGER NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (conversation_id, server_id, arg_index),
+      FOREIGN KEY (conversation_id, server_id) REFERENCES conversation_mcp_servers(conversation_id, server_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_mcp_server_env (
+      conversation_id TEXT NOT NULL,
+      server_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (conversation_id, server_id, name),
+      FOREIGN KEY (conversation_id, server_id) REFERENCES conversation_mcp_servers(conversation_id, server_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_commands (
+      conversation_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      input_schema TEXT,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (conversation_id, name),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_models (
+      conversation_id TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      is_current INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (conversation_id, model_id),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_modes (
+      conversation_id TEXT NOT NULL,
+      mode_id TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      is_current INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (conversation_id, mode_id),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
   `);
 
+  ensureColumn(db, 'conversations', 'session_restore_status', 'TEXT');
+  ensureColumn(db, 'conversations', 'session_restore_method', 'TEXT');
+  ensureColumn(db, 'conversations', 'session_restore_error', 'TEXT');
+  ensureColumn(db, 'conversations', 'session_restored_at', 'INTEGER');
   ensureColumn(db, 'teams', 'leader_slot_id', "TEXT NOT NULL DEFAULT 'leader'");
   ensureColumn(db, 'teams', 'agents', "TEXT NOT NULL DEFAULT '[]'");
   db.prepare("UPDATE teams SET leader_slot_id = 'leader' WHERE leader_slot_id IS NULL OR leader_slot_id = ''").run();
@@ -147,6 +217,7 @@ export function initializeSchema(db: Db): void {
     CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_conversations_acp_session_id ON conversations(acp_session_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_last_turn_id ON conversations(last_turn_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_session_restore ON conversations(session_restore_status, session_restored_at);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation_sequence ON messages(conversation_id, sequence);
     CREATE INDEX IF NOT EXISTS idx_messages_turn_id ON messages(turn_id);
@@ -167,6 +238,10 @@ export function initializeSchema(db: Db): void {
     CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_message_id ON mailbox_attachments(mailbox_message_id);
     CREATE INDEX IF NOT EXISTS idx_mailbox_attachments_attachment_id ON mailbox_attachments(attachment_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team_id, status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversation_mcp_servers_conversation ON conversation_mcp_servers(conversation_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_conversation_commands_conversation ON conversation_commands(conversation_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversation_models_conversation ON conversation_models(conversation_id, is_current, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversation_modes_conversation ON conversation_modes(conversation_id, is_current, updated_at);
   `);
 }
 

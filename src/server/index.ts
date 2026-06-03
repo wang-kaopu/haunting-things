@@ -46,6 +46,7 @@ await auth.ensureAdmin();
 const events = new EventBus();
 const attachmentService = new AttachmentService(path.join(config.dataDir, 'attachments'));
 const conversations = new ConversationService(conversationsRepo, events, config.dataDir, attachmentsRepo, attachmentService);
+conversations.recoverStaleRuntimeState();
 const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events, attachmentsRepo, attachmentService);
 const app = createApp({ auth, logger, rendererDist: config.rendererDist, attachments: attachmentsRepo });
 const serverManager = new ServerManager({

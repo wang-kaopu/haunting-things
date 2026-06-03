@@ -30,6 +30,10 @@ export function rowToConversation(row: any): Conversation {
     usageUsed: row.usage_used ?? undefined,
     usageRatio: row.usage_ratio ?? undefined,
     usageUpdatedAt: row.usage_updated_at ?? undefined,
+    sessionRestoreStatus: row.session_restore_status ?? undefined,
+    sessionRestoreMethod: row.session_restore_method ?? undefined,
+    sessionRestoreError: row.session_restore_error ?? undefined,
+    sessionRestoredAt: row.session_restored_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
