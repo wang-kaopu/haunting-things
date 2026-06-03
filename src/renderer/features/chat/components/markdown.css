@@ -6,6 +6,10 @@
   overflow-wrap: anywhere;
 }
 
+.markdown-message--phase {
+  color: var(--phase-fg);
+}
+
 .markdown-message > :first-child {
   margin-top: 0;
 }

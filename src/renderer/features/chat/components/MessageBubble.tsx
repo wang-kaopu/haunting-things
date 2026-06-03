@@ -23,6 +23,7 @@ export function MessageBubble({ message, activePhase, assistantAgent }: MessageB
   const wrappedPrompt = message.role === 'user' && isWrappedTeamPrompt(message.content);
   const content = getMessageFallbackText(message, activePhase);
   const isError = message.status === 'error';
+  const isPhasePlaceholder = message.role === 'assistant' && message.status === 'streaming' && !message.content;
 
   if (message.role === 'user') {
     return (
@@ -80,7 +81,7 @@ export function MessageBubble({ message, activePhase, assistantAgent }: MessageB
             <pre>{message.content}</pre>
           </details>
         ) : (
-          <MarkdownMessage content={content} />
+          <MarkdownMessage content={content} className={isPhasePlaceholder ? 'markdown-message--phase' : undefined} />
         )}
         {message.attachments?.length ? (
           <div className="message-attachments">

@@ -19,6 +19,9 @@
   --success: #027a48;
   --warning: #b54708;
   --danger: #b42318;
+  --phase-fg: #5f6368;
+  --phase-bg: #f4f4f5;
+  --phase-border: #e4e4e7;
   --sidebar-bg: #f9f9f9;
   --sidebar-hover: #ececec;
   --sidebar-active: #e7e7e7;
@@ -1097,9 +1100,9 @@ label,
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 12px;
-  background: var(--panel-muted);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  background: var(--phase-bg);
+  color: var(--phase-fg);
+  border: 1px solid var(--phase-border);
   white-space: nowrap;
 }
 
@@ -1121,8 +1124,9 @@ label,
 
 .phase-badge.tool_calling,
 .agent-phase.tool_calling {
-  color: var(--accent);
-  background: #d1e9ff;
+  color: var(--phase-fg);
+  background: var(--phase-bg);
+  border-color: var(--phase-border);
 }
 
 .agent-badge {
