@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  Conversation,
   ConversationCommands,
   ConversationMode,
   ConversationModels,
   ConversationUsage,
   TeamAgent,
-} from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import { readCachedCommands, writeCachedCommands } from '../commandCache';
-import { readCachedModels, writeCachedModels } from '../modelCache';
+} from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import { readCachedCommands, writeCachedCommands } from '@renderer/shared/commandCache';
+import { readCachedModels, writeCachedModels } from '@renderer/shared/modelCache';
 import {
   normalizeConversationCommands,
+  normalizeConversation,
   normalizeConversationMode,
   normalizeConversationModels,
   normalizeConversationUsage,
-} from '../utils/backendData';
+} from '@renderer/shared/utils/backendData';
 
 /** 当前活跃 Agent 的运行时快照输入。 */
 export type UseRuntimeSnapshotsInput = {
@@ -71,12 +73,28 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       if (!snapshot) return;
       setModeByConversation((prev) => ({ ...prev, [snapshot.conversationId]: snapshot }));
     });
+    const unsubConversationUpdated = bridge.on('conversation.updated', (payload) => {
+      const conversation = normalizeConversation(payload);
+      if (!conversation) return;
+      const usage = buildUsageSnapshot(conversation);
+      if (usage) setUsageByConversation((prev) => ({ ...prev, [usage.conversationId]: usage }));
+      const models = buildModelSnapshot(conversation);
+      if (models) {
+        setModelsByConversation((prev) => ({
+          ...prev,
+          [models.conversationId]: mergeModelSnapshot(prev[models.conversationId], models),
+        }));
+      }
+      const mode = buildModeSnapshot(conversation);
+      if (mode) setModeByConversation((prev) => ({ ...prev, [mode.conversationId]: mode }));
+    });
 
     return () => {
       unsubUsage();
       unsubCommands();
       unsubModels();
       unsubMode();
+      unsubConversationUpdated();
     };
   }, [activeAgent?.backend, activeAgent?.conversationId]);
 
@@ -84,6 +102,24 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
     const conversationId = activeAgent?.conversationId;
     if (!conversationId) return;
 
+    bridge
+      .invoke('conversation.get', { conversationId })
+      .then((value) => {
+        const conversation = normalizeConversation(value);
+        if (!conversation) return;
+        const usage = buildUsageSnapshot(conversation);
+        if (usage) setUsageByConversation((prev) => ({ ...prev, [conversationId]: usage }));
+        const models = buildModelSnapshot(conversation);
+        if (models) {
+          setModelsByConversation((prev) => ({
+            ...prev,
+            [conversationId]: mergeModelSnapshot(prev[conversationId], models),
+          }));
+        }
+        const mode = buildModeSnapshot(conversation);
+        if (mode) setModeByConversation((prev) => ({ ...prev, [conversationId]: mode }));
+      })
+      .catch(() => {});
     bridge
       .invoke('conversation.commands', { conversationId })
       .then((value) => {
@@ -158,4 +194,66 @@ function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
   const next = { ...record };
   delete next[key];
   return next;
+}
+
+/**
+ * 将持久化 Conversation 字段转换为前端 usage 快照。
+ */
+function buildUsageSnapshot(conversation: Conversation): ConversationUsage | null {
+  if (
+    conversation.usageSize === undefined ||
+    conversation.usageUsed === undefined ||
+    conversation.usageRatio === undefined ||
+    conversation.usageUpdatedAt === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    conversationId: conversation.id,
+    size: conversation.usageSize,
+    used: conversation.usageUsed,
+    ratio: conversation.usageRatio,
+    updatedAt: conversation.usageUpdatedAt,
+  };
+}
+
+/**
+ * 将持久化 Conversation 字段转换为最小模型快照。
+ */
+function buildModelSnapshot(conversation: Conversation): ConversationModels | null {
+  if (!conversation.currentModelId) return null;
+  return {
+    conversationId: conversation.id,
+    currentModelId: conversation.currentModelId,
+    models: [],
+    updatedAt: conversation.updatedAt,
+  };
+}
+
+/**
+ * 将持久化 Conversation 字段转换为模式快照。
+ */
+function buildModeSnapshot(conversation: Conversation): ConversationMode | null {
+  if (!conversation.sessionMode) return null;
+  return {
+    conversationId: conversation.id,
+    mode: conversation.sessionMode,
+    updatedAt: conversation.updatedAt,
+  };
+}
+
+/**
+ * 保留已加载的模型列表，只用持久化快照补当前模型。
+ */
+function mergeModelSnapshot(
+  current: ConversationModels | undefined,
+  persisted: ConversationModels
+): ConversationModels {
+  if (!current) return persisted;
+  return {
+    ...current,
+    currentModelId: persisted.currentModelId,
+    updatedAt: Math.max(current.updatedAt, persisted.updatedAt),
+  };
 }

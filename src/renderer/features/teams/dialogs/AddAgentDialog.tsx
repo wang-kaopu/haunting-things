@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
-import type { AgentBackend } from '../../../../shared/types';
-import type { AddAgentInput } from '../../../shared/types/ui';
+import type { AgentBackend } from '@shared/types';
+import type { AddAgentInput } from '@renderer/shared/types/ui';
 
 export type AddAgentDialogProps = {
   open: boolean;

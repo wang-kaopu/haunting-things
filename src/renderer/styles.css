@@ -19,6 +19,9 @@
   --success: #027a48;
   --warning: #b54708;
   --danger: #b42318;
+  --phase-fg: #5f6368;
+  --phase-bg: #f4f4f5;
+  --phase-border: #e4e4e7;
   --sidebar-bg: #f9f9f9;
   --sidebar-hover: #ececec;
   --sidebar-active: #e7e7e7;
@@ -827,7 +830,7 @@ label,
 
 .composer-send {
   flex: 0 0 auto;
-  background: #0d0d0d;
+  background: rgba(52, 64, 84, 0.82);
   color: #ffffff;
   font-weight: 600;
 }
@@ -1097,9 +1100,9 @@ label,
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 12px;
-  background: var(--panel-muted);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  background: var(--phase-bg);
+  color: var(--phase-fg);
+  border: 1px solid var(--phase-border);
   white-space: nowrap;
 }
 
@@ -1121,8 +1124,9 @@ label,
 
 .phase-badge.tool_calling,
 .agent-phase.tool_calling {
-  color: var(--accent);
-  background: #d1e9ff;
+  color: var(--phase-fg);
+  background: var(--phase-bg);
+  border-color: var(--phase-border);
 }
 
 .agent-badge {
@@ -1510,40 +1514,62 @@ label,
 .image-attachment-list {
   display: flex;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   overflow-x: auto;
-  padding: 2px 0;
+  padding: 2px 2px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d9d9 transparent;
 }
 
 .image-attachment-preview {
   position: relative;
   flex: 0 0 auto;
   margin: 0;
+  width: 72px;
+  height: 72px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
 .image-attachment-preview img {
   display: block;
-  width: 72px;
-  height: 72px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 11px;
+  background: #f4f4f4;
 }
 
 .image-attachment-preview button {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 24px;
-  height: 24px;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
   padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
-  line-height: 1;
-  border-color: var(--border);
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  background: #0d0d0d;
+  color: #ffffff;
+  line-height: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.image-attachment-preview button:hover {
+  background: rgba(52, 64, 84, 0.96);
+}
+
+.image-attachment-preview button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 4px rgba(13, 13, 13, 0.18);
 }
 
 /* ================================================================

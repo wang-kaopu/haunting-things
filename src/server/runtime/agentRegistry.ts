@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { AgentBackend, AgentHealth, AgentInfo } from '../../shared/types';
+import type { AgentBackend, AgentHealth, AgentInfo } from '@shared/types';
 
 const execFileAsync = promisify(execFile);
 

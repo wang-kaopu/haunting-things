@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { normalizeAuthResponse, normalizeAuthUser, readJsonResponse } from '../shared/utils/backendData';
-import { Workbench } from './Workbench';
+import { normalizeAuthResponse, normalizeAuthUser, readJsonResponse } from '@renderer/shared/utils/backendData';
+import { Workbench } from '@renderer/app/Workbench';
 
 type AuthUser = {
   id: string;

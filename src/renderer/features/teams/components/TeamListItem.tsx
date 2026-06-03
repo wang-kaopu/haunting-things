@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import type { Team } from '../../../../shared/types';
+import type { Team } from '@shared/types';
 
 export type TeamListItemProps = {
   team: Team;

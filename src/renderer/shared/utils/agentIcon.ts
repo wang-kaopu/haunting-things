@@ -1,8 +1,8 @@
-import type { AgentBackend } from '../../../shared/types';
+import type { AgentBackend } from '@shared/types';
 
-import claudeIcon from '../../assets/icons/agents/claude.svg';
-import codexIcon from '../../assets/icons/agents/openai.svg';
-import defaultIcon from '../../assets/icons/agents/default.svg';
+import claudeIcon from '@renderer/assets/icons/agents/claude.svg';
+import codexIcon from '@renderer/assets/icons/agents/openai.svg';
+import defaultIcon from '@renderer/assets/icons/agents/default.svg';
 
 const agentIconMap: Record<AgentBackend, string> = {
   claude: claudeIcon,

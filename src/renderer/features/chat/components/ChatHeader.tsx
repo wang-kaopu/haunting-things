@@ -1,7 +1,7 @@
 import type React from 'react';
-import type { AgentTurnPhase, ConversationUsage, Team, TeamAgent } from '../../../../shared/types';
-import { formatPhase } from '../../../shared/utils/format';
-import { UsageChip } from './UsageChip';
+import type { AgentTurnPhase, ConversationUsage, Team, TeamAgent } from '@shared/types';
+import { formatPhase } from '@renderer/shared/utils/format';
+import { UsageChip } from '@renderer/features/chat/components/UsageChip';
 
 export type ChatHeaderProps = {
   team: Team | null;

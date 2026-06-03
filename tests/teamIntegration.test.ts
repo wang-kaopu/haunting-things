@@ -7,11 +7,11 @@
  * 对应 PLAN-4.md 中的用例一到用例七。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openDatabase } from '../src/server/db/connection';
-import { MailboxRepository } from '../src/server/db/mailboxRepository';
-import { TaskRepository } from '../src/server/db/taskRepository';
-import { TeamRepository } from '../src/server/db/teamRepository';
-import { EventBus } from '../src/server/events';
+import { openDatabase } from '@server/db/connection';
+import { MailboxRepository } from '@server/db/mailboxRepository';
+import { TaskRepository } from '@server/db/taskRepository';
+import { TeamRepository } from '@server/db/teamRepository';
+import { EventBus } from '@server/events';
 import type {
   AgentBackend,
   AgentEvent,
@@ -22,7 +22,7 @@ import type {
   TeamAgent,
   TeamAgentStatus,
   TeamMailboxEntry,
-} from '../src/shared/types';
+} from '@shared/types';
 
 // ---------------------------------------------------------------------------
 // Mock TeamMcpServer — same pattern as teamService.test.ts
@@ -37,7 +37,7 @@ const mockMcpInstances: Array<{
   callTool: (tool: string, args: Record<string, any>, fromSlotId?: string) => Promise<any>;
 }> = [];
 
-vi.mock('../src/server/mcp/teamMcpServer', () => {
+vi.mock('@server/mcp/teamMcpServer', () => {
   class MockTeamMcpServer {
     readonly teamId;
     readonly getTeam;
@@ -135,7 +135,7 @@ vi.mock('../src/server/mcp/teamMcpServer', () => {
   return { TeamMcpServer: MockTeamMcpServer };
 });
 
-import { TeamService } from '../src/server/services/teamService';
+import { TeamService } from '@server/services/teamService';
 
 // ---------------------------------------------------------------------------
 // FakeConversationService — 按 PLAN-4.md §5 设计

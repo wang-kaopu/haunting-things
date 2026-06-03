@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RequestPermissionRequest, SessionNotification } from '@agentclientprotocol/sdk';
-import { AcpRuntime } from '../src/server/runtime/acpRuntime';
-import type { AgentEvent, ConversationModels, ConversationMode, PermissionRequest } from '../src/shared/types';
+import { AcpRuntime } from '@server/runtime/acpRuntime';
+import type { AgentEvent, ConversationModels, ConversationMode, PermissionRequest } from '@shared/types';
 
 function createRuntime(): AcpRuntime {
   const runtime = new AcpRuntime({

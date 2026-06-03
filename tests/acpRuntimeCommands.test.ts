@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionNotification } from '@agentclientprotocol/sdk';
-import { AcpRuntime } from '../src/server/runtime/acpRuntime';
-import type { ConversationCommands } from '../src/shared/types';
+import { AcpRuntime } from '@server/runtime/acpRuntime';
+import type { ConversationCommands } from '@shared/types';
 
 describe('AcpRuntime available commands', () => {
   it('handles available_commands_update as commands snapshot', () => {

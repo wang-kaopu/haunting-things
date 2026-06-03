@@ -3,9 +3,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { openDatabase } from '../src/server/db/connection';
-import { MailboxRepository } from '../src/server/db/mailboxRepository';
-import { TeamRepository } from '../src/server/db/teamRepository';
+import { openDatabase } from '@server/db/connection';
+import { MailboxRepository } from '@server/db/mailboxRepository';
+import { TeamRepository } from '@server/db/teamRepository';
 
 describe('mailbox repository', () => {
   test('readUnreadAndMark returns unread messages once', () => {

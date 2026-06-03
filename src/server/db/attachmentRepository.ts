@@ -1,6 +1,6 @@
-import type { AttachmentRef, StoredAttachment } from '../../shared/types';
-import type { Db } from './connection';
-import { rowToStoredAttachment, toAttachmentRef } from './mappers';
+import type { AttachmentRef, StoredAttachment } from '@shared/types';
+import type { Db } from '@server/db/connection';
+import { rowToStoredAttachment, toAttachmentRef } from '@server/db/mappers';
 
 /**
  * 管理附件元数据和消息关联关系。

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { TeamAgent } from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import type { AppNotification, PushNotificationInput, RuntimeNotificationContext } from '../types/ui';
-import { normalizeAgentEvent, normalizeTeamMessageEvent } from '../utils/backendData';
-import { formatAgentEvent, shouldShowAgentEventInToast } from '../utils/format';
+import type { TeamAgent } from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import type { AppNotification, PushNotificationInput, RuntimeNotificationContext } from '@renderer/shared/types/ui';
+import { normalizeAgentEvent, normalizeTeamMessageEvent } from '@renderer/shared/utils/backendData';
+import { formatAgentEvent, shouldShowAgentEventInToast } from '@renderer/shared/utils/format';
 
 /** 通知 Hook 需要的运行时上下文。 */
 export type UseNotificationsInput = RuntimeNotificationContext;

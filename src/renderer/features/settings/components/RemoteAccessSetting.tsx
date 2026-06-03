@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { ServerInfo } from '../../../../shared/types';
+import type { ServerInfo } from '@shared/types';
 
 export type RemoteAccessSettingProps = {
   serverInfo: ServerInfo | null;

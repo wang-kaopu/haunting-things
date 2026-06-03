@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { initializeSchema } from './schema';
+import { initializeSchema } from '@server/db/schema';
 
 export type Db = Database.Database;
 

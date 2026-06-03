@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { AgentTurnPhase, ConversationCommands, ConversationMode, TeamAgent } from '../../../../shared/types';
-import { TeamMemberCard } from './TeamMemberCard';
+import type { AgentTurnPhase, ConversationCommands, ConversationMode, TeamAgent } from '@shared/types';
+import { TeamMemberCard } from '@renderer/features/teams/components/TeamMemberCard';
 
 export type TeamMemberListProps = {
   agents: TeamAgent[];

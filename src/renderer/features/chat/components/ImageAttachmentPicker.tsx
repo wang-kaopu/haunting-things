@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
-import type { AttachmentRef } from '../../../../shared/types';
+import type { AttachmentRef } from '@shared/types';
 
 /** 图片选择器的上传行为配置。 */
 export type ImageAttachmentPickerProps = {
@@ -90,11 +90,37 @@ export function ImageAttachmentPreview({
       {attachments.map((attachment) => (
         <figure className="image-attachment-preview" key={attachment.id}>
           <img src={attachment.url} alt={attachment.name} />
-          <button type="button" aria-label={`移除 ${attachment.name}`} onClick={() => onRemove(attachment.id)}>
-            x
+          <button
+            type="button"
+            aria-label={`移除 ${attachment.name}`}
+            title={`移除 ${attachment.name}`}
+            onClick={() => onRemove(attachment.id)}
+          >
+            <RemoveImageIcon />
           </button>
         </figure>
       ))}
     </div>
+  );
+}
+
+/** 图片预览移除图标。 */
+function RemoveImageIcon(): React.ReactElement {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M6 6l12 12M18 6 6 18"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

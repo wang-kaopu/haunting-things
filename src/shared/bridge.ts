@@ -1,4 +1,4 @@
-import type { EventMap, InvokeMap } from './types';
+import type { EventMap, InvokeMap } from '@shared/types';
 
 export type BridgeInvokeName = keyof InvokeMap & string;
 export type BridgeEventName = keyof EventMap & string;

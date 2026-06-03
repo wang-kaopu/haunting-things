@@ -1,6 +1,6 @@
-import type { MailboxMessage } from '../../shared/types';
-import type { Db } from './connection';
-import { rowToMailbox } from './mappers';
+import type { MailboxMessage } from '@shared/types';
+import type { Db } from '@server/db/connection';
+import { rowToMailbox } from '@server/db/mappers';
 
 /** 负责团队内部 Agent 邮箱消息的写入、读取和已读状态推进。 */
 export class MailboxRepository {

@@ -7,11 +7,11 @@ import type {
   ConversationMode,
   ConversationModels,
   TeamAgent,
-} from '../../../../shared/types';
-import { bridge } from '../../../shared/bridgeClient';
-import { normalizeAttachmentRef } from '../../../shared/utils/backendData';
-import { ComposerTools } from './ComposerTools';
-import { ImageAttachmentPicker, ImageAttachmentPreview } from './ImageAttachmentPicker';
+} from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import { normalizeAttachmentRef } from '@renderer/shared/utils/backendData';
+import { ComposerTools } from '@renderer/features/chat/components/ComposerTools';
+import { ImageAttachmentPicker, ImageAttachmentPreview } from '@renderer/features/chat/components/ImageAttachmentPicker';
 
 const ALLOWED_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventBus } from '../src/server/events';
-import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
+import { EventBus } from '@server/events';
+import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '@shared/types';
 
 const mockInstances: Array<{
   teamId: string;
@@ -9,7 +9,7 @@ const mockInstances: Array<{
   getStdioConfig: ReturnType<typeof vi.fn>;
 }> = [];
 
-vi.mock('../src/server/mcp/teamMcpServer', () => {
+vi.mock('@server/mcp/teamMcpServer', () => {
   class MockTeamMcpServer {
     readonly teamId;
     readonly getTeam;
@@ -43,7 +43,7 @@ vi.mock('../src/server/mcp/teamMcpServer', () => {
   return { TeamMcpServer: MockTeamMcpServer };
 });
 
-import { TeamService } from '../src/server/services/teamService';
+import { TeamService } from '@server/services/teamService';
 
 type FakeRepository = {
   createTeam(team: Team): Team;

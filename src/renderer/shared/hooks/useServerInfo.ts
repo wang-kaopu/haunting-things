@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ServerInfo } from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import { normalizeServerInfo } from '../utils/backendData';
+import type { ServerInfo } from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import { normalizeServerInfo } from '@renderer/shared/utils/backendData';
 
 /** 服务监听地址和远程访问配置状态。 */
 export type UseServerInfoResult = {

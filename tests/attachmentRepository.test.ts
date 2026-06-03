@@ -2,9 +2,9 @@ import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AttachmentRepository } from '../src/server/db/attachmentRepository';
-import { openDatabase } from '../src/server/db/connection';
-import { AttachmentService } from '../src/server/services/attachmentService';
+import { AttachmentRepository } from '@server/db/attachmentRepository';
+import { openDatabase } from '@server/db/connection';
+import { AttachmentService } from '@server/services/attachmentService';
 
 const PNG_1X1_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l6Rj2wAAAABJRU5ErkJggg==';
@@ -76,9 +76,9 @@ describe('AttachmentRepository', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run('mailbox-1', 'team-1', 'leader', 'user', 'hello', 0, now);
     db.prepare(
-      `INSERT INTO messages (id, conversation_id, role, content, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)`
-    ).run('message-1', 'conversation-1', 'user', 'hello', 'done', now);
+      `INSERT INTO messages (id, conversation_id, role, type, content, status, sequence, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('message-1', 'conversation-1', 'user', 'text', 'hello', 'done', 1, now);
 
     const attachment = repo.createAttachment(
       await service.saveImage({

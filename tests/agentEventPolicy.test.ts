@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyAgentEvent } from '../src/server/agentEventPolicy';
+import { classifyAgentEvent } from '@server/agentEventPolicy';
 
 describe('classifyAgentEvent', () => {
   it('marks streaming and update events according to the logging policy', () => {

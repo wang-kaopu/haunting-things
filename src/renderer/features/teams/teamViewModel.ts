@@ -1,4 +1,4 @@
-import type { Team, TeamMailboxEntry } from '../../../shared/types';
+import type { Team, TeamMailboxEntry } from '@shared/types';
 
 /** Team 发送框最终会调用的 bridge RPC。 */
 export type TeamSendInvocation =

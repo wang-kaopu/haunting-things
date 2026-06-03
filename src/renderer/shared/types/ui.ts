@@ -10,7 +10,7 @@ import type {
   ConversationUsage,
   Team,
   TeamAgent,
-} from '../../../shared/types';
+} from '@shared/types';
 
 export type ActiveTeamState = {
   team: Team | null;

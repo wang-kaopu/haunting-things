@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { AgentTurnPhase, TeamAgent } from '../../../../shared/types';
-import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
+import type { AgentTurnPhase, TeamAgent } from '@shared/types';
+import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
 
 export type SidebarAgentListProps = {
   agents: TeamAgent[];

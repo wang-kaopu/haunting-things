@@ -1,4 +1,4 @@
-import type { AcpAvailableCommand, AgentBackend, ConversationCommands } from '../../shared/types';
+import type { AcpAvailableCommand, AgentBackend, ConversationCommands } from '@shared/types';
 
 const STORAGE_KEY = 'haunting-souls.command-cache.v1';
 

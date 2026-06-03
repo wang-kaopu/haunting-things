@@ -7,17 +7,17 @@ import type {
   TeamAgent,
   TeamMailboxEntry,
   TeamTask,
-} from '../../shared/types';
-import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
-import type { MailboxRepositoryPort } from '../db/mailboxRepository';
-import type { TaskRepositoryPort } from '../db/taskRepository';
-import type { TeamRepositoryPort } from '../db/teamRepository';
-import type { ConversationService } from './conversationService';
-import type { AttachmentService } from './attachmentService';
-import type { EventBus } from '../events';
-import { createId } from '../id';
-import { createLogger } from '../utils/logger';
-import { TeamMcpServer } from '../mcp/teamMcpServer';
+} from '@shared/types';
+import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import type { MailboxRepositoryPort } from '@server/db/mailboxRepository';
+import type { TaskRepositoryPort } from '@server/db/taskRepository';
+import type { TeamRepositoryPort } from '@server/db/teamRepository';
+import type { ConversationService } from '@server/services/conversationService';
+import type { AttachmentService } from '@server/services/attachmentService';
+import type { EventBus } from '@server/events';
+import { createId } from '@server/id';
+import { createLogger } from '@server/utils/logger';
+import { TeamMcpServer } from '@server/mcp/teamMcpServer';
 
 /** 运行时 Team 会话：持有 Team 快照和对应的 MCP TCP 服务。 */
 type TeamSession = {

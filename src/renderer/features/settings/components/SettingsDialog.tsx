@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { ServerInfo } from '../../../../shared/types';
-import { SettingsPanel } from './SettingsPanel';
+import type { ServerInfo } from '@shared/types';
+import { SettingsPanel } from '@renderer/features/settings/components/SettingsPanel';
 
 export type SettingsDialogProps = {
   open: boolean;

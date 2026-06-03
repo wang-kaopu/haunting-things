@@ -1,4 +1,4 @@
-export type * from './agent';
-export type * from './conversation';
-export type * from './team';
-export type * from './bridge';
+export type * from '@shared/types/agent';
+export type * from '@shared/types/conversation';
+export type * from '@shared/types/team';
+export type * from '@shared/types/bridge';

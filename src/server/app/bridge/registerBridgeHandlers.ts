@@ -1,11 +1,11 @@
-import type { AgentBackend, ServerInfo } from '../../../shared/types';
-import type { AttachmentRepositoryPort } from '../../db/attachmentRepository';
-import { toAttachmentRef } from '../../db/mappers';
-import { healthAgent, listAgents } from '../../runtime/agentRegistry';
-import type { AttachmentService } from '../../services/attachmentService';
-import type { ConversationService } from '../../services/conversationService';
-import type { TeamService } from '../../services/teamService';
-import type { WebBridge } from './webBridge';
+import type { AgentBackend, ServerInfo } from '@shared/types';
+import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import { toAttachmentRef } from '@server/db/mappers';
+import { healthAgent, listAgents } from '@server/runtime/agentRegistry';
+import type { AttachmentService } from '@server/services/attachmentService';
+import type { ConversationService } from '@server/services/conversationService';
+import type { TeamService } from '@server/services/teamService';
+import type { WebBridge } from '@server/app/bridge/webBridge';
 
 /**
  * 注册 renderer 可调用的 bridge RPC。
@@ -39,6 +39,7 @@ export function registerBridgeHandlers(input: {
   bridge.register('conversation.setModel', (params) => conversations.setModel(params));
   bridge.register('conversation.setMode', (params) => conversations.setMode(params));
   bridge.register('conversation.list', () => conversations.list());
+  bridge.register('conversation.get', ({ conversationId }) => conversations.get(conversationId));
   bridge.register('conversation.messages', ({ conversationId }) => conversations.messages(conversationId));
   bridge.register('conversation.agentEvents', ({ conversationId, limit }) =>
     conversations.agentEvents(conversationId, limit)

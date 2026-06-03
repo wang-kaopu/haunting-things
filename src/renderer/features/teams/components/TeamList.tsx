@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { Team } from '../../../../shared/types';
-import { TeamListItem } from './TeamListItem';
+import type { Team } from '@shared/types';
+import { TeamListItem } from '@renderer/features/teams/components/TeamListItem';
 
 export type TeamListProps = {
   teams: Team[];

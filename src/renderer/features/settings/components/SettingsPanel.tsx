@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { ServerInfo } from '../../../../shared/types';
-import { RemoteAccessSetting } from './RemoteAccessSetting';
+import type { ServerInfo } from '@shared/types';
+import { RemoteAccessSetting } from '@renderer/features/settings/components/RemoteAccessSetting';
 
 export type SettingsPanelProps = {
   serverInfo: ServerInfo | null;

@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EventBus } from '../src/server/events';
-import { ConversationService } from '../src/server/services/conversationService';
-import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '../src/shared/types';
+import { EventBus } from '@server/events';
+import { ConversationService } from '@server/services/conversationService';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '@shared/types';
 
 const runtimeInstances: Array<{
   send: ReturnType<typeof vi.fn>;
   cancelCurrentTurn: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  input: unknown;
 }> = [];
 
-vi.mock('../src/server/runtime/acpRuntime', () => {
+vi.mock('@server/runtime/acpRuntime', () => {
   const { EventEmitter } = require('node:events') as typeof import('node:events');
 
   class MockAcpRuntime extends EventEmitter {
@@ -17,9 +18,9 @@ vi.mock('../src/server/runtime/acpRuntime', () => {
     readonly cancelCurrentTurn = vi.fn(async () => true);
     readonly stop = vi.fn();
 
-    constructor(_input: unknown) {
+    constructor(input: unknown) {
       super();
-      runtimeInstances.push({ send: this.send, cancelCurrentTurn: this.cancelCurrentTurn, stop: this.stop });
+      runtimeInstances.push({ send: this.send, cancelCurrentTurn: this.cancelCurrentTurn, stop: this.stop, input });
     }
   }
 
@@ -45,6 +46,11 @@ function createFakeRepository() {
     listConversations(): Conversation[] {
       return [...conversations.values()].map((conversation) => structuredClone(conversation));
     },
+    listConversationsByStatus(status: Conversation['status']): Conversation[] {
+      return [...conversations.values()]
+        .filter((conversation) => conversation.status === status)
+        .map((conversation) => structuredClone(conversation));
+    },
     updateConversationModel(id: string, model: string | undefined): void {
       const conversation = conversations.get(id);
       if (conversation) conversations.set(id, { ...conversation, model, updatedAt: Date.now() });
@@ -53,11 +59,66 @@ function createFakeRepository() {
       const conversation = conversations.get(id);
       if (conversation) conversations.set(id, { ...conversation, status, updatedAt: Date.now() });
     },
+    updateConversationAcpSession(id: string, acpSessionId: string): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationSessionRestoreState(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId: patch.acpSessionId, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationRuntimeState(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationTurnResult(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    finalizeInterruptedConversation(input: {
+      conversationId: string;
+      lastTurnId?: string;
+      reason: 'app_restarted' | 'runtime_missing';
+      message: string;
+    }): void {
+      const conversation = conversations.get(input.conversationId);
+      if (!conversation) return;
+      conversations.set(input.conversationId, {
+        ...conversation,
+        status: 'stopped',
+        lastTurnId: input.lastTurnId ?? conversation.lastTurnId,
+        lastStopReason: 'stopped',
+        lastError: `${input.message} (${input.reason})`,
+        updatedAt: Date.now(),
+      });
+    },
+    finalizeStreamingMessages(input: { conversationId: string; stopReason: 'stopped' }): void {
+      const list = messages.get(input.conversationId) ?? [];
+      messages.set(
+        input.conversationId,
+        list.map((message) =>
+          message.status === 'streaming' ? { ...message, status: 'done', stopReason: input.stopReason } : message
+        )
+      );
+    },
     addMessage(message: ChatMessage): ChatMessage {
       const list = messages.get(message.conversationId) ?? [];
-      list.push(structuredClone(message));
+      const stored = { ...message, sequence: list.length + 1 };
+      list.push(structuredClone(stored));
       messages.set(message.conversationId, list);
-      return message;
+      return stored;
     },
     updateMessage(message: ChatMessage): void {
       const list = messages.get(message.conversationId) ?? [];
@@ -68,6 +129,9 @@ function createFakeRepository() {
     listMessages(conversationId: string): ChatMessage[] {
       return structuredClone(messages.get(conversationId) ?? []);
     },
+    messageExists(messageId: string): boolean {
+      return [...messages.values()].some((list) => list.some((message) => message.id === messageId));
+    },
     addAgentEvent(event: AgentEvent): AgentEvent {
       const list = agentEvents.get(event.conversationId) ?? [];
       list.push(structuredClone(event));
@@ -76,6 +140,10 @@ function createFakeRepository() {
     },
     listAgentEvents(conversationId: string): AgentEvent[] {
       return structuredClone(agentEvents.get(conversationId) ?? []);
+    },
+    replaceConversationMcpServers(): void {},
+    listConversationMcpServers(): never[] {
+      return [];
     },
   };
 }
@@ -96,7 +164,9 @@ describe('ConversationService runtime prompt separation', () => {
     const runtime = runtimeInstances.at(-1);
     expect(runtime).toBeDefined();
     expect(runtime?.send).toHaveBeenCalledWith(
-      expect.stringContaining('Available team RPC tools:')
+      expect.objectContaining({
+        text: expect.stringContaining('Available team RPC tools:'),
+      })
     );
 
     const storedMessages = conversations.messages(conversation.id);
@@ -106,6 +176,32 @@ describe('ConversationService runtime prompt separation', () => {
       content: 'user: 原来是这样',
     });
     expect(storedMessages[0].content).not.toContain('Available team RPC tools:');
+  });
+
+  it('builds restore context from prior stable text messages before sending the current prompt', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
+
+    await conversations.sendMessage({
+      conversationId: conversation.id,
+      content: '第一条消息',
+    });
+    await conversations.sendMessage({
+      conversationId: conversation.id,
+      content: '第二条消息',
+    });
+
+    const runtime = runtimeInstances.at(-1);
+    expect(runtime?.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        text: '第二条消息',
+        restoreContext: expect.stringContaining('用户: 第一条消息'),
+      })
+    );
+    const lastPrompt = runtime?.send.mock.calls.at(-1)?.[0] as { restoreContext?: string };
+    expect(lastPrompt.restoreContext).not.toContain('第二条消息');
   });
 
   it('forwards current turn cancellation to the active runtime', async () => {
@@ -138,6 +234,63 @@ describe('ConversationService runtime prompt separation', () => {
     expect(emitSpy).toHaveBeenCalledWith('conversation.status', {
       conversationId: conversation.id,
       status: 'idle',
+    });
+  });
+
+  it('finalizes running conversation when cancellation finds no runtime', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const emitSpy = vi.spyOn(events, 'emit');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
+    repo.updateConversationStatus(conversation.id, 'running');
+
+    const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
+
+    expect(result).toEqual({ accepted: true });
+    expect(conversations.list().find((item) => item.id === conversation.id)).toMatchObject({
+      status: 'stopped',
+      lastStopReason: 'stopped',
+    });
+    expect(emitSpy).toHaveBeenCalledWith('conversation.status', {
+      conversationId: conversation.id,
+      status: 'stopped',
+      error: '运行时已丢失，当前轮次已停止',
+    });
+  });
+
+  it('recovers stale running conversations on service startup', () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const emitSpy = vi.spyOn(events, 'emit');
+    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
+    repo.updateConversationStatus(conversation.id, 'running');
+    repo.addMessage({
+      id: 'assistant-streaming',
+      conversationId: conversation.id,
+      role: 'assistant',
+      type: 'text',
+      content: 'partial',
+      status: 'streaming',
+      createdAt: Date.now(),
+      sequence: 0,
+    });
+
+    conversations.recoverStaleRuntimeState();
+
+    expect(conversations.list().find((item) => item.id === conversation.id)).toMatchObject({
+      status: 'stopped',
+      lastStopReason: 'stopped',
+    });
+    expect(conversations.messages(conversation.id)[0]).toMatchObject({
+      status: 'done',
+      stopReason: 'stopped',
+    });
+    expect(emitSpy).toHaveBeenCalledWith('conversation.status', {
+      conversationId: conversation.id,
+      status: 'stopped',
+      error: '应用重启，上一轮运行时已丢失',
     });
   });
 

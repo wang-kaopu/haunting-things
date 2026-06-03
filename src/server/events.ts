@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
-import type { BridgeEventMessage, BridgeEventName } from '../shared/bridge';
-import type { EventMap } from '../shared/types';
+import type { BridgeEventMessage, BridgeEventName } from '@shared/bridge';
+import type { EventMap } from '@shared/types';
 
 /**
  * 服务端 WebSocket 事件的内存广播总线。

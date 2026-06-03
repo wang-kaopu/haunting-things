@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { AgentTurnPhase, ConversationCommands, ConversationMode, Team } from '../../../shared/types';
-import { TeamMemberList } from './components/TeamMemberList';
+import type { AgentTurnPhase, ConversationCommands, ConversationMode, Team } from '@shared/types';
+import { TeamMemberList } from '@renderer/features/teams/components/TeamMemberList';
 
 /** 右侧 Team 成员抽屉输入。 */
 export type TeamDrawerProps = {

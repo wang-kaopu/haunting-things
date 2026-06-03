@@ -4,10 +4,10 @@ import type {
   ConversationMode,
   ConversationModels,
   TeamAgent,
-} from '../../../../shared/types';
-import { AgentCommandsMenu } from './AgentCommandsMenu';
-import { ModelPicker } from './ModelPicker';
-import { PermissionModePicker } from './PermissionModePicker';
+} from '@shared/types';
+import { AgentCommandsMenu } from '@renderer/features/chat/components/AgentCommandsMenu';
+import { ModelPicker } from '@renderer/features/chat/components/ModelPicker';
+import { PermissionModePicker } from '@renderer/features/chat/components/PermissionModePicker';
 
 /** Composer 工具栏展示所需的运行时状态。 */
 export type ComposerToolsProps = {

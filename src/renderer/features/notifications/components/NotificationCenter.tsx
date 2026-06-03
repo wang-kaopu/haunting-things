@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { AppNotification } from '../../../shared/types/ui';
-import { ToastItem } from './ToastItem';
+import type { AppNotification } from '@renderer/shared/types/ui';
+import { ToastItem } from '@renderer/features/notifications/components/ToastItem';
 
 /** Toast 通知中心输入。 */
 export type NotificationCenterProps = {
