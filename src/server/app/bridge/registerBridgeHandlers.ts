@@ -50,6 +50,7 @@ export function registerBridgeHandlers(input: {
     await conversations.sendMessage(params);
     return { accepted: true };
   });
+  bridge.register('conversation.cancel', (params) => conversations.cancelCurrentTurn(params));
   bridge.register('conversation.confirmPermission', (params) => conversations.confirmPermission(params));
   bridge.register('conversation.respondPermission', (params) => conversations.respondPermission(params));
   bridge.register('conversation.deleteMessage', (params) => conversations.deleteMessage(params));

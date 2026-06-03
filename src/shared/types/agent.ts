@@ -157,6 +157,7 @@ export type AgentEvent =
       conversationId: string;
       turnId: string;
       status: ConversationStatus;
+      stopReason?: string;
       at: number;
     };
 

@@ -259,7 +259,12 @@ export function normalizeAgentEvent(value: unknown): AgentEvent | null {
         detail: input.detail,
       };
     case 'agent.done':
-      return { ...base, type, status: enumValue(input.status, conversationStatuses, 'idle') };
+      return {
+        ...base,
+        type,
+        status: enumValue(input.status, conversationStatuses, 'idle'),
+        stopReason: optionalString(input.stopReason),
+      };
     default:
       return null;
   }
@@ -375,6 +380,23 @@ export function normalizeTeamAgentStatusEvent(
     teamId,
     slotId,
     status: enumValue(input.status, agentStatuses, 'idle'),
+    error: optionalString(input.error),
+  };
+}
+
+/**
+ * 归一化 Conversation 状态变更事件。
+ */
+export function normalizeConversationStatusEvent(
+  value: unknown
+): { conversationId: string; status: ConversationStatus; error?: string } | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const conversationId = asString(input.conversationId);
+  if (!conversationId) return null;
+  return {
+    conversationId,
+    status: enumValue(input.status, conversationStatuses, 'idle'),
     error: optionalString(input.error),
   };
 }

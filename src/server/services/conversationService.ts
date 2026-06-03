@@ -315,6 +315,44 @@ export class ConversationService {
     });
   }
 
+  /**
+   * 取消指定 Conversation 当前正在执行的 ACP prompt turn。
+   */
+  async cancelCurrentTurn(input: { conversationId: string }): Promise<{ accepted: boolean; error?: string }> {
+    const runtime = this.runtimes.get(input.conversationId);
+    if (!runtime) {
+      this.logger.warn('conversation_cancel_runtime_missing', {
+        conversationId: input.conversationId,
+      });
+      this.markConversationIdle(input.conversationId);
+      return { accepted: true };
+    }
+
+    try {
+      const accepted = await runtime.cancelCurrentTurn();
+      if (!accepted) {
+        this.markConversationIdle(input.conversationId);
+        return { accepted: true };
+      }
+      return { accepted: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn('conversation_cancel_failed', {
+        conversationId: input.conversationId,
+        error: message,
+      });
+      runtime.stop('idle');
+      this.runtimes.delete(input.conversationId);
+      return { accepted: false, error: message };
+    }
+  }
+
+  /** 将 Conversation 对外状态恢复为空闲，用于取消请求已无可用 runtime 的恢复路径。 */
+  private markConversationIdle(conversationId: string): void {
+    this.repo.updateConversationStatus(conversationId, 'idle');
+    this.events.emit('conversation.status', { conversationId, status: 'idle' });
+  }
+
   async deleteMessage(input: { messageId: string }): Promise<{ deleted: true }> {
     const attachments = this.attachmentsRepo?.deleteMessage(input.messageId) ?? [];
     await this.attachmentService?.deleteStoredFiles(attachments);

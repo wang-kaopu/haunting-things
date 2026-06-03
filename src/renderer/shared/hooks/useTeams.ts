@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Team, TeamAgent } from '../../../shared/types';
+import type { ConversationStatus, Team, TeamAgent } from '../../../shared/types';
 import { bridge } from '../bridgeClient';
 import type { AddAgentInput, CreateTeamInput } from '../types/ui';
-import { normalizeTeam, normalizeTeamAgent, normalizeTeamAgentStatusEvent, normalizeTeamList } from '../utils/backendData';
+import {
+  normalizeConversationStatusEvent,
+  normalizeTeam,
+  normalizeTeamAgent,
+  normalizeTeamAgentStatusEvent,
+  normalizeTeamList,
+} from '../utils/backendData';
 
 /** Team 列表和成员变更操作状态。 */
 export type UseTeamsResult = {
@@ -63,11 +69,26 @@ export function useTeams(): UseTeamsResult {
         )
       );
     });
+    const unsubConversationStatus = bridge.on('conversation.status', (payload) => {
+      const event = normalizeConversationStatusEvent(payload);
+      if (!event) return;
+      setTeams((current) =>
+        current.map((team) => ({
+          ...team,
+          agents: (team.agents ?? []).map((agent) =>
+            agent.conversationId === event.conversationId
+              ? { ...agent, status: conversationStatusToAgentStatus(event.status) }
+              : agent
+          ),
+        }))
+      );
+    });
 
     return () => {
       unsubAdded();
       unsubRemoved();
       unsubStatus();
+      unsubConversationStatus();
     };
   }, [refreshTeams]);
 
@@ -115,4 +136,11 @@ export function useTeams(): UseTeamsResult {
     addAgent,
     updateTeam,
   };
+}
+
+function conversationStatusToAgentStatus(status: ConversationStatus): TeamAgent['status'] {
+  if (status === 'running') return 'active';
+  if (status === 'failed') return 'failed';
+  if (status === 'stopped') return 'stopped';
+  return 'idle';
 }

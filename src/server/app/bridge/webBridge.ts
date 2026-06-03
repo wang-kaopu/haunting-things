@@ -141,6 +141,7 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
     case 'conversation.deleteMessageAttachment':
       return pick(input, ['messageId', 'attachmentId']);
     case 'conversation.sendMessage':
+    case 'conversation.cancel':
     case 'team.sendMessage':
     case 'team.sendMessageToAgent':
       return {

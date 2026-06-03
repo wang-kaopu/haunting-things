@@ -73,6 +73,10 @@ export type InvokeMap = {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
   };
+  'conversation.cancel': {
+    params: { conversationId: string };
+    result: { accepted: boolean; error?: string };
+  };
   'conversation.deleteMessage': { params: { messageId: string }; result: { deleted: true } };
   'conversation.deleteMessageAttachment': {
     params: { messageId: string; attachmentId: string };

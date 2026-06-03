@@ -1,6 +1,7 @@
 import {
   ClientSideConnection,
   PROTOCOL_VERSION,
+  type PromptResponse,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -94,7 +95,7 @@ type AcpRuntimeAgentEventInput =
     message: string;
     detail?: unknown;
   }
-  | { type: 'agent.done'; status: ConversationStatus };
+  | { type: 'agent.done'; status: ConversationStatus; stopReason?: string };
 
 /** 面向 ACP SDK 的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
 type McpServer = {
@@ -139,6 +140,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   private sessionId: string | null = null;
   private assistantMessage: ChatMessage | null = null;
   private activePrompt = false;
+  private cancelRequested = false;
+  private forcedStopStatus: ConversationStatus | null = null;
   private activeTurnId: string | null = null;
   private turnFinalized = false;
   private turnPhase: AgentTurnPhase = 'queued';
@@ -183,6 +186,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     const runtimeInput = typeof input === 'string' ? { text: input, attachments: [] } : input;
     await this.ensureStarted();
     this.activeTurnId = createId();
+    this.cancelRequested = false;
     this.turnFinalized = false;
     this.turnPhase = 'thinking';
     this.hasReplyStarted = false;
@@ -210,14 +214,23 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
     try {
       const prompt = await this.buildPromptBlocks(runtimeInput);
-      await this.runConnectionRequest(() =>
+      const result = await this.runConnectionRequest(() =>
         this.connection!.prompt({
           sessionId: this.sessionId!,
           prompt,
         })
       );
+      if (this.isCancelledPromptResponse(result)) {
+        this.finalizeCancelledTurn();
+        return;
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+
+      if (this.cancelRequested) {
+        this.finalizeCancelledTurn();
+        return;
+      }
 
       if (!this.turnFinalized) {
         const turnId = this.activeTurnId;
@@ -237,6 +250,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         this.turnFinalized = true;
         this.turnPhase = 'done';
         this.activeTurnId = null;
+        this.cancelRequested = false;
         this.logger.error('prompt_failed', {
           conversationId: this.input.conversationId,
           turnId,
@@ -262,6 +276,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     this.emit('status', 'idle');
     this.emitAgentEvent({ type: 'agent.done', status: 'idle' });
     this.turnFinalized = true;
+    this.cancelRequested = false;
     this.logger.info('prompt_done', {
       conversationId: this.input.conversationId,
       turnId: this.activeTurnId,
@@ -270,6 +285,48 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     });
     this.activeTurnId = null;
     this.emit('finish', 'idle');
+  }
+
+  /**
+   * 取消当前 ACP prompt turn。
+   *
+   * 这里只发送 `session/cancel` notification，不关闭 ACP 子进程；
+   * 原始 `session/prompt` 会在 Agent 中断后返回 cancelled stopReason。
+   */
+  async cancelCurrentTurn(): Promise<boolean> {
+    if (!this.connection || !this.sessionId || !this.activePrompt) {
+      this.logger.warn('prompt_cancel_ignored', {
+        conversationId: this.input.conversationId,
+        hasConnection: Boolean(this.connection),
+        hasSession: Boolean(this.sessionId),
+        activePrompt: this.activePrompt,
+      });
+      return false;
+    }
+
+    if (this.cancelRequested) return true;
+
+    this.cancelRequested = true;
+    this.logger.info('prompt_cancel_start', {
+      conversationId: this.input.conversationId,
+      turnId: this.activeTurnId,
+      sessionId: this.sessionId,
+    });
+
+    try {
+      await this.connection.cancel({ sessionId: this.sessionId });
+    } catch (error) {
+      this.cancelRequested = false;
+      this.logger.warn('prompt_cancel_failed', {
+        conversationId: this.input.conversationId,
+        turnId: this.activeTurnId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+
+    this.cancelPendingPermissions();
+    return true;
   }
 
   private async buildPromptBlocks(input: RuntimePromptInput): Promise<AcpPromptBlock[]> {
@@ -346,14 +403,25 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   /**
    * 强制停止代理进程，清理所有状态。
    * 未完成的权限请求会以 `cancelled` 响应，pending SDK 请求会被 reject。
+   *
+   * @param finalStatus - 对外广播的最终状态；默认用于真正停止 runtime 的 `stopped`。
    */
-  stop(): void {
+  stop(finalStatus: ConversationStatus = 'stopped'): void {
+    this.forcedStopStatus = finalStatus;
+    if (finalStatus === 'idle' && this.activeTurnId && !this.turnFinalized) {
+      this.cancelPendingPermissions();
+      this.finalizeCancelledTurn();
+    }
+
     if (this.child) {
       this.child.kill();
       this.child = null;
     }
     this.connection = null;
-    this.emit('status', 'stopped');
+    this.cancelRequested = false;
+    if (finalStatus !== 'idle') {
+      this.emit('status', finalStatus);
+    }
   }
 
   /**
@@ -407,6 +475,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     /** 进程正常退出后的清理逻辑。 */
     child.once('exit', (code, signal) => {
       const wasClean = code === 0 || signal === 'SIGTERM';
+      const forcedStatus = this.forcedStopStatus;
+      this.forcedStopStatus = null;
       this.child = null;
       this.connection = null;
       const error = new Error(`ACP exited (code=${code ?? signal})`);
@@ -415,7 +485,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         resolve({ outcome: { outcome: 'cancelled' } });
       }
       this.pendingPermissions.clear();
-      const status: ConversationStatus = wasClean ? 'stopped' : 'failed';
+      const status: ConversationStatus = forcedStatus ?? (wasClean ? 'stopped' : 'failed');
       if (this.activeTurnId && !this.turnFinalized) {
         if (!wasClean) {
           this.turnPhase = 'failed';
@@ -430,7 +500,9 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
         this.turnFinalized = true;
         this.turnPhase = 'done';
         this.activeTurnId = null;
+        this.cancelRequested = false;
       }
+      if (forcedStatus === 'idle') return;
       this.emit('status', status, wasClean ? undefined : error.message);
       this.emit('finish', status);
     });
@@ -556,6 +628,46 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
           keys: Object.keys(update),
         });
     }
+  }
+
+  /** 判断 `session/prompt` 是否按 ACP 语义以取消结束。 */
+  private isCancelledPromptResponse(result: PromptResponse): boolean {
+    const raw = result as Record<string, unknown>;
+    const stopReason = this.readString(raw.stopReason) ?? this.readString(raw.stop_reason);
+    if (!stopReason) return false;
+    const normalized = stopReason.toLowerCase();
+    return normalized === 'cancelled' || normalized === 'canceled';
+  }
+
+  /** 按取消语义结束当前 turn，保留已流式输出的 assistant 内容。 */
+  private finalizeCancelledTurn(): void {
+    if (this.turnFinalized) return;
+
+    const turnId = this.activeTurnId;
+    if (this.assistantMessage) {
+      this.assistantMessage = { ...this.assistantMessage, status: 'done' };
+      this.emit('message', this.assistantMessage);
+      if (this.hasReplyStarted) {
+        this.emitAgentEvent({
+          type: 'agent.reply.done',
+          messageId: this.assistantMessage.id,
+          content: this.assistantMessage.content,
+        });
+      }
+    }
+
+    this.turnPhase = 'done';
+    this.emit('status', 'idle');
+    this.emitAgentEvent({ type: 'agent.done', status: 'idle', stopReason: 'cancelled' });
+    this.turnFinalized = true;
+    this.activeTurnId = null;
+    this.cancelRequested = false;
+    this.logger.info('prompt_cancelled', {
+      conversationId: this.input.conversationId,
+      turnId,
+      replyLength: this.assistantMessage?.content.length ?? 0,
+    });
+    this.emit('finish', 'idle');
   }
 
   /** 将流式 assistant 文本片段追加到当前进行中的 assistant 消息。 */
@@ -1134,6 +1246,14 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       this.pendingPermissions.set(callId, resolve);
       this.emit('permission', permissionRequest);
     });
+  }
+
+  /** 取消所有未完成的权限请求，满足 ACP 取消流程对 pending permission 的要求。 */
+  private cancelPendingPermissions(): void {
+    for (const resolve of this.pendingPermissions.values()) {
+      resolve({ outcome: { outcome: 'cancelled' } });
+    }
+    this.pendingPermissions.clear();
   }
 
   /**

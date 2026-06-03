@@ -25,6 +25,7 @@ export type ChatLayoutProps = {
   mode?: ConversationMode | null;
   onOpenSidebar?: () => void;
   onSendMessage: (payload: SendBoxPayload) => Promise<void>;
+  onCancelTurn: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
 };
@@ -46,6 +47,7 @@ export function ChatLayout({
   mode,
   onOpenSidebar,
   onSendMessage,
+  onCancelTurn,
   onSetModel,
   onSetMode,
 }: ChatLayoutProps): React.ReactElement {
@@ -79,10 +81,12 @@ export function ChatLayout({
       <SendBox
         disabled={!team || !activeAgent}
         activeAgent={activeAgent}
+        activePhase={activePhase}
         commands={commands}
         models={models}
         mode={mode}
         onSend={onSendMessage}
+        onCancel={onCancelTurn}
         onSetModel={onSetModel}
         onSetMode={onSetMode}
       />

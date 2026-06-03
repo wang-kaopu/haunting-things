@@ -19,6 +19,7 @@ export type UseConversationStreamResult = {
   loading: boolean;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   sendTeamMessage: (payload: SendBoxPayload) => Promise<void>;
+  cancelCurrentTurn: () => Promise<void>;
   phaseByConversation: Record<string, AgentTurnPhase>;
 };
 
@@ -138,6 +139,20 @@ export function useConversationStream({
     [activeAgent?.slotId, activeTeam]
   );
 
+  const cancelCurrentTurn = useCallback(async () => {
+    const conversationId = activeAgent?.conversationId;
+    if (!conversationId) return;
+    const result = await bridge.invoke('conversation.cancel', { conversationId });
+    if (!result.accepted) {
+      if (isRecoverableCancelError(result.error)) {
+        setPhaseByConversation((prev) => ({ ...prev, [conversationId]: 'done' }));
+        return;
+      }
+      throw new Error(result.error ?? '取消请求未被接受');
+    }
+    setPhaseByConversation((prev) => ({ ...prev, [conversationId]: 'done' }));
+  }, [activeAgent?.conversationId]);
+
   const conversationId = activeAgent?.conversationId;
   return {
     messages,
@@ -146,6 +161,11 @@ export function useConversationStream({
     loading,
     setMessages,
     sendTeamMessage,
+    cancelCurrentTurn,
     phaseByConversation,
   };
+}
+
+function isRecoverableCancelError(error?: string): boolean {
+  return error === 'runtime not found' || error === 'no active prompt';
 }

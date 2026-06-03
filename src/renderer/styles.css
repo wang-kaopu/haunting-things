@@ -833,6 +833,21 @@ label,
   background: #2f2f2f;
 }
 
+.composer-send--stop {
+  background: #0d0d0d;
+}
+
+.composer-send--stop:hover {
+  background: #2f2f2f;
+}
+
+.composer-stop-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
 .composer-send:disabled {
   background: #d0d0d0;
   color: #ffffff;

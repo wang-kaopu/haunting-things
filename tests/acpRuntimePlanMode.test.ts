@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RequestPermissionRequest, SessionNotification } from '@agentclientprotocol/sdk';
 import { AcpRuntime } from '../src/server/runtime/acpRuntime';
 import type { AgentEvent, ConversationModels, ConversationMode, PermissionRequest } from '../src/shared/types';
@@ -190,5 +190,64 @@ describe('AcpRuntime plan and mode mappings', () => {
     });
     expect(permissions[0].body).toContain('"path": "src/index.ts"');
     expect(response).toBeDefined();
+  });
+
+  it('sends session cancel notification and cancels pending permission requests', async () => {
+    const runtime = createRuntime();
+    const cancel = vi.fn(async () => undefined);
+    (runtime as any).connection = { cancel };
+    (runtime as any).sessionId = 'session-1';
+    (runtime as any).activePrompt = true;
+
+    const responsePromise = runtime['handlePermissionRequest']({
+      options: [
+        {
+          optionId: 'allow',
+          name: 'Allow',
+        },
+      ],
+      toolCall: {
+        toolCallId: 'call-1',
+        title: 'Run tool',
+      },
+    } as RequestPermissionRequest);
+
+    const accepted = await runtime.cancelCurrentTurn();
+
+    expect(accepted).toBe(true);
+    expect(cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    await expect(responsePromise).resolves.toEqual({ outcome: { outcome: 'cancelled' } });
+  });
+
+  it('finalizes prompt as idle when the agent returns cancelled stopReason', async () => {
+    const runtime = createRuntime();
+    const prompt = vi.fn(async () => ({ stopReason: 'cancelled' }));
+    (runtime as any).ensureStarted = vi.fn(async () => undefined);
+    (runtime as any).connection = { prompt };
+    (runtime as any).sessionId = 'session-1';
+
+    const statuses: string[] = [];
+    const finishes: string[] = [];
+    const messages: Array<{ status?: string }> = [];
+    const agentEvents: AgentEvent[] = [];
+    runtime.on('status', (status) => statuses.push(status));
+    runtime.on('finish', (status) => finishes.push(status));
+    runtime.on('message', (message) => messages.push(message));
+    runtime.on('agentEvent', (event) => agentEvents.push(event));
+
+    await runtime.send('cancel me');
+
+    expect(prompt).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'cancel me' }],
+    });
+    expect(statuses).toEqual(['running', 'idle']);
+    expect(finishes).toEqual(['idle']);
+    expect(messages.at(-1)).toMatchObject({ status: 'done' });
+    expect(agentEvents.at(-1)).toMatchObject({
+      type: 'agent.done',
+      status: 'idle',
+      stopReason: 'cancelled',
+    });
   });
 });

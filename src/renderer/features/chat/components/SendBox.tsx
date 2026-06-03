@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type React from 'react';
 import type {
+  AgentTurnPhase,
   AttachmentRef,
   ConversationCommands,
   ConversationMode,
@@ -25,10 +26,12 @@ export type SendBoxPayload = {
 export type SendBoxProps = {
   disabled?: boolean;
   activeAgent?: TeamAgent | null;
+  activePhase?: AgentTurnPhase;
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
   onSend: (payload: SendBoxPayload) => Promise<void>;
+  onCancel: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
 };
@@ -42,10 +45,12 @@ export type SendBoxProps = {
 export function SendBox({
   disabled,
   activeAgent,
+  activePhase,
   commands,
   models,
   mode,
   onSend,
+  onCancel,
   onSetModel,
   onSetMode,
 }: SendBoxProps): React.ReactElement {
@@ -53,6 +58,7 @@ export function SendBox({
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<AttachmentRef[]>([]);
   const [sending, setSending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,6 +79,20 @@ export function SendBox({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
+    }
+  }
+
+  async function cancelTurn(): Promise<void> {
+    if (disabled || cancelling) return;
+
+    try {
+      setCancelling(true);
+      setError('');
+      await onCancel();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -124,7 +144,9 @@ export function SendBox({
     });
   }
 
-  const canSend = !disabled && !sending && !uploading && (content.trim().length > 0 || attachments.length > 0);
+  const canCancel = !disabled && isCancellablePhase(activePhase);
+  const canSend = !canCancel && !disabled && !sending && !uploading && (content.trim().length > 0 || attachments.length > 0);
+  const sendButtonLabel = canCancel ? (cancelling ? '正在取消' : '停止生成') : (sending ? '发送中' : '发送消息');
 
   return (
     <div className="composer">
@@ -168,18 +190,34 @@ export function SendBox({
           />
           <button
             type="button"
-            className="composer-send"
-            disabled={!canSend}
-            onClick={() => void submit()}
-            aria-label={sending ? '发送中' : '发送消息'}
-            title={sending ? '发送中' : '发送消息'}
+            className={canCancel ? 'composer-send composer-send--stop' : 'composer-send'}
+            disabled={canCancel ? cancelling : !canSend}
+            onClick={() => {
+              if (canCancel) {
+                void cancelTurn();
+                return;
+              }
+              void submit();
+            }}
+            aria-label={sendButtonLabel}
+            title={sendButtonLabel}
           >
-            {sending ? '…' : '↑'}
+            {canCancel ? <span className="composer-stop-icon" aria-hidden="true" /> : sending ? '…' : '↑'}
           </button>
         </div>
         {error ? <p className="send-error">{error}</p> : null}
       </div>
     </div>
+  );
+}
+
+function isCancellablePhase(phase?: AgentTurnPhase): boolean {
+  return (
+    phase === 'thinking' ||
+    phase === 'planning' ||
+    phase === 'replying' ||
+    phase === 'tool_calling' ||
+    phase === 'waiting_permission'
   );
 }
 

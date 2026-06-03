@@ -203,6 +203,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         mode={snapshots.mode}
         onOpenSidebar={() => setMobileSidebarOpen(true)}
         onSendMessage={conversation.sendTeamMessage}
+        onCancelTurn={conversation.cancelCurrentTurn}
         onSetModel={setModel}
         onSetMode={setMode}
       />
