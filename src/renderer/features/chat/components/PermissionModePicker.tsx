@@ -6,34 +6,34 @@ import { CustomSelect } from '../../../shared/components/CustomSelect';
 type PermissionModeOption = {
   id: string;
   label: string;
-  description: string;
+  // description: string;
 };
 
 const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
   {
     id: 'default',
     label: 'default',
-    description: 'Claude Code 标准权限行为，危险操作会请求确认。',
+    // description: 'Claude Code 标准权限行为，危险操作会请求确认。',
   },
   {
     id: 'acceptEdits',
     label: 'acceptEdits',
-    description: '自动接受文件编辑操作，其他高风险操作仍按权限策略处理。',
+    // description: '自动接受文件编辑操作，其他高风险操作仍按权限策略处理。',
   },
   {
     id: 'plan',
     label: 'plan',
-    description: '规划模式，不执行实际工具操作。',
+    // description: '规划模式，不执行实际工具操作。',
   },
   {
     id: 'dontAsk',
     label: 'dontAsk',
-    description: '不弹权限确认，未预批准的工具会直接拒绝。',
+    // description: '不弹权限确认，未预批准的工具会直接拒绝。',
   },
   {
     id: 'bypassPermissions',
     label: 'bypassPermissions',
-    description: '跳过权限确认，仅建议在隔离环境中使用。',
+    // description: '跳过权限确认，仅建议在隔离环境中使用。',
   },
 ];
 
@@ -41,17 +41,17 @@ const CODEX_MODE_OPTIONS: PermissionModeOption[] = [
   {
     id: 'read-only',
     label: 'read-only',
-    description: '只允许读取和分析。',
+    // description: '只允许读取和分析。',
   },
   {
     id: 'auto',
     label: 'auto',
-    description: '默认推荐。允许在工作区内自动执行常见开发操作。',
+    // description: '默认推荐。允许在工作区内自动执行常见开发操作。',
   },
   {
     id: 'full-access',
     label: 'full-access',
-    description: 'YOLO模式，仅建议在可信工作区或隔离环境中使用。',
+    // description: 'YOLO模式，仅建议在可信工作区或隔离环境中使用。',
   },
 ];
 
@@ -112,7 +112,6 @@ export function PermissionModePicker({
           ...options.map((option) => ({
             value: option.id,
             label: option.label,
-            description: option.description,
           })),
           ...(!options.some((option) => option.id === current)
             ? [{ value: current, label: current }]

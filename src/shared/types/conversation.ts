@@ -3,6 +3,9 @@ import type { AcpAvailableCommand, AgentBackend } from './agent';
 /** Conversation 当前状态。 */
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';
 
+/** Agent 单轮停止原因。 */
+export type StopReason = 'done' | 'cancelled' | 'failed' | 'stopped';
+
 /** 单个 Conversation 的元数据。 */
 export type Conversation = {
   id: string;
@@ -11,6 +14,16 @@ export type Conversation = {
   workspace: string;
   model?: string;
   status: ConversationStatus;
+  acpSessionId?: string;
+  sessionMode?: PermissionModeId;
+  currentModelId?: string;
+  lastTurnId?: string;
+  lastStopReason?: StopReason;
+  lastError?: string;
+  usageSize?: number;
+  usageUsed?: number;
+  usageRatio?: number;
+  usageUpdatedAt?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -38,15 +51,26 @@ export type StoredAttachment = AttachmentRef & {
   sha256?: string;
 };
 
+/** 聊天消息类型，供历史回放和上下文恢复区分来源。 */
+export type ChatMessageType = 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'plan' | 'permission' | 'system';
+
 /** 单条聊天消息，`status` 在流式输出期间为 `streaming`，完成后为 `done`。 */
 export type ChatMessage = {
   id: string;
   conversationId: string;
   role: ChatRole;
+  type: ChatMessageType;
   content: string;
   attachments?: AttachmentRef[];
   createdAt: number;
   status?: 'streaming' | 'done' | 'error';
+  turnId?: string;
+  sourceEventId?: string;
+  stopReason?: StopReason;
+  toolCallId?: string;
+  permissionCallId?: string;
+  parentMessageId?: string;
+  sequence: number;
 };
 
 /** Conversation 的实时 usage 快照。 */

@@ -53,11 +53,33 @@ function createFakeRepository() {
       const conversation = conversations.get(id);
       if (conversation) conversations.set(id, { ...conversation, status, updatedAt: Date.now() });
     },
+    updateConversationAcpSession(id: string, acpSessionId: string): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationRuntimeState(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationTurnResult(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
     addMessage(message: ChatMessage): ChatMessage {
       const list = messages.get(message.conversationId) ?? [];
-      list.push(structuredClone(message));
+      const stored = { ...message, sequence: list.length + 1 };
+      list.push(structuredClone(stored));
       messages.set(message.conversationId, list);
-      return message;
+      return stored;
     },
     updateMessage(message: ChatMessage): void {
       const list = messages.get(message.conversationId) ?? [];
@@ -67,6 +89,9 @@ function createFakeRepository() {
     },
     listMessages(conversationId: string): ChatMessage[] {
       return structuredClone(messages.get(conversationId) ?? []);
+    },
+    messageExists(messageId: string): boolean {
+      return [...messages.values()].some((list) => list.some((message) => message.id === messageId));
     },
     addAgentEvent(event: AgentEvent): AgentEvent {
       const list = agentEvents.get(event.conversationId) ?? [];

@@ -5,7 +5,9 @@ import type {
   AttachmentKind,
   AttachmentRef,
   ChatMessage,
+  ChatMessageType,
   ChatRole,
+  Conversation,
   ConversationCommands,
   ConversationMode,
   ConversationModels,
@@ -15,6 +17,7 @@ import type {
   PermissionOption,
   PermissionRequest,
   ServerInfo,
+  StopReason,
   Team,
   TeamAgent,
   TeamAgentStatus,
@@ -28,8 +31,10 @@ const agentBackends = new Set<AgentBackend>(['claude', 'codex']);
 const agentRoles = new Set<TeamAgent['role']>(['leader', 'teammate']);
 const agentStatuses = new Set<TeamAgentStatus>(['idle', 'active', 'failed', 'stopped']);
 const attachmentKinds = new Set<AttachmentKind>(['image']);
+const chatMessageTypes = new Set<ChatMessageType>(['text', 'thinking', 'tool_call', 'tool_result', 'plan', 'permission', 'system']);
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
+const stopReasons = new Set<StopReason>(['done', 'cancelled', 'failed', 'stopped']);
 
 /**
  * 安全读取 HTTP JSON 响应。
@@ -66,6 +71,41 @@ export function normalizeAuthResponse(value: unknown): { user: User | null; erro
   return {
     user: normalizeAuthUser(input?.user),
     error: asString(input?.error),
+  };
+}
+
+/**
+ * 归一化 Conversation 快照。
+ */
+export function normalizeConversation(value: unknown): Conversation | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const backend = enumValue(input.backend, agentBackends, undefined);
+  const status = enumValue(input.status, conversationStatuses, undefined);
+  const createdAt = asRequiredNumber(input.createdAt);
+  const updatedAt = asRequiredNumber(input.updatedAt);
+  if (!id || !backend || !status || createdAt === null || updatedAt === null) return null;
+
+  return {
+    id,
+    backend,
+    name: asString(input.name),
+    workspace: asString(input.workspace),
+    model: optionalString(input.model),
+    status,
+    acpSessionId: optionalString(input.acpSessionId),
+    sessionMode: optionalString(input.sessionMode),
+    currentModelId: optionalString(input.currentModelId),
+    lastTurnId: optionalString(input.lastTurnId),
+    lastStopReason: enumValue(input.lastStopReason, stopReasons, undefined),
+    lastError: optionalString(input.lastError),
+    usageSize: optionalNumber(input.usageSize),
+    usageUsed: optionalNumber(input.usageUsed),
+    usageRatio: optionalNumber(input.usageRatio),
+    usageUpdatedAt: optionalNumber(input.usageUpdatedAt),
+    createdAt,
+    updatedAt,
   };
 }
 
@@ -129,22 +169,34 @@ export function normalizeMessageList(value: unknown): ChatMessage[] {
 /**
  * 归一化单条聊天消息。
  *
- * 附件字段来自新关系表聚合结果，缺失时返回空数组以便渲染层统一处理。
+ * 附件字段来自关系表聚合结果。
  */
 export function normalizeChatMessage(value: unknown): ChatMessage | null {
   const input = asRecord(value);
   if (!input) return null;
   const id = asString(input.id);
   const conversationId = asString(input.conversationId);
-  if (!id || !conversationId) return null;
+  const role = enumValue(input.role, chatRoles, undefined);
+  const type = enumValue(input.type, chatMessageTypes, undefined);
+  const sequence = asRequiredNumber(input.sequence);
+  const createdAt = asRequiredNumber(input.createdAt);
+  if (!id || !conversationId || !role || !type || sequence === null || createdAt === null) return null;
   return {
     id,
     conversationId,
-    role: enumValue(input.role, chatRoles, 'assistant'),
+    role,
+    type,
     content: asString(input.content),
     attachments: normalizeArray(input.attachments, normalizeAttachmentRef),
-    createdAt: asNumber(input.createdAt, Date.now()),
+    createdAt,
     status: enumValue(input.status, new Set(['streaming', 'done', 'error'] as const), undefined),
+    turnId: optionalString(input.turnId),
+    sourceEventId: optionalString(input.sourceEventId),
+    stopReason: enumValue(input.stopReason, stopReasons, undefined),
+    toolCallId: optionalString(input.toolCallId),
+    permissionCallId: optionalString(input.permissionCallId),
+    parentMessageId: optionalString(input.parentMessageId),
+    sequence,
   };
 }
 
@@ -185,12 +237,25 @@ export function normalizeAgentEvent(value: unknown): AgentEvent | null {
   if (!input) return null;
   const type = asString(input.type);
   const conversationId = asString(input.conversationId);
-  if (!type || !conversationId) return null;
+  const id = asString(input.id);
+  const turnId = asString(input.turnId);
+  const sequence = asRequiredNumber(input.sequence);
+  const at = asRequiredNumber(input.at);
+  if (!id || !type || !conversationId || !turnId || sequence === null || at === null) return null;
+  const memory = {
+    sequence,
+    status: optionalString(input.status),
+    stopReason: enumValue(input.stopReason, stopReasons, undefined),
+    toolCallId: optionalString(input.toolCallId),
+    permissionCallId: optionalString(input.permissionCallId),
+    messageId: optionalString(input.messageId),
+  };
   const base = {
-    id: asString(input.id, `${type}:${Date.now()}`),
+    id,
     conversationId,
-    turnId: asString(input.turnId),
-    at: asNumber(input.at, Date.now()),
+    turnId,
+    ...memory,
+    at,
   };
 
   switch (type) {
@@ -263,7 +328,7 @@ export function normalizeAgentEvent(value: unknown): AgentEvent | null {
         ...base,
         type,
         status: enumValue(input.status, conversationStatuses, 'idle'),
-        stopReason: optionalString(input.stopReason),
+        stopReason: enumValue(input.stopReason, stopReasons, undefined),
       };
     default:
       return null;
@@ -508,8 +573,16 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function asRequiredNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function asBoolean(value: unknown, fallback: boolean): boolean {

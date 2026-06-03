@@ -1,4 +1,4 @@
-import type { ConversationStatus } from './conversation';
+import type { ConversationStatus, StopReason } from './conversation';
 
 export type AgentBackend = 'claude' | 'codex';
 
@@ -43,8 +43,18 @@ export type AcpAvailableCommand = {
   input?: unknown;
 };
 
+/** Agent 事件持久化列化字段。 */
+export type AgentEventMemoryFields = {
+  sequence: number;
+  status?: string;
+  stopReason?: StopReason;
+  toolCallId?: string;
+  permissionCallId?: string;
+  messageId?: string;
+};
+
 /** 标准化的 Agent 运行过程事件。 */
-export type AgentEvent =
+export type AgentEventPayload =
   | {
       id: string;
       type: 'agent.turn.started';
@@ -157,9 +167,11 @@ export type AgentEvent =
       conversationId: string;
       turnId: string;
       status: ConversationStatus;
-      stopReason?: string;
+      stopReason?: StopReason;
       at: number;
     };
+
+export type AgentEvent = AgentEventPayload & AgentEventMemoryFields;
 
 /** Agent 发起的权限请求，需用户在 UI 中选择一个选项后才能继续执行。 */
 export type PermissionRequest = {

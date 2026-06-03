@@ -10,6 +10,7 @@ import type {
   ConversationMode,
   ConversationUsage,
   PermissionResponse,
+  StopReason,
   StoredAttachment,
 } from '../../shared/types';
 import { classifyAgentEvent } from '../agentEventPolicy';
@@ -88,6 +89,16 @@ export class ConversationService {
       workspace,
       model: input.model?.trim() || undefined,
       status: 'idle',
+      acpSessionId: undefined,
+      sessionMode: undefined,
+      currentModelId: input.model?.trim() || undefined,
+      lastTurnId: undefined,
+      lastStopReason: undefined,
+      lastError: undefined,
+      usageSize: undefined,
+      usageUsed: undefined,
+      usageRatio: undefined,
+      usageUpdatedAt: undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -115,6 +126,11 @@ export class ConversationService {
     return this.repo.listConversations();
   }
 
+  /** 返回单个 Conversation 快照。 */
+  get(conversationId: string): Conversation | null {
+    return this.repo.getConversation(conversationId);
+  }
+
   /** 返回指定 Conversation 的历史消息。 */
   messages(conversationId: string): ChatMessage[] {
     return this.withMessageAttachments(this.repo.listMessages(conversationId));
@@ -132,12 +148,29 @@ export class ConversationService {
 
   /** 返回指定 Conversation 的模型快照。 */
   models(conversationId: string): ConversationModels | null {
-    return this.modelSnapshots.get(conversationId) ?? null;
+    const snapshot = this.modelSnapshots.get(conversationId);
+    if (snapshot) return snapshot;
+    const conversation = this.repo.getConversation(conversationId);
+    if (!conversation?.currentModelId) return null;
+    return {
+      conversationId,
+      currentModelId: conversation.currentModelId,
+      models: [],
+      updatedAt: conversation.updatedAt,
+    };
   }
 
   /** 返回指定 Conversation 的模式快照。 */
   mode(conversationId: string): ConversationMode | null {
-    return this.modeSnapshots.get(conversationId) ?? null;
+    const snapshot = this.modeSnapshots.get(conversationId);
+    if (snapshot) return snapshot;
+    const conversation = this.repo.getConversation(conversationId);
+    if (!conversation?.sessionMode) return null;
+    return {
+      conversationId,
+      mode: conversation.sessionMode,
+      updatedAt: conversation.updatedAt,
+    };
   }
 
   /**
@@ -185,9 +218,11 @@ export class ConversationService {
       id: createId(),
       conversationId: conversation.id,
       role: 'user',
+      type: 'text',
       content: input.content,
       createdAt: Date.now(),
       status: 'done',
+      sequence: 0,
     });
     this.attachmentsRepo?.linkMessageAttachments(
       userMessage.id,
@@ -246,9 +281,11 @@ export class ConversationService {
         id: createId(),
         conversationId: conversation.id,
         role: 'user',
+        type: 'text',
         content: visibleMessage ?? '',
         createdAt: Date.now(),
         status: 'done',
+        sequence: 0,
       });
       this.attachmentsRepo?.linkMessageAttachments(
         userMessage.id,
@@ -341,6 +378,10 @@ export class ConversationService {
         conversationId: input.conversationId,
         error: message,
       });
+      this.repo.updateConversationTurnResult(input.conversationId, {
+        lastStopReason: 'failed',
+        lastError: message,
+      });
       runtime.stop('idle');
       this.runtimes.delete(input.conversationId);
       return { accepted: false, error: message };
@@ -405,6 +446,9 @@ export class ConversationService {
       model,
     });
     this.repo.updateConversationModel(conversation.id, model);
+    this.repo.updateConversationRuntimeState(conversation.id, {
+      currentModelId: model,
+    });
     this.restart(conversation.id);
     const now = Date.now();
     this.commandSnapshots.delete(conversation.id);
@@ -427,7 +471,7 @@ export class ConversationService {
     return this.repo.getConversation(conversation.id) ?? { ...conversation, model, updatedAt: now };
   }
 
-  /** 切换指定 Conversation 当前运行时的权限模式，不持久化到数据库。 */
+  /** 切换指定 Conversation 当前运行时的权限模式并持久化。 */
   async setMode(input: { conversationId: string; mode: string }): Promise<ConversationMode> {
     const conversation = this.repo.getConversation(input.conversationId);
     if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
@@ -444,6 +488,9 @@ export class ConversationService {
 
     const runtime = this.getRuntime(conversation);
     const snapshot = await runtime.setSessionMode(mode);
+    this.repo.updateConversationRuntimeState(conversation.id, {
+      sessionMode: snapshot.mode,
+    });
 
     if (this.modeSnapshots.get(conversation.id) !== snapshot) {
       this.modeSnapshots.set(conversation.id, snapshot);
@@ -488,35 +535,69 @@ export class ConversationService {
       workspace: conversation.workspace,
       model: conversation.model,
       mcpServers: this.mcpServers.get(conversation.id),
+      resumeSessionId: conversation.acpSessionId,
+    });
+    runtime.on('session', ({ sessionId }) => {
+      const updated = this.repo.updateConversationAcpSession(conversation.id, sessionId);
+      this.logger.info('conversation_acp_session_persisted', {
+        conversationId: conversation.id,
+        sessionId,
+      });
+      if (updated) {
+        this.events.emit('conversation.updated', updated);
+      }
     });
     runtime.on('message', (message) => {
-      const known = this.repo.listMessages(message.conversationId).some((item) => item.id === message.id);
+      const known = this.repo.messageExists(message.id);
+      const streamMessage = known ? message : this.repo.addMessage(message);
       if (known) this.repo.updateMessage(message);
-      else this.repo.addMessage(message);
-      this.events.emit('conversation.stream', { conversationId: conversation.id, message });
+      this.events.emit('conversation.stream', { conversationId: conversation.id, message: streamMessage });
     });
     runtime.on('agentEvent', (event: AgentEvent) => {
       const policy = classifyAgentEvent(event);
+      let eventForEmit = event;
 
       if (policy.persist) {
-        this.repo.addAgentEvent(event);
+        eventForEmit = this.repo.addAgentEvent(event);
+      }
+
+      if (eventForEmit.type === 'agent.done') {
+        this.repo.updateConversationTurnResult(conversation.id, {
+          lastTurnId: eventForEmit.turnId,
+          lastStopReason: eventForEmit.stopReason ?? normalizeStatusToStopReason(eventForEmit.status),
+          lastError: undefined,
+        });
+      }
+
+      if (eventForEmit.type === 'agent.error') {
+        this.repo.updateConversationTurnResult(conversation.id, {
+          lastTurnId: eventForEmit.turnId,
+          lastStopReason: 'failed',
+          lastError: eventForEmit.message,
+        });
       }
 
       if (policy.realtime) {
-        this.events.emit('conversation.agentEvent', event);
+        this.events.emit('conversation.agentEvent', eventForEmit);
       }
 
       for (const handler of this.agentEventHandlers) {
-        Promise.resolve(handler(event)).catch((error) => {
+        Promise.resolve(handler(eventForEmit)).catch((error) => {
           this.logger.warn('agent_event_handler_failed', {
             conversationId: conversation.id,
-            eventType: event.type,
+            eventType: eventForEmit.type,
             error: error instanceof Error ? error.message : String(error),
           });
         });
       }
     });
     runtime.on('usage', (usage: ConversationUsage) => {
+      this.repo.updateConversationRuntimeState(conversation.id, {
+        usageSize: usage.size,
+        usageUsed: usage.used,
+        usageRatio: usage.ratio,
+        usageUpdatedAt: usage.updatedAt,
+      });
       this.events.emit('conversation.usage', usage);
     });
     runtime.on('commands', (snapshot: ConversationCommands) => {
@@ -525,10 +606,16 @@ export class ConversationService {
     });
     runtime.on('models', (snapshot: ConversationModels) => {
       this.modelSnapshots.set(conversation.id, snapshot);
+      this.repo.updateConversationRuntimeState(conversation.id, {
+        currentModelId: snapshot.currentModelId,
+      });
       this.events.emit('conversation.models', snapshot);
     });
     runtime.on('mode', (snapshot: ConversationMode) => {
       this.modeSnapshots.set(conversation.id, snapshot);
+      this.repo.updateConversationRuntimeState(conversation.id, {
+        sessionMode: snapshot.mode,
+      });
       this.events.emit('conversation.mode', snapshot);
     });
     runtime.on('permission', (request) => this.events.emit('conversation.permission', request));
@@ -572,4 +659,10 @@ function summarizeLogText(text: string, maxLength = 240): string {
   const trimmed = text.trim();
   if (trimmed.length <= maxLength) return trimmed;
   return `${trimmed.slice(0, maxLength - 3)}...`;
+}
+
+function normalizeStatusToStopReason(status?: string): StopReason {
+  if (status === 'failed') return 'failed';
+  if (status === 'stopped') return 'stopped';
+  return 'done';
 }

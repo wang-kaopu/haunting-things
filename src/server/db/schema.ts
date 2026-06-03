@@ -22,7 +22,18 @@ export function initializeSchema(db: Db): void {
       backend TEXT NOT NULL,
       name TEXT NOT NULL,
       workspace TEXT NOT NULL,
+      model TEXT,
       status TEXT NOT NULL,
+      acp_session_id TEXT,
+      session_mode TEXT,
+      current_model_id TEXT,
+      last_turn_id TEXT,
+      last_stop_reason TEXT,
+      last_error TEXT,
+      usage_size INTEGER,
+      usage_used INTEGER,
+      usage_ratio REAL,
+      usage_updated_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -31,8 +42,16 @@ export function initializeSchema(db: Db): void {
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
       role TEXT NOT NULL,
+      type TEXT NOT NULL,
       content TEXT NOT NULL,
       status TEXT,
+      turn_id TEXT,
+      source_event_id TEXT,
+      stop_reason TEXT,
+      tool_call_id TEXT,
+      permission_call_id TEXT,
+      parent_message_id TEXT,
+      sequence INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
@@ -42,6 +61,12 @@ export function initializeSchema(db: Db): void {
       conversation_id TEXT NOT NULL,
       turn_id TEXT NOT NULL,
       type TEXT NOT NULL,
+      status TEXT,
+      stop_reason TEXT,
+      tool_call_id TEXT,
+      permission_call_id TEXT,
+      message_id TEXT,
+      sequence INTEGER NOT NULL,
       payload TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -112,7 +137,6 @@ export function initializeSchema(db: Db): void {
     );
   `);
 
-  ensureColumn(db, 'conversations', 'model', 'TEXT');
   ensureColumn(db, 'teams', 'leader_slot_id', "TEXT NOT NULL DEFAULT 'leader'");
   ensureColumn(db, 'teams', 'agents', "TEXT NOT NULL DEFAULT '[]'");
   db.prepare("UPDATE teams SET leader_slot_id = 'leader' WHERE leader_slot_id IS NULL OR leader_slot_id = ''").run();
@@ -120,9 +144,21 @@ export function initializeSchema(db: Db): void {
   ensureColumn(db, 'mailbox', 'summary', 'TEXT');
   ensureColumn(db, 'mailbox', 'read', 'INTEGER NOT NULL DEFAULT 0');
   db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_acp_session_id ON conversations(acp_session_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_last_turn_id ON conversations(last_turn_id);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation_sequence ON messages(conversation_id, sequence);
+    CREATE INDEX IF NOT EXISTS idx_messages_turn_id ON messages(turn_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_source_event_id ON messages(source_event_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_tool_call_id ON messages(tool_call_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_permission_call_id ON messages(permission_call_id);
     CREATE INDEX IF NOT EXISTS idx_agent_events_conversation ON agent_events(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_conversation_sequence ON agent_events(conversation_id, sequence);
     CREATE INDEX IF NOT EXISTS idx_agent_events_turn ON agent_events(turn_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_turn_id ON agent_events(turn_id, sequence);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_type ON agent_events(type, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_events_stop_reason ON agent_events(stop_reason);
     CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(team_id, to_agent_id, read, created_at);
     CREATE INDEX IF NOT EXISTS idx_attachments_kind ON attachments(kind);
     CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at);

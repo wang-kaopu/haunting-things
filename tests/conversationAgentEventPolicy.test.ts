@@ -28,6 +28,27 @@ function createFakeRepository() {
       const conversation = conversations.get(id);
       if (conversation) conversations.set(id, { ...conversation, status, updatedAt: Date.now() });
     },
+    updateConversationAcpSession(id: string, acpSessionId: string): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationRuntimeState(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationTurnResult(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
     addMessage(message: never): never {
       return message;
     },
@@ -37,11 +58,15 @@ function createFakeRepository() {
     listMessages(): never[] {
       return [];
     },
+    messageExists(): boolean {
+      return false;
+    },
     addAgentEvent(event: AgentEvent): AgentEvent {
       const list = agentEvents.get(event.conversationId) ?? [];
-      list.push(structuredClone(event));
+      const stored = { ...event, sequence: list.length + 1 };
+      list.push(structuredClone(stored));
       agentEvents.set(event.conversationId, list);
-      return event;
+      return stored;
     },
     listAgentEvents(conversationId: string): AgentEvent[] {
       return structuredClone(agentEvents.get(conversationId) ?? []);

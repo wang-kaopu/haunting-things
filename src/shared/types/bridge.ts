@@ -64,6 +64,7 @@ export type InvokeMap = {
     result: ConversationMode;
   };
   'conversation.list': { params: void; result: Conversation[] };
+  'conversation.get': { params: { conversationId: string }; result: Conversation | null };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
   'conversation.agentEvents': { params: { conversationId: string; limit?: number }; result: AgentEvent[] };
   'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
@@ -140,6 +141,7 @@ export type EventMap = {
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };
+  'conversation.updated': Conversation;
   'team.agent.status': { teamId: string; slotId: string; status: TeamAgentStatus; error?: string };
   'team.agent.prompt': { teamId: string; slotId: string; conversationId: string; prompt: string };
   'team.agent.message': { teamId: string; entry: TeamMailboxEntry };

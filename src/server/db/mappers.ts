@@ -20,6 +20,16 @@ export function rowToConversation(row: any): Conversation {
     workspace: row.workspace,
     model: row.model ?? undefined,
     status: row.status,
+    acpSessionId: row.acp_session_id ?? undefined,
+    sessionMode: row.session_mode ?? undefined,
+    currentModelId: row.current_model_id ?? undefined,
+    lastTurnId: row.last_turn_id ?? undefined,
+    lastStopReason: row.last_stop_reason ?? undefined,
+    lastError: row.last_error ?? undefined,
+    usageSize: row.usage_size ?? undefined,
+    usageUsed: row.usage_used ?? undefined,
+    usageRatio: row.usage_ratio ?? undefined,
+    usageUpdatedAt: row.usage_updated_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -33,9 +43,17 @@ export function rowToMessage(row: any): ChatMessage {
     id: row.id,
     conversationId: row.conversation_id,
     role: row.role,
+    type: row.type,
     content: row.content,
     status: row.status ?? undefined,
     createdAt: row.created_at,
+    turnId: row.turn_id ?? undefined,
+    sourceEventId: row.source_event_id ?? undefined,
+    stopReason: row.stop_reason ?? undefined,
+    toolCallId: row.tool_call_id ?? undefined,
+    permissionCallId: row.permission_call_id ?? undefined,
+    parentMessageId: row.parent_message_id ?? undefined,
+    sequence: row.sequence,
   };
 }
 
@@ -43,7 +61,20 @@ export function rowToMessage(row: any): ChatMessage {
  * 还原持久化的 AgentEvent payload。
  */
 export function rowToAgentEvent(row: any): AgentEvent {
-  return JSON.parse(row.payload) as AgentEvent;
+  const payload = JSON.parse(row.payload) as AgentEvent;
+  return {
+    ...payload,
+    id: row.id,
+    conversationId: row.conversation_id,
+    turnId: row.turn_id,
+    type: row.type,
+    status: row.status ?? payload.status,
+    stopReason: row.stop_reason ?? payload.stopReason,
+    toolCallId: row.tool_call_id ?? payload.toolCallId,
+    permissionCallId: row.permission_call_id ?? payload.permissionCallId,
+    messageId: row.message_id ?? payload.messageId,
+    sequence: row.sequence,
+  } as AgentEvent;
 }
 
 /**

@@ -81,7 +81,7 @@ export function formatAgentEvent(event: AgentEvent): string {
     case 'agent.error':
       return `返回错误：${event.message}`;
     case 'agent.done':
-      if (event.stopReason === 'cancelled' || event.stopReason === 'canceled') return '本轮已取消';
+      if (event.stopReason === 'cancelled') return '本轮已取消';
       return event.status === 'idle' ? '本轮完成' : `本轮结束：${event.status}`;
     case 'agent.reply.delta':
       return '正在回复';

@@ -7,6 +7,8 @@ import type { SendBoxPayload } from '../../features/chat/components/SendBox';
 import { normalizeAgentEvent, normalizeAgentEventList, normalizeConversationStream, normalizeMessageList } from '../utils/backendData';
 import { phaseFromAgentEvent } from '../utils/format';
 
+const MAX_AGENT_EVENTS_IN_MEMORY = 200;
+
 export type UseConversationStreamInput = {
   activeTeam: Team | null;
   activeAgent: TeamAgent | null;
@@ -42,13 +44,7 @@ export function useConversationStream({
     const unsubStream = bridge.on('conversation.stream', (payload) => {
       const event = normalizeConversationStream(payload);
       if (!event || event.conversationId !== activeConversationRef.current) return;
-      setMessages((current) => {
-        const index = current.findIndex((item) => item.id === event.message.id);
-        if (index < 0) return [...current, event.message];
-        const next = [...current];
-        next[index] = event.message;
-        return next;
-      });
+      setMessages((current) => mergeStreamMessage(current, event.message));
     });
 
     const unsubAgentEvent = bridge.on('conversation.agentEvent', (payload) => {
@@ -58,7 +54,7 @@ export function useConversationStream({
         const list = prev[event.conversationId] ?? [];
         return {
           ...prev,
-          [event.conversationId]: [...list, event].slice(-80),
+          [event.conversationId]: [...list, event].slice(-MAX_AGENT_EVENTS_IN_MEMORY),
         };
       });
       setPhaseByConversation((prev) => ({
@@ -81,11 +77,14 @@ export function useConversationStream({
     }
 
     let cancelled = false;
+    setMessages([]);
     setLoading(true);
     bridge
       .invoke('conversation.messages', { conversationId })
       .then((items) => {
-        if (!cancelled) setMessages(normalizeMessageList(items));
+        if (cancelled) return;
+        const loaded = normalizeMessageList(items);
+        setMessages((current) => mergeLoadedMessages(conversationId, loaded, current));
       })
       .catch(() => {
         if (!cancelled) setMessages([]);
@@ -101,7 +100,7 @@ export function useConversationStream({
         const events = normalizeAgentEventList(value);
         setAgentEventsByConversation((prev) => ({
           ...prev,
-          [conversationId]: events,
+          [conversationId]: events.slice(-MAX_AGENT_EVENTS_IN_MEMORY),
         }));
         const last = events.at(-1);
         setPhaseByConversation((prev) => {
@@ -168,4 +167,61 @@ export function useConversationStream({
 
 function isRecoverableCancelError(error?: string): boolean {
   return error === 'runtime not found' || error === 'no active prompt';
+}
+
+function mergeStreamMessage(current: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  const scoped = current.filter((item) => item.conversationId === incoming.conversationId);
+  const index = scoped.findIndex((item) => item.id === incoming.id);
+  if (index < 0) {
+    return [...scoped, incoming].sort(sortMessage);
+  }
+
+  const next = [...scoped];
+  next[index] = preferRicherMessage(scoped[index], incoming);
+  return next.sort(sortMessage);
+}
+
+function mergeLoadedMessages(
+  conversationId: string,
+  loaded: ChatMessage[],
+  current: ChatMessage[]
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+  for (const item of loaded.filter((message) => message.conversationId === conversationId)) {
+    byId.set(item.id, item);
+  }
+
+  for (const item of current.filter((message) => message.conversationId === conversationId)) {
+    const existing = byId.get(item.id);
+    byId.set(item.id, existing ? preferRicherMessage(existing, item) : item);
+  }
+
+  return Array.from(byId.values()).sort(sortMessage);
+}
+
+function preferRicherMessage(oldMessage: ChatMessage, newMessage: ChatMessage): ChatMessage {
+  const mergedSequence =
+    newMessage.sequence > 0 ? newMessage.sequence : oldMessage.sequence > 0 ? oldMessage.sequence : newMessage.sequence;
+
+  if (
+    oldMessage.status === 'streaming' &&
+    newMessage.content.length < oldMessage.content.length
+  ) {
+    return { ...oldMessage, sequence: mergedSequence };
+  }
+
+  if (
+    oldMessage.status === 'done' &&
+    newMessage.status === 'streaming' &&
+    newMessage.content.length < oldMessage.content.length
+  ) {
+    return { ...oldMessage, sequence: mergedSequence };
+  }
+
+  return { ...newMessage, sequence: mergedSequence };
+}
+
+function sortMessage(a: ChatMessage, b: ChatMessage): number {
+  if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+  return a.createdAt - b.createdAt;
 }

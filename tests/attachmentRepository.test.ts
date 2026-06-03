@@ -76,9 +76,9 @@ describe('AttachmentRepository', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run('mailbox-1', 'team-1', 'leader', 'user', 'hello', 0, now);
     db.prepare(
-      `INSERT INTO messages (id, conversation_id, role, content, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)`
-    ).run('message-1', 'conversation-1', 'user', 'hello', 'done', now);
+      `INSERT INTO messages (id, conversation_id, role, type, content, status, sequence, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('message-1', 'conversation-1', 'user', 'text', 'hello', 'done', 1, now);
 
     const attachment = repo.createAttachment(
       await service.saveImage({

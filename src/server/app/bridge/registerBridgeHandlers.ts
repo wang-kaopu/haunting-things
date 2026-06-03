@@ -39,6 +39,7 @@ export function registerBridgeHandlers(input: {
   bridge.register('conversation.setModel', (params) => conversations.setModel(params));
   bridge.register('conversation.setMode', (params) => conversations.setMode(params));
   bridge.register('conversation.list', () => conversations.list());
+  bridge.register('conversation.get', ({ conversationId }) => conversations.get(conversationId));
   bridge.register('conversation.messages', ({ conversationId }) => conversations.messages(conversationId));
   bridge.register('conversation.agentEvents', ({ conversationId, limit }) =>
     conversations.agentEvents(conversationId, limit)

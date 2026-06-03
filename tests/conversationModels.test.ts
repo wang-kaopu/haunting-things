@@ -26,6 +26,27 @@ function createFakeRepository() {
       const conversation = conversations.get(id);
       if (conversation) conversations.set(id, { ...conversation, status, updatedAt: Date.now() });
     },
+    updateConversationAcpSession(id: string, acpSessionId: string): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationRuntimeState(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    updateConversationTurnResult(id: string, patch: Partial<Conversation>): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, ...patch, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
     addMessage(message: never): never {
       return message;
     },
@@ -34,6 +55,9 @@ function createFakeRepository() {
     },
     listMessages(): never[] {
       return [];
+    },
+    messageExists(): boolean {
+      return false;
     },
     addAgentEvent(event: never): never {
       return event;
@@ -76,7 +100,11 @@ describe('ConversationService model snapshots', () => {
     expect(updated.model).toBe('sonnet-4');
     expect(restartSpy).toHaveBeenCalledWith(conversation.id);
     expect(conversations.commands(conversation.id)).toBeNull();
-    expect(conversations.models(conversation.id)).toBeNull();
+    expect(conversations.models(conversation.id)).toMatchObject({
+      conversationId: conversation.id,
+      currentModelId: 'sonnet-4',
+      models: [],
+    });
     expect(emittedCommands.at(-1)).toMatchObject({
       conversationId: conversation.id,
       commands: [],

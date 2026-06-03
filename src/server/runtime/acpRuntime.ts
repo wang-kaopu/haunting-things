@@ -24,6 +24,7 @@ import type {
   ConversationUsage,
   PermissionRequest,
   PermissionResponse,
+  StopReason,
   StoredAttachment,
 } from '../../shared/types';
 import { createId } from '../id';
@@ -41,6 +42,7 @@ type AcpRuntimeEvents = {
   permission: [PermissionRequest];
   status: [ConversationStatus, string?];
   finish: [ConversationStatus];
+  session: [{ conversationId: string; sessionId: string; updatedAt: number }];
 };
 
 type AcpRuntimeAgentEventInput =
@@ -95,7 +97,7 @@ type AcpRuntimeAgentEventInput =
     message: string;
     detail?: unknown;
   }
-  | { type: 'agent.done'; status: ConversationStatus; stopReason?: string };
+  | { type: 'agent.done'; status: ConversationStatus; stopReason?: StopReason };
 
 /** 面向 ACP SDK 的 MCP server 配置格式（env 为 {name,value}[] 数组）。 */
 type McpServer = {
@@ -119,6 +121,13 @@ export type RuntimePromptInput = {
 type AcpPromptBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string };
+
+type AcpSessionStartupResult = {
+  sessionId: string;
+  modeSource?: unknown;
+  modelSource?: unknown;
+  restored: boolean;
+};
 
 /**
  * 管理单个 Agent（Claude / Codex）的完整生命周期：
@@ -168,6 +177,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       workspace: string;
       model?: string;
       mcpServers?: McpServer[];
+      resumeSessionId?: string;
     }
   ) {
     super();
@@ -199,9 +209,12 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       id: createId(),
       conversationId: this.input.conversationId,
       role: 'assistant',
+      type: 'text',
       content: '',
       createdAt: Date.now(),
       status: 'streaming',
+      turnId: this.activeTurnId,
+      sequence: 0,
     };
     this.emit('message', this.assistantMessage);
 
@@ -235,7 +248,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       if (!this.turnFinalized) {
         const turnId = this.activeTurnId;
         if (this.assistantMessage) {
-          this.assistantMessage = { ...this.assistantMessage, status: 'error' };
+          this.assistantMessage = { ...this.assistantMessage, status: 'error', stopReason: 'failed' };
           this.emit('message', this.assistantMessage);
         }
         this.turnPhase = 'failed';
@@ -264,7 +277,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     }
 
     if (this.assistantMessage) {
-      this.assistantMessage = { ...this.assistantMessage, status: 'done' };
+      this.assistantMessage = { ...this.assistantMessage, status: 'done', stopReason: 'done' };
       this.emit('message', this.assistantMessage);
       this.emitAgentEvent({
         type: 'agent.reply.done',
@@ -558,23 +571,132 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     void initResult;
 
-    const sessionResult = await this.runConnectionRequest(() =>
-      connection.newSession({
-        cwd,
-        mcpServers: (this.input.mcpServers ?? []).map((s) => ({ ...s, args: s.args ?? [], env: s.env ?? [] })),
-      })
-    );
+    const sessionResult = await this.startSession(connection, cwd, initResult);
     this.sessionId = sessionResult.sessionId;
-    this.logger.info('session_new_done', {
+    this.emit('session', {
+      conversationId: this.input.conversationId,
+      sessionId: this.sessionId,
+      updatedAt: Date.now(),
+    });
+    this.logger.info(sessionResult.restored ? 'session_restore_done' : 'session_new_done', {
       conversationId: this.input.conversationId,
       sessionId: this.sessionId,
     });
-    this.handleNewSessionMode(sessionResult);
-    this.handleNewSessionModels(sessionResult);
+    this.handleNewSessionMode(sessionResult.modeSource);
+    this.handleNewSessionModels(sessionResult.modelSource);
     if (this.input.model?.trim()) {
       await this.setSessionModel(this.input.model.trim());
     }
     await this.setSessionMode(this.getStartupMode());
+  }
+
+  /**
+   * 根据 agent 能力创建或恢复 ACP session。
+   *
+   * 已持久化 sessionId 时优先使用 `session/load`，其次使用实验性的
+   * `session/resume`；恢复请求失败会直接暴露错误，避免静默丢失连续记忆。
+   */
+  private async startSession(
+    connection: ClientSideConnection,
+    cwd: string,
+    initResult: Awaited<ReturnType<ClientSideConnection['initialize']>>
+  ): Promise<AcpSessionStartupResult> {
+    const mcpServers = (this.input.mcpServers ?? []).map((server) => ({
+      ...server,
+      args: server.args ?? [],
+      env: server.env ?? [],
+    }));
+    const resumeSessionId = this.input.resumeSessionId?.trim();
+    const capabilities = initResult.agentCapabilities;
+
+    if (resumeSessionId && capabilities?.loadSession) {
+      let loaded: Awaited<ReturnType<ClientSideConnection['loadSession']>>;
+      try {
+        loaded = await this.runConnectionRequest(() =>
+          connection.loadSession({
+            cwd,
+            mcpServers,
+            sessionId: resumeSessionId,
+          })
+        );
+      } catch (error) {
+        if (!isMissingSessionResourceError(error)) throw error;
+        this.logger.warn('session_restore_missing', {
+          conversationId: this.input.conversationId,
+          sessionId: resumeSessionId,
+          method: 'session/load',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return this.createNewSession(connection, cwd, mcpServers);
+      }
+      return {
+        sessionId: resumeSessionId,
+        modeSource: loaded,
+        modelSource: loaded,
+        restored: true,
+      };
+    }
+
+    if (resumeSessionId && capabilities?.sessionCapabilities?.resume) {
+      let resumed: Awaited<ReturnType<ClientSideConnection['unstable_resumeSession']>>;
+      try {
+        resumed = await this.runConnectionRequest(() =>
+          connection.unstable_resumeSession({
+            cwd,
+            mcpServers,
+            sessionId: resumeSessionId,
+          })
+        );
+      } catch (error) {
+        if (!isMissingSessionResourceError(error)) throw error;
+        this.logger.warn('session_restore_missing', {
+          conversationId: this.input.conversationId,
+          sessionId: resumeSessionId,
+          method: 'session/resume',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return this.createNewSession(connection, cwd, mcpServers);
+      }
+      return {
+        sessionId: resumeSessionId,
+        modeSource: resumed,
+        modelSource: resumed,
+        restored: true,
+      };
+    }
+
+    if (resumeSessionId) {
+      this.logger.warn('session_restore_unavailable', {
+        conversationId: this.input.conversationId,
+        sessionId: resumeSessionId,
+        loadSession: Boolean(capabilities?.loadSession),
+        resumeSession: Boolean(capabilities?.sessionCapabilities?.resume),
+      });
+    }
+
+    return this.createNewSession(connection, cwd, mcpServers);
+  }
+
+  /**
+   * 创建全新 ACP session，并把响应作为后续 mode/model 初始化来源。
+   */
+  private async createNewSession(
+    connection: ClientSideConnection,
+    cwd: string,
+    mcpServers: Array<{ name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }>
+  ): Promise<AcpSessionStartupResult> {
+    const created = await this.runConnectionRequest(() =>
+      connection.newSession({
+        cwd,
+        mcpServers,
+      })
+    );
+    return {
+      sessionId: created.sessionId,
+      modeSource: created,
+      modelSource: created,
+      restored: false,
+    };
   }
 
   /**
@@ -645,7 +767,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     const turnId = this.activeTurnId;
     if (this.assistantMessage) {
-      this.assistantMessage = { ...this.assistantMessage, status: 'done' };
+      this.assistantMessage = { ...this.assistantMessage, status: 'done', stopReason: 'cancelled' };
       this.emit('message', this.assistantMessage);
       if (this.hasReplyStarted) {
         this.emitAgentEvent({
@@ -1298,14 +1420,43 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   /** 附加 conversation/turn 元数据，并发出标准化 Agent 事件。 */
   private emitAgentEvent(event: AcpRuntimeAgentEventInput): void {
     if (!this.activeTurnId) return;
+    const memoryFields = extractAgentEventMemoryFields(event);
     this.emit('agentEvent', {
       id: createId(),
       conversationId: this.input.conversationId,
       turnId: this.activeTurnId,
+      sequence: 0,
       at: Date.now(),
+      ...memoryFields,
       ...event,
     } as AgentEvent);
   }
+}
+
+function extractAgentEventMemoryFields(event: AcpRuntimeAgentEventInput): Partial<AgentEvent> {
+  switch (event.type) {
+    case 'agent.reply.delta':
+    case 'agent.reply.done':
+      return { messageId: event.messageId };
+    case 'agent.tool.call':
+    case 'agent.tool.update':
+    case 'agent.tool.result':
+      return { toolCallId: event.toolCallId, status: event.status };
+    case 'agent.permission.request':
+      return { permissionCallId: event.callId };
+    case 'agent.done':
+      return { status: event.status, stopReason: event.stopReason };
+    default:
+      return {};
+  }
+}
+
+/**
+ * 判断 ACP 恢复请求是否因为远端 session 资源缺失而失败。
+ */
+function isMissingSessionResourceError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('resource not found');
 }
 
 /** 将应用层权限响应转换为 ACP SDK 响应格式。 */

@@ -3,6 +3,7 @@ import {
   normalizeMessageList,
   normalizeServerInfo,
   normalizeTeamList,
+  normalizeConversation,
   normalizeConversationCommands,
 } from '../src/renderer/shared/utils/backendData';
 
@@ -42,8 +43,8 @@ describe('renderer backend data normalization', () => {
     expect(normalizeMessageList(undefined)).toEqual([]);
     expect(
       normalizeMessageList([
-        { id: 'm1', conversationId: 'c1', role: 'user', content: 'hello', createdAt: 1 },
-        { id: '', conversationId: 'c2', role: 'assistant', content: 'bad', createdAt: 2 },
+        { id: 'm1', conversationId: 'c1', role: 'user', type: 'text', content: 'hello', sequence: 1, createdAt: 1 },
+        { id: '', conversationId: 'c2', role: 'assistant', type: 'text', content: 'bad', sequence: 2, createdAt: 2 },
       ])
     ).toHaveLength(1);
   });
@@ -62,6 +63,40 @@ describe('renderer backend data normalization', () => {
       port: 1234,
       allowRemote: true,
       urls: [],
+    });
+  });
+
+  test('normalizes persisted conversation runtime fields', () => {
+    expect(
+      normalizeConversation({
+        id: 'conv-1',
+        backend: 'codex',
+        name: 'Alpha',
+        workspace: '/tmp/project',
+        model: 'gpt-5',
+        status: 'idle',
+        acpSessionId: 'session-1',
+        sessionMode: 'auto',
+        currentModelId: 'gpt-5',
+        lastTurnId: 'turn-1',
+        lastStopReason: 'cancelled',
+        usageSize: 100,
+        usageUsed: 25,
+        usageRatio: 0.25,
+        usageUpdatedAt: 10,
+        createdAt: 1,
+        updatedAt: 2,
+      })
+    ).toMatchObject({
+      id: 'conv-1',
+      acpSessionId: 'session-1',
+      sessionMode: 'auto',
+      currentModelId: 'gpt-5',
+      lastStopReason: 'cancelled',
+      usageSize: 100,
+      usageUsed: 25,
+      usageRatio: 0.25,
+      usageUpdatedAt: 10,
     });
   });
 });
