@@ -23,7 +23,7 @@ import type {
   TeamAgentStatus,
   TeamMailboxEntry,
   User,
-} from '../../../shared/types';
+} from '@shared/types';
 
 type RecordValue = Record<string, unknown>;
 

@@ -2,12 +2,12 @@ import http from 'node:http';
 import { networkInterfaces } from 'node:os';
 import type express from 'express';
 import { WebSocketServer } from 'ws';
-import type { AuthService } from './services/authService';
-import type { Logger } from './utils/logger';
-import { resolveListenHost } from './config';
-import { saveServerPreferences } from './serverPreferences';
-import { WebBridge } from './app/bridge/webBridge';
-import type { ServerInfo } from '../shared/types';
+import type { AuthService } from '@server/services/authService';
+import type { Logger } from '@server/utils/logger';
+import { resolveListenHost } from '@server/config';
+import { saveServerPreferences } from '@server/serverPreferences';
+import { WebBridge } from '@server/app/bridge/webBridge';
+import type { ServerInfo } from '@shared/types';
 
 export type ServerInstance = {
   server: http.Server;

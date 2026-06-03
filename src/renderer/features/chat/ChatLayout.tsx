@@ -8,10 +8,10 @@ import type {
   ConversationUsage,
   Team,
   TeamAgent,
-} from '../../../shared/types';
-import { ChatHeader } from './components/ChatHeader';
-import { MessageList } from './components/MessageList';
-import { SendBox, type SendBoxPayload } from './components/SendBox';
+} from '@shared/types';
+import { ChatHeader } from '@renderer/features/chat/components/ChatHeader';
+import { MessageList } from '@renderer/features/chat/components/MessageList';
+import { SendBox, type SendBoxPayload } from '@renderer/features/chat/components/SendBox';
 
 /** 聊天主面板的运行时数据和操作回调。 */
 export type ChatLayoutProps = {

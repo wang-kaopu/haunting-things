@@ -3,10 +3,10 @@ import { parse as parseCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'node:crypto';
-import type { User } from '../../shared/types';
-import type { UserRepositoryPort } from '../db/userRepository';
-import { createId } from '../id';
-import { setRequestContext } from '../utils/requestContext';
+import type { User } from '@shared/types';
+import type { UserRepositoryPort } from '@server/db/userRepository';
+import { createId } from '@server/id';
+import { setRequestContext } from '@server/utils/requestContext';
 
 const COOKIE_NAME = 'hs_session';
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;

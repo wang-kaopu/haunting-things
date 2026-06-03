@@ -2,12 +2,12 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import cookieParser from 'cookie-parser';
 import express from 'express';
-import type { AuthService } from '../services/authService';
-import type { Logger } from '../utils/logger';
-import { requestContextMiddleware } from '../utils/requestContext';
-import { requestLogger } from '../utils/requestLogger';
-import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
-import { createAuthRoutes } from './routes/authRoutes';
+import type { AuthService } from '@server/services/authService';
+import type { Logger } from '@server/utils/logger';
+import { requestContextMiddleware } from '@server/utils/requestContext';
+import { requestLogger } from '@server/utils/requestLogger';
+import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import { createAuthRoutes } from '@server/app/routes/authRoutes';
 
 /**
  * 创建 Express 应用并挂载认证、附件读取和前端静态资源路由。

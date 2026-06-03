@@ -1,9 +1,9 @@
 import type React from 'react';
-import type { AgentTurnPhase, ChatMessage, TeamAgent } from '../../../../shared/types';
-import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
-import { getMessageFallbackText } from '../../../shared/utils/format';
-import { isWrappedTeamPrompt } from '../../../shared/utils/guards';
-import { MarkdownMessage } from './MarkdownMessage';
+import type { AgentTurnPhase, ChatMessage, TeamAgent } from '@shared/types';
+import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
+import { getMessageFallbackText } from '@renderer/shared/utils/format';
+import { isWrappedTeamPrompt } from '@renderer/shared/utils/guards';
+import { MarkdownMessage } from '@renderer/features/chat/components/MarkdownMessage';
 
 /** 单条聊天消息的展示输入。 */
 export type MessageBubbleProps = {

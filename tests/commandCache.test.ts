@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readCachedCommands, writeCachedCommands } from '../src/renderer/shared/commandCache';
+import { readCachedCommands, writeCachedCommands } from '@renderer/shared/commandCache';
 
 function createLocalStorageMock(): Storage {
   const items = new Map<string, string>();

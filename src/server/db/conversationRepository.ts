@@ -11,9 +11,9 @@ import type {
   ConversationMode,
   ConversationModels,
   StopReason,
-} from '../../shared/types';
-import type { Db } from './connection';
-import { rowToAgentEvent, rowToConversation, rowToMessage } from './mappers';
+} from '@shared/types';
+import type { Db } from '@server/db/connection';
+import { rowToAgentEvent, rowToConversation, rowToMessage } from '@server/db/mappers';
 
 /** 负责会话、消息和 Agent 事件的持久化，是聊天流恢复的主仓库。 */
 export class ConversationRepository {

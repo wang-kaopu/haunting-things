@@ -1,5 +1,5 @@
-import type { ChatMessage } from '../../shared/types';
-import type { ConversationRepositoryPort } from '../db/conversationRepository';
+import type { ChatMessage } from '@shared/types';
+import type { ConversationRepositoryPort } from '@server/db/conversationRepository';
 
 export type MemoryContextBuildInput = {
   conversationId: string;

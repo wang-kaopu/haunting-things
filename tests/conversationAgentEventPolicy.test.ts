@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EventBus } from '../src/server/events';
-import { ConversationService } from '../src/server/services/conversationService';
-import type { AgentEvent, Conversation } from '../src/shared/types';
+import { EventBus } from '@server/events';
+import { ConversationService } from '@server/services/conversationService';
+import type { AgentEvent, Conversation } from '@shared/types';
 
 function createFakeRepository() {
   const conversations = new Map<string, Conversation>();

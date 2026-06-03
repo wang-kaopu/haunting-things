@@ -1,6 +1,6 @@
-import type { Team } from '../../shared/types';
-import type { Db } from './connection';
-import { rowToTeam } from './mappers';
+import type { Team } from '@shared/types';
+import type { Db } from '@server/db/connection';
+import { rowToTeam } from '@server/db/mappers';
 
 /** 负责团队配置的持久化读写，团队成员列表以 JSON 快照保存。 */
 export class TeamRepository {

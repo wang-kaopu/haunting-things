@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { loadServerPreferences } from './serverPreferences';
+import { loadServerPreferences } from '@server/serverPreferences';
 
 /** Web 服务默认监听端口。 */
 export const DEFAULT_PORT = 25808;

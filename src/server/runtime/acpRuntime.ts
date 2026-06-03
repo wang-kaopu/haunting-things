@@ -29,11 +29,11 @@ import type {
   PermissionResponse,
   StopReason,
   StoredAttachment,
-} from '../../shared/types';
-import { createId } from '../id';
-import { createLogger } from '../utils/logger';
-import { getBridgePackageVersioned } from './agentRegistry';
-import { ndjsonFromChildProcess } from './ndjsonTransport';
+} from '@shared/types';
+import { createId } from '@server/id';
+import { createLogger } from '@server/utils/logger';
+import { getBridgePackageVersioned } from '@server/runtime/agentRegistry';
+import { ndjsonFromChildProcess } from '@server/runtime/ndjsonTransport';
 
 type AcpRuntimeEvents = {
   message: [ChatMessage];

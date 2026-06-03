@@ -1,5 +1,5 @@
-import type { AgentBackend } from './agent';
-import type { AttachmentRef } from './conversation';
+import type { AgentBackend } from '@shared/types/agent';
+import type { AttachmentRef } from '@shared/types/conversation';
 
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';

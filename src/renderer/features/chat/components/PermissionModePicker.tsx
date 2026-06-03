@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import type { ConversationMode, TeamAgent } from '../../../../shared/types';
-import { CustomSelect } from '../../../shared/components/CustomSelect';
+import type { ConversationMode, TeamAgent } from '@shared/types';
+import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
 type PermissionModeOption = {
   id: string;

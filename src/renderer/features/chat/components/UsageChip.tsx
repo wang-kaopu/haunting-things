@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { ConversationUsage } from '../../../../shared/types';
-import { formatUsagePercent, formatUsageShort } from '../../../shared/utils/format';
+import type { ConversationUsage } from '@shared/types';
+import { formatUsagePercent, formatUsageShort } from '@renderer/shared/utils/format';
 
 export type UsageChipProps = {
   usage?: ConversationUsage | null;

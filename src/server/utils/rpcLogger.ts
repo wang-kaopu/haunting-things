@@ -1,4 +1,4 @@
-import { createLogger, formatValue, sanitizeLogFields } from './logger';
+import { createLogger, formatValue, sanitizeLogFields } from '@server/utils/logger';
 
 const rpcLogger = createLogger('rpc');
 

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { StoredAttachment } from '../../shared/types';
-import { createId } from '../id';
+import type { StoredAttachment } from '@shared/types';
+import { createId } from '@server/id';
 
 const ALLOWED_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;

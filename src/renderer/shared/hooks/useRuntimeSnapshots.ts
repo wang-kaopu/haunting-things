@@ -6,17 +6,17 @@ import type {
   ConversationModels,
   ConversationUsage,
   TeamAgent,
-} from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import { readCachedCommands, writeCachedCommands } from '../commandCache';
-import { readCachedModels, writeCachedModels } from '../modelCache';
+} from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import { readCachedCommands, writeCachedCommands } from '@renderer/shared/commandCache';
+import { readCachedModels, writeCachedModels } from '@renderer/shared/modelCache';
 import {
   normalizeConversationCommands,
   normalizeConversation,
   normalizeConversationMode,
   normalizeConversationModels,
   normalizeConversationUsage,
-} from '../utils/backendData';
+} from '@renderer/shared/utils/backendData';
 
 /** 当前活跃 Agent 的运行时快照输入。 */
 export type UseRuntimeSnapshotsInput = {

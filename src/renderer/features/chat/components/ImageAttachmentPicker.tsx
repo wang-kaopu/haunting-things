@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
-import type { AttachmentRef } from '../../../../shared/types';
+import type { AttachmentRef } from '@shared/types';
 
 /** 图片选择器的上传行为配置。 */
 export type ImageAttachmentPickerProps = {

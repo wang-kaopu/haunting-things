@@ -1,6 +1,6 @@
-import type { BridgeEventName, BridgeInvokeName, BridgeServerMessage } from '../../shared/bridge';
-import { createBridgeId } from '../../shared/bridge';
-import type { EventMap, InvokeMap } from '../../shared/types';
+import type { BridgeEventName, BridgeInvokeName, BridgeServerMessage } from '@shared/bridge';
+import { createBridgeId } from '@shared/bridge';
+import type { EventMap, InvokeMap } from '@shared/types';
 
 type Pending = {
   resolve: (value: unknown) => void;

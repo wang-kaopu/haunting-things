@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Team, TeamAgent } from '../../../shared/types';
+import type { Team, TeamAgent } from '@shared/types';
 
 /** 活跃团队选择 Hook 的输入。 */
 export type UseActiveTeamInput = {

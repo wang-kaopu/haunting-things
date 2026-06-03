@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { ConversationCommands } from '../../../../shared/types';
-import { CustomSelect } from '../../../shared/components/CustomSelect';
+import type { ConversationCommands } from '@shared/types';
+import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
 export type AgentCommandsMenuProps = {
   commands?: ConversationCommands | null;

@@ -13,17 +13,17 @@ import type {
   PermissionResponse,
   StopReason,
   StoredAttachment,
-} from '../../shared/types';
-import { classifyAgentEvent } from '../agentEventPolicy';
-import type { AttachmentRepositoryPort } from '../db/attachmentRepository';
-import type { ConversationRepositoryPort } from '../db/conversationRepository';
-import { toAttachmentRef } from '../db/mappers';
-import type { EventBus } from '../events';
-import { createId } from '../id';
-import { createLogger } from '../utils/logger';
-import type { AttachmentService } from './attachmentService';
-import { AcpRuntime } from '../runtime/acpRuntime';
-import { MemoryContextService } from './memoryContextService';
+} from '@shared/types';
+import { classifyAgentEvent } from '@server/agentEventPolicy';
+import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import type { ConversationRepositoryPort } from '@server/db/conversationRepository';
+import { toAttachmentRef } from '@server/db/mappers';
+import type { EventBus } from '@server/events';
+import { createId } from '@server/id';
+import { createLogger } from '@server/utils/logger';
+import type { AttachmentService } from '@server/services/attachmentService';
+import { AcpRuntime } from '@server/runtime/acpRuntime';
+import { MemoryContextService } from '@server/services/memoryContextService';
 
 const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
   claude: ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'],

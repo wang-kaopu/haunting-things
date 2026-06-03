@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { ServerInfo } from '../../../../shared/types';
+import type { ServerInfo } from '@shared/types';
 
 /** 远程访问设置面板输入。 */
 export type RemoteAccessPanelProps = {

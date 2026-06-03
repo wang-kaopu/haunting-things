@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EventBus } from '../src/server/events';
-import { ConversationService } from '../src/server/services/conversationService';
-import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '../src/shared/types';
+import { EventBus } from '@server/events';
+import { ConversationService } from '@server/services/conversationService';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '@shared/types';
 
 const runtimeInstances: Array<{
   send: ReturnType<typeof vi.fn>;
@@ -10,7 +10,7 @@ const runtimeInstances: Array<{
   input: unknown;
 }> = [];
 
-vi.mock('../src/server/runtime/acpRuntime', () => {
+vi.mock('@server/runtime/acpRuntime', () => {
   const { EventEmitter } = require('node:events') as typeof import('node:events');
 
   class MockAcpRuntime extends EventEmitter {

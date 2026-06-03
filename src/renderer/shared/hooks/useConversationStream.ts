@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { AgentEvent, AgentTurnPhase, ChatMessage, Team, TeamAgent } from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import { resolveTeamSendInvocation } from '../../features/teams/teamViewModel';
-import type { SendBoxPayload } from '../../features/chat/components/SendBox';
-import { normalizeAgentEvent, normalizeAgentEventList, normalizeConversationStream, normalizeMessageList } from '../utils/backendData';
-import { phaseFromAgentEvent } from '../utils/format';
+import type { AgentEvent, AgentTurnPhase, ChatMessage, Team, TeamAgent } from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import { resolveTeamSendInvocation } from '@renderer/features/teams/teamViewModel';
+import type { SendBoxPayload } from '@renderer/features/chat/components/SendBox';
+import { normalizeAgentEvent, normalizeAgentEventList, normalizeConversationStream, normalizeMessageList } from '@renderer/shared/utils/backendData';
+import { phaseFromAgentEvent } from '@renderer/shared/utils/format';
 
 const MAX_AGENT_EVENTS_IN_MEMORY = 200;
 

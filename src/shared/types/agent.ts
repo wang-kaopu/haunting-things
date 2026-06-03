@@ -1,4 +1,4 @@
-import type { ConversationStatus, StopReason } from './conversation';
+import type { ConversationStatus, StopReason } from '@shared/types/conversation';
 
 export type AgentBackend = 'claude' | 'codex';
 

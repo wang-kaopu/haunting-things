@@ -1,6 +1,6 @@
-import type { TeamTask } from '../../shared/types';
-import type { Db } from './connection';
-import { rowToTask } from './mappers';
+import type { TeamTask } from '@shared/types';
+import type { Db } from '@server/db/connection';
+import { rowToTask } from '@server/db/mappers';
 
 /** 负责团队任务的持久化，供 Agent 间协作和任务状态展示使用。 */
 export class TaskRepository {

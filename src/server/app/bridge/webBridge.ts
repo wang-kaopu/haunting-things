@@ -1,9 +1,9 @@
 import type { IncomingMessage } from 'node:http';
 import type { WebSocketServer, WebSocket } from 'ws';
-import type { AuthService } from '../../services/authService';
-import type { BridgeClientMessage, BridgeHandler, BridgeInvokeName, BridgeResultMessage } from '../../../shared/bridge';
-import { createLogger } from '../../utils/logger';
-import { createRequestId, runWithRequestContext } from '../../utils/requestContext';
+import type { AuthService } from '@server/services/authService';
+import type { BridgeClientMessage, BridgeHandler, BridgeInvokeName, BridgeResultMessage } from '@shared/bridge';
+import { createLogger } from '@server/utils/logger';
+import { createRequestId, runWithRequestContext } from '@server/utils/requestContext';
 
 /**
  * 渲染端与服务端之间的已认证 WebSocket RPC bridge。

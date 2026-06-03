@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgent, TeamTask } from '../../shared/types';
-import { createId } from '../id';
-import { createLogger } from '../utils/logger';
+import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgent, TeamTask } from '@shared/types';
+import { createId } from '@server/id';
+import { createLogger } from '@server/utils/logger';
 
 type TcpRequest = {
   authToken?: string;

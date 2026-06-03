@@ -1,4 +1,4 @@
-import type { AcpAvailableCommand, AgentBackend } from './agent';
+import type { AcpAvailableCommand, AgentBackend } from '@shared/types/agent';
 
 /** Conversation 当前状态。 */
 export type ConversationStatus = 'idle' | 'running' | 'failed' | 'stopped';

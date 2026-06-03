@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
-import type { AgentBackend } from '../../../../shared/types';
-import type { CreateTeamInput } from '../../../shared/types/ui';
+import type { AgentBackend } from '@shared/types';
+import type { CreateTeamInput } from '@renderer/shared/types/ui';
 
 export type CreateTeamDialogProps = {
   open: boolean;

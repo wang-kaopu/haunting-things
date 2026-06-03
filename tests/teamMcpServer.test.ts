@@ -2,8 +2,8 @@ import net from 'node:net';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamMcpServer, resolveTeamMcpStdioInvocation } from '../src/server/mcp/teamMcpServer';
-import type { MailboxMessage, Team, TeamAgent, TeamTask } from '../src/shared/types';
+import { TeamMcpServer, resolveTeamMcpStdioInvocation } from '@server/mcp/teamMcpServer';
+import type { MailboxMessage, Team, TeamAgent, TeamTask } from '@shared/types';
 
 function makeTeam(): Team {
   return {

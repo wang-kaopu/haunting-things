@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { AppNotification } from '../../../shared/types/ui';
+import type { AppNotification } from '@renderer/shared/types/ui';
 
 export type ToastItemProps = {
   item: AppNotification;

@@ -5,7 +5,7 @@ import type {
   ChatRole,
   ConversationUsage,
   TeamAgent,
-} from '../../../shared/types';
+} from '@shared/types';
 
 /**
  * 将 Agent 状态转换为界面文案。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValue } from '../src/server/utils/logger';
+import { formatValue } from '@server/utils/logger';
 
 describe('logger formatting', () => {
   it('keeps long string values complete', () => {

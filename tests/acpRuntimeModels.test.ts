@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConversationMode, ConversationModels } from '../src/shared/types';
+import type { ConversationMode, ConversationModels } from '@shared/types';
 
 const { spawnMock, connectionMock, childMock } = vi.hoisted(() => {
   const childMock = {
@@ -42,11 +42,11 @@ vi.mock('node:child_process', () => ({
   spawn: spawnMock,
 }));
 
-vi.mock('../src/server/runtime/agentRegistry', () => ({
+vi.mock('@server/runtime/agentRegistry', () => ({
   getBridgePackageVersioned: () => 'mock-bridge',
 }));
 
-vi.mock('../src/server/runtime/ndjsonTransport', () => ({
+vi.mock('@server/runtime/ndjsonTransport', () => ({
   ndjsonFromChildProcess: () => ({}),
 }));
 
@@ -57,7 +57,7 @@ vi.mock('@agentclientprotocol/sdk', () => ({
   }),
 }));
 
-import { AcpRuntime } from '../src/server/runtime/acpRuntime';
+import { AcpRuntime } from '@server/runtime/acpRuntime';
 
 describe('AcpRuntime models', () => {
   beforeEach(() => {

@@ -5,7 +5,7 @@ import type {
   AgentInfo,
   PermissionRequest,
   PermissionResponse,
-} from './agent';
+} from '@shared/types/agent';
 import type {
   AttachmentRef,
   ChatMessage,
@@ -15,14 +15,14 @@ import type {
   ConversationModels,
   ConversationStatus,
   ConversationUsage,
-} from './conversation';
+} from '@shared/types/conversation';
 import type {
   Team,
   TeamAgent,
   TeamAgentStatus,
   TeamMailboxEntry,
   TeamTask,
-} from './team';
+} from '@shared/types/team';
 
 /** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {

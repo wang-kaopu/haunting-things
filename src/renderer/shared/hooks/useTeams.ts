@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ConversationStatus, Team, TeamAgent } from '../../../shared/types';
-import { bridge } from '../bridgeClient';
-import type { AddAgentInput, CreateTeamInput } from '../types/ui';
+import type { ConversationStatus, Team, TeamAgent } from '@shared/types';
+import { bridge } from '@renderer/shared/bridgeClient';
+import type { AddAgentInput, CreateTeamInput } from '@renderer/shared/types/ui';
 import {
   normalizeConversationStatusEvent,
   normalizeTeam,
   normalizeTeamAgent,
   normalizeTeamAgentStatusEvent,
   normalizeTeamList,
-} from '../utils/backendData';
+} from '@renderer/shared/utils/backendData';
 
 /** Team 列表和成员变更操作状态。 */
 export type UseTeamsResult = {

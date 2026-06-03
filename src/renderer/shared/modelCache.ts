@@ -1,4 +1,4 @@
-import type { AcpModelInfo, AgentBackend, ConversationModels } from '../../shared/types';
+import type { AcpModelInfo, AgentBackend, ConversationModels } from '@shared/types';
 
 const STORAGE_KEY = 'haunting-souls.model-cache.v1';
 

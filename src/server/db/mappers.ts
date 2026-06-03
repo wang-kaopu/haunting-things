@@ -7,7 +7,7 @@ import type {
   StoredAttachment,
   Team,
   TeamTask,
-} from '../../shared/types';
+} from '@shared/types';
 
 /**
  * 将 conversation 表行映射为共享领域类型。

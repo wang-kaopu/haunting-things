@@ -1,7 +1,7 @@
 import type React from 'react';
-import type { AgentTurnPhase, Team } from '../../../shared/types';
-import { SidebarAgentList } from './components/SidebarAgentList';
-import { TeamList } from './components/TeamList';
+import type { AgentTurnPhase, Team } from '@shared/types';
+import { SidebarAgentList } from '@renderer/features/teams/components/SidebarAgentList';
+import { TeamList } from '@renderer/features/teams/components/TeamList';
 
 /** 左侧导航栏输入——成员状态、团队列表和全局入口。 */
 export type SidebarProps = {

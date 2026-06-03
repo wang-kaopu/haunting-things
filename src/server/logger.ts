@@ -1,1 +1,1 @@
-export * from './utils/logger';
+export * from '@server/utils/logger';

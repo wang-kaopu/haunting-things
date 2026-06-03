@@ -2,8 +2,8 @@ import React from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
-import { CodeBlock } from './CodeBlock';
-import './markdown.css';
+import { CodeBlock } from '@renderer/features/chat/components/CodeBlock';
+import '@renderer/features/chat/components/markdown.css';
 
 export type MarkdownMessageProps = {
   content: string;

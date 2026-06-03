@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { AuthService } from '../../services/authService';
-import type { Logger } from '../../utils/logger';
-import { setRequestContext } from '../../utils/requestContext';
+import type { AuthService } from '@server/services/authService';
+import type { Logger } from '@server/utils/logger';
+import { setRequestContext } from '@server/utils/requestContext';
 
 /** 创建认证相关 HTTP 路由，并把登录/改密等安全事件写入审计日志。 */
 export function createAuthRoutes(auth: AuthService, logger: Logger): Router {

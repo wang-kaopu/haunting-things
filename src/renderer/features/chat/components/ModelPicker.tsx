@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
-import type { ConversationModels, TeamAgent } from '../../../../shared/types';
-import { CustomSelect } from '../../../shared/components/CustomSelect';
+import type { ConversationModels, TeamAgent } from '@shared/types';
+import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
 export type ModelPickerProps = {
   agent?: TeamAgent | null;

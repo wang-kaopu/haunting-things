@@ -1,4 +1,4 @@
-import type { Db } from './connection';
+import type { Db } from '@server/db/connection';
 
 /**
  * 初始化并迁移应用数据库 schema。
