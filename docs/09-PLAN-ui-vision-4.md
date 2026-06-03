@@ -7,7 +7,7 @@
 需要完成：
 
 1. 将“远程访问面板”改造成真正的“设置面板”，远程访问只是设置中的一条。
-2. 重新排列消息发送框小组件，使其接近 GPT 网页版。
+2. 重新排列消息发送框小组件，使其接近 新 网页版。
 3. 将“发送”按钮改成圆形图标按钮。
 4. 下拉框组件自己实现，不再使用浏览器默认 `<select>`。
 5. 统一模型、权限、命令等选择器风格。
@@ -55,7 +55,7 @@ SettingsDialog
         └── AboutSetting
 ```
 
-视觉目标接近 GPT 设置页：
+视觉目标接近 新 设置页：
 
 ```txt
 设置
@@ -538,7 +538,7 @@ button + popover + option button
 5. 危险选项
 6. 点击外部关闭
 7. Escape 关闭
-8. 统一 GPT 风格样式
+8. 统一 新 风格样式
 ```
 
 ---
@@ -682,7 +682,7 @@ import { CustomSelect } from "../../../shared/components/CustomSelect";
 
 ### 10.1 目标顺序
 
-接近 GPT 网页版：
+接近 新 网页版：
 
 ```txt
 输入框
@@ -857,7 +857,7 @@ src/renderer/features/chat/components/SendBox.tsx
 
 `composer` 负责底部区域和渐变背景。
 
-`composer-inner` 负责真正的 GPT 风格输入框外壳。
+`composer-inner` 负责真正的 新 风格输入框外壳。
 
 发送按钮从文字按钮改成黑色圆形图标按钮。
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AgentTurnPhase, ChatMessage, TeamAgent } from '../../../../shared/types';
 import { MessageBubble } from './MessageBubble';
 
@@ -10,7 +10,7 @@ export type MessageListProps = {
   activeAgent?: TeamAgent | null;
 };
 
-/** GPT 风格居中消息流，移动端使用 auto 滚动 + ResizeObserver 避免流式输出被打断。 */
+/** 新 风格居中消息流，移动端使用 auto 滚动 + ResizeObserver 避免流式输出被打断。 */
 export function MessageList({ messages, activePhase, agents = [], activeAgent }: MessageListProps): React.ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastLengthRef = useRef(messages.length);
@@ -75,8 +75,8 @@ export function MessageList({ messages, activePhase, agents = [], activeAgent }:
             const assistantAgent =
               message.role === 'assistant'
                 ? (agents.find(
-                    (agent) => agent.conversationId === message.conversationId,
-                  ) ??
+                  (agent) => agent.conversationId === message.conversationId,
+                ) ??
                   activeAgent ??
                   null)
                 : null;

@@ -11,7 +11,7 @@ export type SettingsDialogProps = {
   onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
-/** 设置弹窗——遮罩 + GPT 风格容器 + 头部 + 内容。 */
+/** 设置弹窗——遮罩 + 新 风格容器 + 头部 + 内容。 */
 export function SettingsDialog({
   open,
   serverInfo,

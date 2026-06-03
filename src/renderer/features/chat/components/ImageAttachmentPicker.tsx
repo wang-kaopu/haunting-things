@@ -75,7 +75,7 @@ export function ImageAttachmentPicker({
 /**
  * 展示待发送图片的横向缩略图预览。
  *
- * 预览位于输入框上方，和 ChatGPT 网页版的附件布局保持一致。
+ * 预览位于输入框上方，和 Chat新 网页版的附件布局保持一致。
  */
 export function ImageAttachmentPreview({
   attachments,

@@ -42,7 +42,7 @@ server.tool(
   {
     name: z.string().describe('Human-readable teammate name, e.g. "Claude Reviewer" or "Codex Implementer"'),
     backend: z.enum(['claude', 'codex']).describe('Exact backend to start: "claude" or "codex"'),
-    model: z.string().optional().describe('Optional model id, for example sonnet, opus, gpt-5.1-codex'),
+    model: z.string().optional().describe('Optional model id, for example sonnet, opus, 新-5.1-codex'),
   },
   async (args) => textResult(await callTeamTool('team_add_agent', args))
 );
@@ -71,7 +71,7 @@ server.tool(
   'Delegate a task in one call. It will reuse an existing teammate with the requested backend when available, otherwise it will start that backend and assign the task.',
   {
     backend: z.enum(['claude', 'codex']).describe('Backend to delegate to'),
-    model: z.string().optional().describe('Optional model id, for example sonnet, opus, gpt-5.1-codex'),
+    model: z.string().optional().describe('Optional model id, for example sonnet, opus, 新-5.1-codex'),
     name: z.string().optional().describe('Optional teammate name. If omitted, use a default name based on backend.'),
     task: z.string().describe('Task message to send to the teammate'),
     summary: z.string().optional().describe('Short UI summary'),

@@ -11,7 +11,7 @@ export type ChatHeaderProps = {
   onOpenSidebar?: () => void;
 };
 
-/** GPT 风格简化的顶部状态栏——移动端左侧显示 SVG 菜单图标按钮。 */
+/** 新 风格简化的顶部状态栏——移动端左侧显示 SVG 菜单图标按钮。 */
 export function ChatHeader({
   team,
   activeAgent,

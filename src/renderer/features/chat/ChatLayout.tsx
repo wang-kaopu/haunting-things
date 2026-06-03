@@ -31,7 +31,7 @@ export type ChatLayoutProps = {
 };
 
 /**
- * GPT 风格聊天主面板。
+ * 新 风格聊天主面板。
  *
  * 未选择团队时展示提示，无消息时展示欢迎页，
  * 否则展示 Header、消息列表和底部输入框。
@@ -94,11 +94,10 @@ export function ChatLayout({
   );
 }
 
-/** GPT 风格空状态欢迎页。 */
+/** 新 风格空状态欢迎页。 */
 function ChatEmpty(): React.ReactElement {
   return (
     <div className="chat-empty">
-      <div className="chat-empty__icon">HT</div>
       <h1>What can I help with?</h1>
       <div className="chat-empty__suggestions">
         <button type="button">Summarize this project</button>

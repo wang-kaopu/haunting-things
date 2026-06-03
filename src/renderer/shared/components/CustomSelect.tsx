@@ -93,7 +93,7 @@ export function CustomSelect({
       >
         <span className="custom-select-label">{label}</span>
         <span className="custom-select-chevron" aria-hidden="true">
-          ⌄
+          <ChevronDownIcon />
         </span>
       </button>
 
@@ -130,5 +130,27 @@ export function CustomSelect({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** 下拉箭头图标。 */
+function ChevronDownIcon(): React.ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="m6 9 6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

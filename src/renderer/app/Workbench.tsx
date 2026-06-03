@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PermissionRequest, PermissionResponse, TeamAgent } from '../../shared/types';
-import { bridge } from '../shared/bridgeClient';
 import { ChatLayout } from '../features/chat/ChatLayout';
+import { NotificationCenter } from '../features/notifications/components/NotificationCenter';
+import { SettingsDialog } from '../features/settings/components/SettingsDialog';
 import { Sidebar } from '../features/teams/Sidebar';
 import { AddAgentDialog } from '../features/teams/dialogs/AddAgentDialog';
 import { CreateTeamDialog } from '../features/teams/dialogs/CreateTeamDialog';
-import { NotificationCenter } from '../features/notifications/components/NotificationCenter';
+import { bridge } from '../shared/bridgeClient';
 import { useActiveTeam } from '../shared/hooks/useActiveTeam';
 import { useConversationStream } from '../shared/hooks/useConversationStream';
 import { useNotifications } from '../shared/hooks/useNotifications';
 import { useRuntimeSnapshots } from '../shared/hooks/useRuntimeSnapshots';
 import { useServerInfo } from '../shared/hooks/useServerInfo';
 import { useTeams } from '../shared/hooks/useTeams';
-import { SettingsDialog } from '../features/settings/components/SettingsDialog';
 import type { AddAgentInput, CreateTeamInput } from '../shared/types/ui';
 import { normalizePermissionRequest } from '../shared/utils/backendData';
 
@@ -23,7 +23,7 @@ export type WorkbenchProps = {
 };
 
 /**
- * GPT 风格主工作台。
+ * 新 风格主工作台。
  *
  * 桌面端两栏布局，移动端 Sidebar 改为 fixed 抽屉（通过 ☰ 按钮打开）。
  */

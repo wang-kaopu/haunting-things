@@ -7,7 +7,6 @@ type PermissionModeOption = {
   id: string;
   label: string;
   description: string;
-  danger?: boolean;
 };
 
 const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
@@ -35,7 +34,6 @@ const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
     id: 'bypassPermissions',
     label: 'bypassPermissions',
     description: '跳过权限确认，仅建议在隔离环境中使用。',
-    danger: true,
   },
 ];
 
@@ -54,7 +52,6 @@ const CODEX_MODE_OPTIONS: PermissionModeOption[] = [
     id: 'full-access',
     label: 'full-access',
     description: 'YOLO模式，仅建议在可信工作区或隔离环境中使用。',
-    danger: true,
   },
 ];
 
@@ -64,7 +61,7 @@ export type PermissionModePickerProps = {
   onSetMode: (mode: string) => Promise<void>;
 };
 
-/** 展示当前 Agent 的权限模式——使用自制下拉框，危险模式保留二次确认。 */
+/** 展示当前 Agent 的权限模式。 */
 export function PermissionModePicker({
   agent,
   mode,
@@ -89,14 +86,6 @@ export function PermissionModePicker({
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
       return;
-    }
-
-    const option = options.find((item) => item.id === nextMode);
-    if (option?.danger) {
-      const confirmed = window.confirm(
-        `确定要切换到「${option.label}」吗？该模式会放宽权限限制，建议只在隔离环境中使用。`
-      );
-      if (!confirmed) return;
     }
 
     try {
@@ -124,7 +113,6 @@ export function PermissionModePicker({
             value: option.id,
             label: option.label,
             description: option.description,
-            danger: option.danger,
           })),
           ...(!options.some((option) => option.id === current)
             ? [{ value: current, label: current }]

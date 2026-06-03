@@ -1,35 +1,35 @@
-# haunting-things GPT 风格 UI 编码方案
+# haunting-things 新 风格 UI 编码方案
 
 ## 1. 改造目标
 
-将 `wang-kaopu/haunting-things` 的主工作台页面改造成更接近 ChatGPT 的聊天界面风格。
+将 `wang-kaopu/haunting-things` 的主工作台页面改造成更接近 Chat新 的聊天界面风格。
 
 核心目标：
 
 1. 保留现有业务逻辑，不重写后端协议。
 2. 保留现有 `useConversationStream`、`bridge.invoke`、消息流、图片上传、模型选择、权限确认逻辑。
 3. 主要改造前端布局、组件结构和样式。
-4. 页面视觉从“三栏管理后台风格”改为“ChatGPT 风格聊天工作区”。
+4. 页面视觉从“三栏管理后台风格”改为“Chat新 风格聊天工作区”。
 5. 优先通过 CSS 和少量组件结构调整完成，不引入大规模 UI 框架重构。
 
 ## 2. 技术方案
 
 ### 2.1 暂不全量引入 assistant-ui
 
-`assistant-ui` 可以作为 GPT 风格 UI 参考，但第一阶段不建议直接替换现有消息流和输入框逻辑。
+`assistant-ui` 可以作为 新 风格 UI 参考，但第一阶段不建议直接替换现有消息流和输入框逻辑。
 
 原因：
 
 1. 当前项目已经有完整的消息发送、流式响应、图片上传和权限确认逻辑。
 2. 直接引入 assistant-ui runtime 会增加适配成本。
-3. 当前目标是“页面最像 GPT”，不是重写聊天系统。
+3. 当前目标是“页面最像 新”，不是重写聊天系统。
 4. 更适合先完成静态 UI 改造，再决定是否逐步迁移组件。
 
 第一阶段采用：
 
 ```txt
 现有 React 组件
-+ 自定义 GPT 风格 CSS
++ 自定义 新 风格 CSS
 + 少量组件结构调整
 ```
 
@@ -98,7 +98,7 @@ src/renderer/components/SendBox.tsx
 
 ### 5.1 视觉目标
 
-Sidebar 模仿 ChatGPT 左侧栏：
+Sidebar 模仿 Chat新 左侧栏：
 
 1. 深色或浅灰背景。
 2. 顶部放 `New Chat` / `New Team`。
@@ -193,7 +193,7 @@ Sidebar 模仿 ChatGPT 左侧栏：
 
 ### 6.1 视觉目标
 
-中间区域改成 ChatGPT 主聊天页：
+中间区域改成 Chat新 主聊天页：
 
 ```txt
 Header 固定顶部
@@ -239,7 +239,7 @@ SendBox 固定底部
 
 ### 7.1 视觉目标
 
-消息区不再像卡片列表，而是 ChatGPT 正文流：
+消息区不再像卡片列表，而是 Chat新 正文流：
 
 1. 内容最大宽度 720px。
 2. 整体居中。
@@ -375,7 +375,7 @@ User 消息靠右显示浅灰气泡：
 
 ### 9.1 视觉目标
 
-输入框改成 ChatGPT 底部悬浮 Composer：
+输入框改成 Chat新 底部悬浮 Composer：
 
 1. 居中，最大宽度 760px。
 2. 圆角大边框。
@@ -487,7 +487,7 @@ User 消息靠右显示浅灰气泡：
 
 ### 10.1 视觉目标
 
-Header 简化成 GPT 风格：
+Header 简化成 新 风格：
 
 ```txt
 左侧：当前 Team / Agent 名称
@@ -539,7 +539,7 @@ Header 简化成 GPT 风格：
 
 ## 11. 空状态设计
 
-当没有消息时，中间显示 GPT 风格欢迎页：
+当没有消息时，中间显示 新 风格欢迎页：
 
 ```tsx
 <div className="chat-empty">
@@ -635,7 +635,7 @@ Header 简化成 GPT 风格：
 新建分支：
 
 ```bash
-git checkout -b feat/gpt-like-ui
+git checkout -b feat/新-like-ui
 ```
 
 ### Step 2：重构整体布局
@@ -651,7 +651,7 @@ git checkout -b feat/gpt-like-ui
 修改 `Sidebar.tsx`：
 
 1. 顶部添加 New Chat / New Team。
-2. Team 列表改成 GPT 左侧栏样式。
+2. Team 列表改成 新 左侧栏样式。
 3. 底部固定设置项。
 4. 当前选中 Team 增加 active 状态。
 
@@ -718,7 +718,7 @@ npm run build
 
 完成后需要满足：
 
-1. 页面第一眼接近 ChatGPT。
+1. 页面第一眼接近 Chat新。
 2. 左侧栏不再像后台管理菜单。
 3. 主聊天区居中，消息最大宽度合理。
 4. User 消息右侧浅灰气泡。
@@ -745,5 +745,5 @@ npm run build
 
 ```bash
 git add .
-git commit -m "feat(ui): 改造为GPT风格聊天界面"
+git commit -m "feat(ui): 改造为新风格聊天界面"
 ```

@@ -1,4 +1,4 @@
-# UI 编码方案：隐藏 Teams 操作按钮 + GPT 风格设置面板
+# UI 编码方案：隐藏 Teams 操作按钮 + 新 风格设置面板
 
 ## 目标
 
@@ -6,7 +6,7 @@
 
 1. 隐藏 Teams 列表里的“更多”和“删除”入口。
 2. 不删除删除团队逻辑，只从 UI 上隐藏。
-3. 调整“设置”面板内容样式，使其更接近 ChatGPT 设置面板。
+3. 调整“设置”面板内容样式，使其更接近 Chat新 设置面板。
 4. 不改后端接口、不改 Electron 主进程、不改远程访问业务逻辑。
 
 ---
@@ -205,7 +205,7 @@ src/renderer/styles.css
 
 ---
 
-## 四、设置弹窗改成 GPT 风格
+## 四、设置弹窗改成 新 风格
 
 当前设置面板结构是：
 
@@ -269,7 +269,7 @@ src/renderer/app/Workbench.tsx
 
 目标：
 
-1. 标题更像 GPT 设置面板。
+1. 标题更像 新 设置面板。
 2. “关闭”文字按钮改成右上角圆形 `×`。
 3. 补充一句说明，降低后台感。
 
@@ -323,7 +323,7 @@ src/renderer/features/settings/components/RemoteAccessPanel.tsx
 </span>
 ```
 
-对应 CSS 会把它排成 GPT 设置项的标题 + 描述。
+对应 CSS 会把它排成 新 设置项的标题 + 描述。
 
 ### 6.3 URL Row 按钮加 className
 
@@ -469,7 +469,7 @@ src/renderer/styles.css
 }
 ```
 
-### 7.4 远程访问开关行改成 GPT 设置项
+### 7.4 远程访问开关行改成 新 设置项
 
 ```css
 .remote-toggle-row {
@@ -651,8 +651,8 @@ src/renderer/styles.css
 4. Teams 条目仍可点击切换。
 5. Teams 条目文字过长会省略。
 6. 设置面板右上角是圆形 × 按钮。
-7. 设置面板整体圆角、阴影、遮罩接近 GPT。
-8. 远程访问开关像 GPT 设置里的 switch。
+7. 设置面板整体圆角、阴影、遮罩接近 新。
+8. 远程访问开关像 新 设置里的 switch。
 9. URL 列表像设置项信息卡。
 10. 复制按钮仍可用。
 11. npm run build 通过。
@@ -676,5 +676,5 @@ git commit -m "style(team): 隐藏团队列表操作按钮"
 
 ```bash
 git add .
-git commit -m "style(settings): 优化设置面板为GPT风格"
+git commit -m "style(settings): 优化设置面板为新风格"
 ```

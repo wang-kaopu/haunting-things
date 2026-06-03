@@ -2,7 +2,7 @@
 
 ## 目标
 
-将移动端打开 Sidebar 的抽屉按钮从原始按钮样式改为 GPT 风格图标按钮。
+将移动端打开 Sidebar 的抽屉按钮从原始按钮样式改为 新 风格图标按钮。
 
 要求：
 
@@ -39,17 +39,19 @@ src/renderer/features/chat/components/ChatHeader.tsx
 改成：
 
 ```tsx
-{onOpenSidebar ? (
-  <button
-    type="button"
-    className="mobile-sidebar-trigger"
-    aria-label="打开侧边栏"
-    title="打开侧边栏"
-    onClick={onOpenSidebar}
-  >
-    <MenuIcon />
-  </button>
-) : null}
+{
+  onOpenSidebar ? (
+    <button
+      type="button"
+      className="mobile-sidebar-trigger"
+      aria-label="打开侧边栏"
+      title="打开侧边栏"
+      onClick={onOpenSidebar}
+    >
+      <MenuIcon />
+    </button>
+  ) : null;
+}
 ```
 
 在同文件底部增加本地图标组件：
@@ -85,7 +87,7 @@ src/renderer/shared/components/icons/MenuIcon.tsx
 然后：
 
 ```tsx
-import { MenuIcon } from '../../../shared/components/icons/MenuIcon';
+import { MenuIcon } from "../../../shared/components/icons/MenuIcon";
 ```
 
 ---
@@ -116,9 +118,7 @@ import { MenuIcon } from '../../../shared/components/icons/MenuIcon';
       </button>
     ) : null}
 
-    <div className="chat-title">
-      ...
-    </div>
+    <div className="chat-title">...</div>
   </div>
 </header>
 ```
@@ -246,7 +246,7 @@ button {
 1. 手机端 ChatHeader 左侧显示圆形菜单按钮。
 2. 按钮不再是原始浏览器 button 样式。
 3. 按钮使用 SVG 图标，不直接显示 ☰ 字符。
-4. hover / active / focus-visible 样式和 GPT 风格一致。
+4. hover / active / focus-visible 样式和 新 风格一致。
 5. 桌面端不显示该按钮。
 6. 点击按钮能打开 Sidebar 抽屉。
 7. 点击遮罩仍能关闭 Sidebar。

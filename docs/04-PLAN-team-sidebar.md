@@ -14,7 +14,7 @@
 │                        │
 │ Members                │
 │ ●  [ ] Claude Agent    │
-│ ●  [ ] GPT Agent       │
+│ ●  [ ] 新 Agent       │
 │ ●  [ ] Codex Agent     │
 │                        │
 │ + 添加成员              │
@@ -136,7 +136,7 @@ export function SidebarAgentList({
 agent.backend;
 ```
 
-渲染 Claude Code、Codex、GPT、小机器人图标。
+渲染 Claude Code、Codex、新、小机器人图标。
 
 ## 修改 Sidebar Props
 
@@ -402,7 +402,7 @@ export function Sidebar({
   flex-shrink: 0;
 }
 
-/* 先占位，后续可以换成 cc / gpt / codex 的真实图标 */
+/* 先占位，后续可以换成 cc / 新 / codex 的真实图标 */
 .sidebar-agent-icon-claude,
 .sidebar-agent-icon-codex,
 .sidebar-agent-icon-openai {

@@ -1,8 +1,8 @@
 import type React from 'react';
 import type { AgentTurnPhase, ChatMessage, TeamAgent } from '../../../../shared/types';
+import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
 import { getMessageFallbackText } from '../../../shared/utils/format';
 import { isWrappedTeamPrompt } from '../../../shared/utils/guards';
-import { getAgentIconAlt, getAgentIconSrc } from '../../../shared/utils/agentIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 
 /** 单条聊天消息的展示输入。 */
@@ -13,7 +13,7 @@ export type MessageBubbleProps = {
 };
 
 /**
- * GPT 风格消息气泡。
+ * 新 风格消息气泡。
  *
  * - Assistant 消息：后端图标 + 正文流，无卡片背景。
  * - User 消息：靠右浅灰圆角气泡。

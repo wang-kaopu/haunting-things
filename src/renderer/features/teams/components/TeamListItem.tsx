@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import type { Team } from '../../../../shared/types';
 
 export type TeamListItemProps = {
@@ -9,7 +9,7 @@ export type TeamListItemProps = {
   onDelete: () => Promise<void>;
 };
 
-/** GPT 风格侧边栏团队条目——和 Members 一样的一行式列表项，删除收进 ⋯ 菜单。 */
+/** 新 风格侧边栏团队条目——和 Members 一样的一行式列表项，删除收进 ⋯ 菜单。 */
 export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);

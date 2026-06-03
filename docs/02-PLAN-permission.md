@@ -9,7 +9,7 @@
 
 ## 实现状态
 
-已实现。当前版本新增了 `conversation.setMode` bridge 调用链，`AcpRuntime` 在 `newSession` 和可选模型切换后会按 backend 默认调用 `setSessionMode()`：Claude 使用 `default`，Codex 使用 `auto`。聊天输入框工具栏会直接展示模型、权限模式和可用命令下拉选择器。
+已实现。当前版本新增了 `conversation.setMode` bridge 调用链，`AcpRuntime` 在 `newSession` 和可选模型切换后会按 backend 默认调用 `setSessionMode()`：Claude 使用 `default`，Codex 使用 `auto`。聊天输入框工具栏会直接展示模型、权限模式和可用命令下拉选择器。`bypassPermissions` 和 `full-access` 作为普通权限选项展示，切换时不再弹出二次确认，也不再使用红色危险样式。
 
 权限模式仍按运行时状态处理，不写入数据库；模型切换导致 runtime 重启后会重新回到该 backend 的默认权限模式。如果某个 ACP bridge 不支持指定 mode，后端会抛出 `Current ACP bridge does not support session mode switching` 或 bridge 自身错误，前端选择器会在下拉组件下方展示错误。
 
@@ -515,7 +515,6 @@ type PermissionModeOption = {
   id: string;
   label: string;
   description: string;
-  danger?: boolean;
 };
 
 const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
@@ -543,7 +542,6 @@ const CLAUDE_MODE_OPTIONS: PermissionModeOption[] = [
     id: "bypassPermissions",
     label: "bypassPermissions",
     description: "跳过权限确认，仅建议在隔离环境中使用。",
-    danger: true,
   },
 ];
 
@@ -562,7 +560,6 @@ const CODEX_MODE_OPTIONS: PermissionModeOption[] = [
     id: "full-access",
     label: "full-access",
     description: "YOLO模式，仅建议在可信工作区或隔离环境中使用。",
-    danger: true,
   },
 ];
 
@@ -597,14 +594,6 @@ export function PermissionModePicker({
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
       return;
-    }
-
-    const option = options.find((item) => item.id === nextMode);
-    if (option?.danger) {
-      const confirmed = window.confirm(
-        `确定要切换到「${option.label}」吗？该模式会放宽权限限制，建议只在隔离环境中使用。`,
-      );
-      if (!confirmed) return;
     }
 
     try {
@@ -652,7 +641,7 @@ export function PermissionModePicker({
 - Claude YOLO 模式使用 `bypassPermissions`。
 - Codex YOLO 模式使用 `full-access`。
 - Claude 默认展示 `default`，Codex 默认展示 `auto`，即使 bridge 暂时还没上报 mode，也不会显示空状态。
-- YOLO 模式加 `window.confirm` 二次确认，避免误点。
+- YOLO 模式作为普通下拉选项展示，不使用二次确认或红色危险样式。
 
 ---
 
@@ -787,7 +776,7 @@ tests/acpRuntimeModels.test.ts
 - Codex agent 展示 `read-only / auto / full-access`。
 - 下拉切换后调用 `onSetMode(mode)`。
 - 命令下拉选中后在消息框最前面插入 `/{command_name} `。
-- YOLO 模式触发二次确认。
+- YOLO 模式不触发二次确认，并按普通选项样式展示。
 - 没有 activeAgent 时下拉组件 disabled。
 
 ---

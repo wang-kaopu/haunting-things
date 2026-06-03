@@ -7,9 +7,9 @@
 需要完成：
 
 1. 去掉顶部“添加 Agent”按钮。
-2. 统一模型选择、权限模式、命令选择、图片按钮等工具栏控件样式，使其更接近 GPT。
+2. 统一模型选择、权限模式、命令选择、图片按钮等工具栏控件样式，使其更接近 新。
 3. 将 Teams 条目样式改成和 Members 一样的一行式列表项。
-4. 调整弹出 Dialog 样式，使其更接近 GPT。
+4. 调整弹出 Dialog 样式，使其更接近 新。
 
 ---
 
@@ -155,7 +155,7 @@ ImageAttachmentPicker
 发送按钮
 ```
 
-目标是统一成 GPT 风格“小胶囊控件”：
+目标是统一成 新 风格“小胶囊控件”：
 
 ```txt
 圆角胶囊
@@ -656,7 +656,7 @@ src/renderer/features/teams/components/TeamListItem.tsx
 
 ---
 
-## 四、弹出 Dialog 改成 GPT 风格
+## 四、弹出 Dialog 改成 新 风格
 
 目标：
 
@@ -907,7 +907,7 @@ src/renderer/features/teams/components/TeamListItem.tsx
 
 ### 4.5 设置弹窗头部
 
-当前设置弹窗里右上角是“关闭”文字按钮。建议改成更像 GPT 的圆形关闭按钮：
+当前设置弹窗里右上角是“关闭”文字按钮。建议改成更像 新 的圆形关闭按钮：
 
 ```tsx
 <div className="modal-header">
@@ -961,7 +961,7 @@ CSS：
 
 ## 五、建议清理全局按钮默认样式的影响
 
-当前全局 `button` 样式会影响所有按钮，容易让局部 GPT 风格被“蓝色边框后台按钮”覆盖。
+当前全局 `button` 样式会影响所有按钮，容易让局部 新 风格被“蓝色边框后台按钮”覆盖。
 
 建议把全局按钮样式降低存在感：
 
@@ -1002,7 +1002,7 @@ border-radius: ...
 
 ```bash
 git add .
-git commit -m "style(ui): 补全GPT风格界面细节"
+git commit -m "style(ui): 补全新风格界面细节"
 ```
 
 ## 七、验收标准
@@ -1016,7 +1016,7 @@ git commit -m "style(ui): 补全GPT风格界面细节"
 4. 不再出现空 <span></span>。
 5. Teams 条目和 Members 一样是一行式、32px 高、文字超长省略。
 6. Teams 选中态和 Members 选中态一致。
-7. 创建团队、添加 Agent、权限确认、设置弹窗更像 GPT 弹窗。
+7. 创建团队、添加 Agent、权限确认、设置弹窗更像 新 弹窗。
 8. 弹窗输入框、select、按钮都有统一圆角和 focus 样式。
 9. npm run build 通过。
 ```

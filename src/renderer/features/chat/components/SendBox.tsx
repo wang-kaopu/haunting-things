@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
 import type React from 'react';
+import { useRef, useState } from 'react';
 import type {
   AgentTurnPhase,
   AttachmentRef,
@@ -37,7 +37,7 @@ export type SendBoxProps = {
 };
 
 /**
- * GPT 风格底部悬浮消息输入框。
+ * 新 风格底部悬浮消息输入框。
  *
  * 圆角大边框、文本区无边框、工具栏和圆形发送按钮在下方。
  * 保留 Enter 发送、Shift+Enter 换行、图片粘贴上传逻辑。

@@ -6,7 +6,7 @@
 
 需要完成两件事：
 
-1. 补全 GPT 风格 UI 第一阶段未完成任务。
+1. 补全 新 风格 UI 第一阶段未完成任务。
 
 ---
 
@@ -565,7 +565,7 @@ src/renderer/features/chat/components/SendBox.tsx
 }
 ```
 
-### 8.3 消息流 GPT 风格
+### 8.3 消息流 新 风格
 
 替换当前 `.messages` 和 `.message` 相关样式为：
 
