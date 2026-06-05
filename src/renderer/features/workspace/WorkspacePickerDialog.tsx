@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { Workspace } from '@shared/types';
 import { useWorkspacePicker } from '@renderer/features/workspace/hooks/useWorkspacePicker';
+import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 
 export type WorkspacePickerDialogProps = {
   open: boolean;
@@ -44,35 +45,17 @@ export function WorkspacePickerDialog({
   const directories = listing?.entries.filter((entry) => entry.isDir) ?? [];
 
   return (
-    <div
-      className="workspace-picker-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          close();
-        }
-      }}
+    <PanelDialogShell
+      open={open}
+      className="workspace-picker-dialog"
+      titleId="workspace-picker-title"
+      title="选择工作区"
+      description="从当前项目目录中选择 Agent 的工作目录。"
+      closeLabel="关闭"
+      closeOnBackdrop
+      onClose={close}
     >
-      <section
-        className="workspace-picker-panel"
-        role="dialog"
-        aria-modal="true"
-      >
-        <header className="workspace-picker-header">
-          <div>
-            <h2>选择工作区</h2>
-            <p>从当前项目目录中选择 Agent 的工作目录。</p>
-          </div>
-
-          <button
-            type="button"
-            className="workspace-picker-close"
-            onClick={close}
-            aria-label="关闭"
-          >
-            ×
-          </button>
-        </header>
-
+      <div className="panel-dialog-panel workspace-picker-content">
         <section className="workspace-picker-current">
           <span>当前目录</span>
           <strong>{listing?.absolutePath ?? '加载中...'}</strong>
@@ -141,7 +124,7 @@ export function WorkspacePickerDialog({
             选择当前目录
           </button>
         </footer>
-      </section>
-    </div>
+      </div>
+    </PanelDialogShell>
   );
 }
