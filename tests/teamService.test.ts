@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '@server/events';
-import type { AgentEvent, ChatMessage, Conversation, MailboxMessage, Team, TeamAgent, TeamTask } from '@shared/types';
+import type { AgentEvent, ChatMessage, Conversation, ConversationSummary, MailboxMessage, Team, TeamAgent, TeamTask, Workspace } from '@shared/types';
 
 const mockInstances: Array<{
   teamId: string;
@@ -154,12 +154,14 @@ describe('TeamService', () => {
     finishHandler = null;
     agentEventHandler = null;
     conversationMessages = new Map();
+    const workspace = createWorkspace('workspace-test');
     conversations = {
-      create: vi.fn((input: { backend: string; workspaceId?: string; name?: string }): Conversation => ({
+      create: vi.fn((input: { backend: string; workspaceId?: string; name?: string }): ConversationSummary => ({
         id: `conv-${mockInstances.length + 1}`,
         backend: input.backend as Conversation['backend'],
         name: input.name ?? 'conversation',
-        workspaceId: input.workspaceId ?? 'workspace-test',
+        preview: '',
+        workspace: input.workspaceId ? createWorkspace(input.workspaceId) : workspace,
         model: undefined,
         status: 'idle',
         createdAt: Date.now(),
@@ -260,6 +262,23 @@ describe('TeamService', () => {
     expect(conversations.stop).toHaveBeenCalledWith('conv-1');
     expect(conversations.stop).toHaveBeenCalledWith('conv-2');
     expect(mockInstances[0].stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes every team in a workspace through the normal team cleanup path', async () => {
+    const service = new TeamService(repo as any, repo as any, repo as any, conversations as any, events);
+    const first = await service.create({ name: 'Alpha', workspaceId: 'workspace-a', leaderBackend: 'claude' });
+    const second = await service.create({ name: 'Beta', workspaceId: 'workspace-a', leaderBackend: 'codex' });
+    const third = await service.create({ name: 'Gamma', workspaceId: 'workspace-b', leaderBackend: 'claude' });
+
+    const result = await service.deleteByWorkspace('workspace-a');
+
+    expect(result).toEqual({ deleted: 2 });
+    expect(repo.getTeam(first.id)).toBeNull();
+    expect(repo.getTeam(second.id)).toBeNull();
+    expect(repo.getTeam(third.id)).not.toBeNull();
+    expect(conversations.stop).toHaveBeenCalledWith('conv-1');
+    expect(conversations.stop).toHaveBeenCalledWith('conv-2');
+    expect(conversations.stop).not.toHaveBeenCalledWith('conv-3');
   });
 
   it('records mailbox entries in the team timeline and marks them processed after delivery', async () => {
@@ -425,3 +444,16 @@ describe('TeamService', () => {
     });
   });
 });
+
+function createWorkspace(id: string): Workspace {
+  return {
+    id,
+    name: id,
+    path: `/tmp/${id}`,
+    kind: 'server',
+    isTemporary: false,
+    existsOnDisk: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}

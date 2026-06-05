@@ -49,7 +49,7 @@ describe('ConversationService commands snapshots', () => {
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
 
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversation);
+    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
 
     const emitted: ConversationCommands[] = [];
     const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {

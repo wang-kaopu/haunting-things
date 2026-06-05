@@ -37,7 +37,9 @@ export function registerBridgeHandlers(input: {
   });
   bridge.register('agent.list', () => listAgents());
   bridge.register('agent.health', ({ backend }: { backend: AgentBackend }) => healthAgent(backend));
-  bridge.register('workspace.create', (params) => workspaces.create(params));
+  bridge.register('workspace.root', () => workspaces.getRoot());
+  bridge.register('workspace.browse', (params) => workspaces.browse(params));
+  bridge.register('workspace.selectDirectory', (params) => workspaces.selectDirectory(params));
   bridge.register('workspace.createTemporary', (params) => workspaces.createTemporary(params));
   bridge.register('workspace.list', () => workspaces.list());
   bridge.register('workspace.get', ({ workspaceId }) => workspaces.get(workspaceId));
@@ -47,13 +49,24 @@ export function registerBridgeHandlers(input: {
   bridge.register('workspace.mkdir', (params) => workspaces.mkdir(params));
   bridge.register('workspace.rename', (params) => workspaces.rename(params));
   bridge.register('workspace.deleteEntry', (params) => workspaces.deleteEntry(params));
+  bridge.register('workspace.delete', async ({ workspaceId }) => {
+    workspaces.getRequired(workspaceId);
+    const deletedTeams = await teams.deleteByWorkspace(workspaceId);
+    const deletedConversations = conversations.deleteByWorkspace(workspaceId);
+    workspaces.delete({ workspaceId });
+    return {
+      deleted: true,
+      deletedTeams: deletedTeams.deleted,
+      deletedConversations: deletedConversations.deleted,
+    };
+  });
   bridge.register('workspace.openPath', (params) => workspaces.openPath(params));
   bridge.register('workspace.revealPath', (params) => workspaces.revealPath(params));
   bridge.register('conversation.create', (params) => conversations.create(params));
   bridge.register('conversation.setWorkspace', (params) => conversations.setConversationWorkspace(params));
   bridge.register('conversation.setModel', (params) => conversations.setModel(params));
   bridge.register('conversation.setMode', (params) => conversations.setMode(params));
-  bridge.register('conversation.list', () => conversations.list());
+  bridge.register('conversation.list', (params) => conversations.list(params ?? {}));
   bridge.register('conversation.get', ({ conversationId }) => conversations.get(conversationId));
   bridge.register('conversation.messages', ({ conversationId }) => conversations.messages(conversationId));
   bridge.register('conversation.agentEvents', ({ conversationId, limit }) =>

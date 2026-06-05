@@ -54,6 +54,39 @@ export type ConversationWithWorkspace = Conversation & {
   workspace: Workspace;
 };
 
+/** 会话列表摘要项，避免列表页加载完整消息历史。 */
+export type ConversationSummary = {
+  id: string;
+  name: string;
+  preview: string;
+  status: ConversationStatus;
+  backend: AgentBackend;
+  model?: string;
+  workspace: Workspace;
+  lastStopReason?: StopReason;
+  lastError?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** 会话摘要列表查询条件。 */
+export type ConversationListInput = {
+  workspaceId?: string;
+  cursor?: string;
+  limit?: number;
+  sortKey?: 'createdAt' | 'updatedAt';
+  sortDirection?: 'asc' | 'desc';
+  status?: ConversationStatus[];
+  searchTerm?: string;
+};
+
+/** 会话摘要列表分页结果。 */
+export type ConversationListResult = {
+  data: ConversationSummary[];
+  nextCursor?: string;
+  backwardsCursor?: string;
+};
+
 /** 聊天消息的发送者角色。 */
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
 

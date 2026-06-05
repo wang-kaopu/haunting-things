@@ -82,7 +82,7 @@ export class TeamService {
    * 创建新 Team，自动建立 Leader conversation 并启动 MCP 服务。
    *
    * @param input.name          - Team 名称
-   * @param input.workspaceId   - 工作区 ID（不传则由 ConversationService 自动创建临时工作区）
+   * @param input.workspaceId   - 工作区 ID（不传则由 ConversationService 自动创建对话工作区）
    * @param input.leaderBackend - Leader Agent 使用的后端（claude / codex）
    */
   async create(input: {
@@ -116,7 +116,7 @@ export class TeamService {
     const team = this.teamsRepo.createTeam({
       id: createId(),
       name: input.name,
-      workspaceId: leaderConversation.workspaceId,
+      workspaceId: leaderConversation.workspace.id,
       leaderSlotId: leader.slotId,
       agents: [leader],
       createdAt: now,
@@ -175,6 +175,20 @@ export class TeamService {
       deletedFilesCount: attachments.length,
     });
     return { deleted: true };
+  }
+
+  /** 删除指定工作区下的所有 Team，并复用单个 Team 删除的运行态和附件清理流程。 */
+  async deleteByWorkspace(workspaceId: string): Promise<{ deleted: number }> {
+    const teams = this.teamsRepo.listTeams().filter((team) => team.workspaceId === workspaceId);
+    for (const team of teams) {
+      await this.delete(team.id);
+    }
+
+    this.logger.info('team_delete_by_workspace', {
+      workspaceId,
+      deleted: teams.length,
+    });
+    return { deleted: teams.length };
   }
 
   /**

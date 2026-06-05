@@ -66,7 +66,7 @@ describe('AttachmentRepository', () => {
     db.prepare(
       `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('workspace-1', 'Alpha', dir, 'local', 0, 1, now, now);
+    ).run('workspace-1', 'Alpha', dir, 'server', 0, 1, now, now);
     db.prepare(
       `INSERT INTO teams (id, name, workspace_id, leader_slot_id, agents, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`

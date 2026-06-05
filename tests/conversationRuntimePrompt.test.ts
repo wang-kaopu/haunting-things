@@ -210,7 +210,7 @@ describe('ConversationService runtime prompt separation', () => {
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
-    (conversations as any).getRuntime(conversation);
+    (conversations as any).getRuntime(conversations.get(conversation.id));
     const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
 
     const runtime = runtimeInstances.at(-1);
@@ -228,7 +228,7 @@ describe('ConversationService runtime prompt separation', () => {
     const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
 
     expect(result).toEqual({ accepted: true });
-    expect(conversations.list().find((item) => item.id === conversation.id)).toMatchObject({
+    expect(conversations.list().data.find((item) => item.id === conversation.id)).toMatchObject({
       status: 'idle',
     });
     expect(emitSpy).toHaveBeenCalledWith('conversation.status', {
@@ -248,7 +248,7 @@ describe('ConversationService runtime prompt separation', () => {
     const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
 
     expect(result).toEqual({ accepted: true });
-    expect(conversations.list().find((item) => item.id === conversation.id)).toMatchObject({
+    expect(conversations.list().data.find((item) => item.id === conversation.id)).toMatchObject({
       status: 'stopped',
       lastStopReason: 'stopped',
     });
@@ -279,7 +279,7 @@ describe('ConversationService runtime prompt separation', () => {
 
     conversations.recoverStaleRuntimeState();
 
-    expect(conversations.list().find((item) => item.id === conversation.id)).toMatchObject({
+    expect(conversations.list().data.find((item) => item.id === conversation.id)).toMatchObject({
       status: 'stopped',
       lastStopReason: 'stopped',
     });
@@ -300,7 +300,7 @@ describe('ConversationService runtime prompt separation', () => {
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
-    (conversations as any).getRuntime(conversation);
+    (conversations as any).getRuntime(conversations.get(conversation.id));
     const runtime = runtimeInstances.at(-1);
     runtime?.cancelCurrentTurn.mockRejectedValueOnce(new Error('cancel transport failed'));
 

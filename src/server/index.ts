@@ -13,6 +13,7 @@ import { WorkspaceRepository } from '@server/db/workspaceRepository';
 import { AuthService } from '@server/services/authService';
 import { AttachmentService } from '@server/services/attachmentService';
 import { WorkspaceService } from '@server/services/workspaceService';
+import { WorkspaceRootService } from '@server/services/workspaceRootService';
 import { EventBus } from '@server/events';
 import { ConversationService } from '@server/services/conversationService';
 import { createLogger } from '@server/utils/logger';
@@ -48,7 +49,8 @@ await auth.ensureAdmin();
 
 const events = new EventBus();
 const attachmentService = new AttachmentService(path.join(config.dataDir, 'attachments'));
-const workspaceService = new WorkspaceService(workspacesRepo, config.dataDir);
+const workspaceRootService = new WorkspaceRootService(config.projectRoot);
+const workspaceService = new WorkspaceService(workspacesRepo, workspaceRootService, config.dataDir);
 const conversations = new ConversationService(conversationsRepo, events, config.dataDir, workspaceService, attachmentsRepo, attachmentService);
 conversations.recoverStaleRuntimeState();
 const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events, attachmentsRepo, attachmentService);

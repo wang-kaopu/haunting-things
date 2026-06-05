@@ -80,7 +80,7 @@ describe('ConversationService agent event policy', () => {
     const events = new EventBus();
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversation);
+    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
     (runtime as any).activeTurnId = 'turn-1';
 
     const emitted: AgentEvent[] = [];

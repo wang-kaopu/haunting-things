@@ -11,12 +11,14 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationListInput,
+  ConversationListResult,
   ConversationMode,
   ConversationModels,
   ConversationMcpServer,
+  ConversationSummary,
   ConversationStatus,
   ConversationUsage,
-  ConversationWithWorkspace,
 } from '@shared/types/conversation';
 import type {
   Team,
@@ -26,7 +28,7 @@ import type {
   TeamTask,
   TeamWithWorkspace,
 } from '@shared/types/team';
-import type { Workspace, WorkspaceEntry, WorkspaceKind } from '@shared/types/workspace';
+import type { Workspace, WorkspaceDirectoryListing, WorkspaceEntry, WorkspaceRoot } from '@shared/types/workspace';
 
 /** 服务器监听信息，用于 UI 展示访问地址。 */
 export type ServerInfo = {
@@ -55,8 +57,13 @@ export type InvokeMap = {
   'attachment.delete': { params: { attachmentId: string }; result: { deleted: true } };
   'agent.list': { params: void; result: AgentInfo[] };
   'agent.health': { params: { backend: AgentBackend }; result: AgentHealth };
-  'workspace.create': {
-    params: { name?: string; path?: string; kind?: WorkspaceKind };
+  'workspace.root': { params: void; result: WorkspaceRoot };
+  'workspace.browse': {
+    params: { relativePath?: string };
+    result: WorkspaceDirectoryListing;
+  };
+  'workspace.selectDirectory': {
+    params: { relativePath?: string };
     result: Workspace;
   };
   'workspace.createTemporary': { params: { name?: string }; result: Workspace };
@@ -83,6 +90,10 @@ export type InvokeMap = {
     params: { workspaceId: string; relativePath: string };
     result: { deleted: true };
   };
+  'workspace.delete': {
+    params: { workspaceId: string };
+    result: { deleted: true; deletedTeams: number; deletedConversations: number };
+  };
   'workspace.openPath': {
     params: { workspaceId: string; relativePath?: string };
     result: { opened: true };
@@ -93,11 +104,11 @@ export type InvokeMap = {
   };
   'conversation.create': {
     params: { backend: AgentBackend; workspaceId?: string; name?: string; model?: string; mcpServers?: ConversationMcpServer[] };
-    result: ConversationWithWorkspace;
+    result: ConversationSummary;
   };
   'conversation.setWorkspace': {
     params: { conversationId: string; workspaceId: string };
-    result: ConversationWithWorkspace;
+    result: ConversationSummary;
   };
   'conversation.setModel': {
     params: { conversationId: string; model: string };
@@ -107,7 +118,7 @@ export type InvokeMap = {
     params: { conversationId: string; mode: string };
     result: ConversationMode;
   };
-  'conversation.list': { params: void; result: Conversation[] };
+  'conversation.list': { params: ConversationListInput | void; result: ConversationListResult };
   'conversation.get': { params: { conversationId: string }; result: Conversation | null };
   'conversation.messages': { params: { conversationId: string }; result: ChatMessage[] };
   'conversation.agentEvents': { params: { conversationId: string; limit?: number }; result: AgentEvent[] };

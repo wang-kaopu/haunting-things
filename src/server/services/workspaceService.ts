@@ -2,14 +2,23 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Workspace, WorkspaceCreateInput, WorkspaceEntry, WorkspaceTreeInput } from '@shared/types';
+import type {
+  Workspace,
+  WorkspaceDirectoryEntry,
+  WorkspaceDirectoryListing,
+  WorkspaceEntry,
+  WorkspaceRoot,
+  WorkspaceTreeInput,
+} from '@shared/types';
 import type { WorkspaceRepositoryPort } from '@server/db/workspaceRepository';
 import { normalizeWorkspacePath } from '@server/db/workspaceRepository';
+import type { WorkspaceRootService } from '@server/services/workspaceRootService';
 
 const MAX_READ_TEXT_FILE_BYTES = 1024 * 1024;
 const MAX_WRITE_TEXT_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_WORKSPACE_SEARCH_RESULTS = 500;
 const MAX_TREE_DEPTH = 2;
+const DEFAULT_IGNORED_NAMES = new Set(['.git', 'node_modules', 'dist', 'dist-server', 'build', '.next', '.turbo', '.cache']);
 
 /**
  * 管理工作区实体和工作区内文件操作。
@@ -19,28 +28,42 @@ const MAX_TREE_DEPTH = 2;
 export class WorkspaceService {
   constructor(
     private readonly repo: WorkspaceRepositoryPort,
+    private readonly rootService: WorkspaceRootService,
     private readonly dataDir: string
   ) {}
 
-  /** 创建本地或托管工作区；未传 path 时创建临时工作区。 */
-  create(input: WorkspaceCreateInput): Workspace {
-    if (!input.path?.trim()) {
-      return this.createTemporary({ name: input.name });
-    }
-
-    const workspace = this.repo.findOrCreateLocalWorkspace({
-      path: input.path,
-      name: input.name,
-    });
-
-    if (input.kind === 'managed' && workspace.kind !== 'managed') {
-      return this.repo.updateWorkspace({ id: workspace.id, name: workspace.name, path: workspace.path }) ?? workspace;
-    }
-
-    return workspace;
+  /** 返回 WebUI 可浏览的唯一项目根目录。 */
+  getRoot(): WorkspaceRoot {
+    return this.rootService.getRoot();
   }
 
-  /** 创建临时工作区。 */
+  /** 浏览启动项目根目录内的目录内容。 */
+  async browse(input: { relativePath?: string }): Promise<WorkspaceDirectoryListing> {
+    const root = this.rootService.getRoot();
+    const relativePath = normalizeRelativePath(input.relativePath);
+    const targetPath = this.rootService.resolve(relativePath);
+    const info = await stat(targetPath).catch(() => null);
+    if (!info?.isDirectory()) throw new Error('Selected path is not a directory');
+
+    return {
+      root,
+      relativePath,
+      absolutePath: targetPath,
+      parentRelativePath: getParentRelativePath(relativePath),
+      entries: await this.listDirectory(root.path, targetPath),
+    };
+  }
+
+  /** 选择启动项目根目录内的目录并注册为 server workspace。 */
+  async selectDirectory(input: { relativePath?: string }): Promise<Workspace> {
+    const absolutePath = this.rootService.resolve(normalizeRelativePath(input.relativePath));
+    const info = await stat(absolutePath).catch(() => null);
+    if (!info?.isDirectory()) throw new Error('Selected path is not a directory');
+
+    return this.createOrReuseServerWorkspace(absolutePath);
+  }
+
+  /** 创建对话工作区。 */
   createTemporary(input: { name?: string } = {}): Workspace {
     return this.repo.createTemporaryWorkspace({
       baseDir: this.dataDir,
@@ -58,19 +81,31 @@ export class WorkspaceService {
     return this.repo.getWorkspace(workspaceId);
   }
 
-  /** 解析已有工作区；必要时创建临时工作区。 */
+  /** 删除工作区记录；调用方必须先清理关联的 Team 和 Conversation。 */
+  delete(input: { workspaceId: string }): { deleted: true } {
+    this.getRequired(input.workspaceId);
+    this.repo.deleteWorkspace(input.workspaceId);
+    return { deleted: true };
+  }
+
+  /** 读取已有工作区；不存在时抛出明确错误。 */
+  getRequired(workspaceId: string): Workspace {
+    const workspace = this.repo.getWorkspace(workspaceId);
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`);
+    return this.repo.touchWorkspace(workspace.id) ?? workspace;
+  }
+
+  /** 解析已有工作区；必要时创建对话工作区。 */
   resolveOrCreate(input: {
     workspaceId?: string;
     createTemporaryWhenMissing?: boolean;
   }): Workspace {
     if (input.workspaceId) {
-      const workspace = this.repo.getWorkspace(input.workspaceId);
-      if (!workspace) throw new Error(`Workspace not found: ${input.workspaceId}`);
-      return this.repo.touchWorkspace(workspace.id) ?? workspace;
+      return this.getRequired(input.workspaceId);
     }
 
     if (input.createTemporaryWhenMissing) {
-      return this.createTemporary({ name: 'Temporary Session' });
+      return this.createTemporary({ name: '对话' });
     }
 
     throw new Error('workspaceId is required');
@@ -182,6 +217,30 @@ export class WorkspaceService {
     return resolveInsideWorkspace(workspace.path, relativePath);
   }
 
+  /** 根据后端 allowlist 解析出的真实目录创建或复用 server workspace。 */
+  private createOrReuseServerWorkspace(workspacePath: string): Workspace {
+    return this.repo.findOrCreateServerWorkspace({
+      path: workspacePath,
+      name: path.basename(workspacePath) || workspacePath,
+    });
+  }
+
+  /** 列出服务端目录浏览条目，只展示常规目录/文件并默认隐藏重型目录。 */
+  private async listDirectory(rootPath: string, dir: string): Promise<WorkspaceDirectoryEntry[]> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const result: WorkspaceDirectoryEntry[] = [];
+
+    for (const entry of entries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))) {
+      if (DEFAULT_IGNORED_NAMES.has(entry.name)) continue;
+      const fullPath = path.join(dir, entry.name);
+      const info = await stat(fullPath).catch(() => null);
+      if (!info) continue;
+      result.push(toWorkspaceDirectoryEntry(rootPath, fullPath, entry.isDirectory(), entry.isFile(), info));
+    }
+
+    return result;
+  }
+
   /** 按固定深度读取目录树。 */
   private async listEntries(workspacePath: string, dir: string, depth: number): Promise<WorkspaceEntry[]> {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -252,6 +311,38 @@ function toWorkspaceEntry(
     size: isFile ? info.size : undefined,
     modifiedAt: Math.floor(info.mtimeMs),
   };
+}
+
+/** 将服务端目录 stat 结果转换为目录浏览条目。 */
+function toWorkspaceDirectoryEntry(
+  rootPath: string,
+  fullPath: string,
+  isDir: boolean,
+  isFile: boolean,
+  info: { size: number; mtimeMs: number }
+): WorkspaceDirectoryEntry {
+  return {
+    name: path.basename(fullPath),
+    relativePath: normalizeRelativePath(path.relative(rootPath, fullPath)),
+    isDir,
+    isFile,
+    size: isFile ? info.size : undefined,
+    modifiedAt: Math.floor(info.mtimeMs),
+  };
+}
+
+/** 规范化 WebUI 提交的项目根相对路径。 */
+function normalizeRelativePath(value?: string): string {
+  if (!value || value === '/') return '.';
+  const normalized = value.replace(/\\/g, '/');
+  return normalized || '.';
+}
+
+/** 计算目录浏览的父级相对路径。 */
+function getParentRelativePath(relativePath: string): string | undefined {
+  if (!relativePath || relativePath === '.') return undefined;
+  const parent = path.posix.dirname(relativePath.replace(/\\/g, '/'));
+  return parent === '.' ? '.' : parent;
 }
 
 /** 禁止对工作区根目录执行破坏性操作。 */

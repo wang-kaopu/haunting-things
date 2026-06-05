@@ -1,12 +1,13 @@
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import type { PermissionRequest, PermissionResponse, TeamAgent } from '@shared/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { PermissionRequest, PermissionResponse, TeamAgent, Workspace } from '@shared/types';
 import { ChatLayout } from '@renderer/features/chat/ChatLayout';
 import { NotificationCenter } from '@renderer/features/notifications/components/NotificationCenter';
 import { SettingsDialog } from '@renderer/features/settings/components/SettingsDialog';
 import { Sidebar } from '@renderer/features/teams/Sidebar';
 import { AddAgentDialog } from '@renderer/features/teams/dialogs/AddAgentDialog';
 import { CreateTeamDialog } from '@renderer/features/teams/dialogs/CreateTeamDialog';
+import { WorkspacePickerDialog } from '@renderer/features/workspace/WorkspacePickerDialog';
 import { bridge } from '@renderer/shared/bridgeClient';
 import { useActiveTeam } from '@renderer/shared/hooks/useActiveTeam';
 import { useConversationStream } from '@renderer/shared/hooks/useConversationStream';
@@ -15,7 +16,7 @@ import { useRuntimeSnapshots } from '@renderer/shared/hooks/useRuntimeSnapshots'
 import { useServerInfo } from '@renderer/shared/hooks/useServerInfo';
 import { useTeams } from '@renderer/shared/hooks/useTeams';
 import type { AddAgentInput, CreateTeamInput } from '@renderer/shared/types/ui';
-import { normalizePermissionRequest } from '@renderer/shared/utils/backendData';
+import { normalizePermissionRequest, normalizeWorkspace } from '@renderer/shared/utils/backendData';
 
 export type WorkbenchProps = {
   user: { id: string; username: string };
@@ -36,10 +37,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   });
   const snapshots = useRuntimeSnapshots({ activeAgent: active.activeAgent });
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
+  const [createTeamWorkspaceId, setCreateTeamWorkspaceId] = useState<string | null>(null);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [permissionQueue, setPermissionQueue] = useState<PermissionRequest[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const permission = permissionQueue[0] ?? null;
 
   const {
@@ -67,6 +72,21 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     });
   }, [user.id]);
 
+  const refreshWorkspaces = useCallback(async () => {
+    const result = await bridge.invoke('workspace.list', undefined);
+    const next = result.map(normalizeWorkspace).filter((workspace): workspace is Workspace => workspace !== null);
+    setWorkspaces(next);
+    setActiveWorkspaceId((current) => (current && next.some((workspace) => workspace.id === current) ? current : null));
+  }, []);
+
+  useEffect(() => {
+    void refreshWorkspaces();
+  }, [refreshWorkspaces]);
+
+  useEffect(() => {
+    if (active.activeTeam?.workspaceId) setActiveWorkspaceId(active.activeTeam.workspaceId);
+  }, [active.activeTeam?.workspaceId]);
+
   useEffect(() => {
     const unsubPermission = bridge.on('conversation.permission', (payload) => {
       const request = normalizePermissionRequest(payload);
@@ -84,9 +104,18 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
 
   async function createTeam(input: CreateTeamInput): Promise<void> {
     const team = await teamsState.createTeam(input);
+    setActiveWorkspaceId(team.workspaceId || null);
     active.selectTeam(team.id);
     setCreateTeamOpen(false);
+    setCreateTeamWorkspaceId(null);
+    await refreshWorkspaces();
     notifications.push({ title: '团队已创建', message: team.name, level: 'success' });
+  }
+
+  /** 打开创建 Team 弹窗；不传 workspaceId 时创建普通对话分组。 */
+  function openCreateTeam(workspaceId?: string): void {
+    setCreateTeamWorkspaceId(workspaceId ?? null);
+    setCreateTeamOpen(true);
   }
 
   async function addAgent(input: AddAgentInput): Promise<void> {
@@ -100,6 +129,31 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   async function deleteTeam(teamId: string): Promise<void> {
     await teamsState.deleteTeam(teamId);
     notifications.push({ title: '团队已删除', message: '团队和成员已移除。', level: 'warning' });
+  }
+
+  /** 删除一个或多个工作区记录，并清理其下 Team 与 Conversation。 */
+  async function deleteWorkspaces(workspaceIds: string[], label: string): Promise<void> {
+    const uniqueIds = [...new Set(workspaceIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+    const confirmed = window.confirm(`删除“${label}”会删除其下的 Team 和 Conversation，磁盘文件不会被删除。继续？`);
+    if (!confirmed) return;
+
+    let deletedTeams = 0;
+    let deletedConversations = 0;
+    for (const workspaceId of uniqueIds) {
+      const result = await bridge.invoke('workspace.delete', { workspaceId });
+      deletedTeams += result.deletedTeams;
+      deletedConversations += result.deletedConversations;
+    }
+
+    await teamsState.refreshTeams();
+    await refreshWorkspaces();
+    setActiveWorkspaceId((current) => (current && uniqueIds.includes(current) ? null : current));
+    notifications.push({
+      title: '工作区已删除',
+      message: `已删除 ${deletedTeams} 个 Team 和 ${deletedConversations} 个 Conversation。`,
+      level: 'warning',
+    });
   }
 
   async function setModel(model: string): Promise<void> {
@@ -178,9 +232,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         activeTeamId={active.activeTeamId}
         activeSlotId={active.activeSlotId}
         phases={conversation.phaseByConversation}
-        onCreateTeamClick={() => setCreateTeamOpen(true)}
+        workspaces={workspaces}
         onAddAgentClick={() => setAddAgentOpen(true)}
+        onOpenDirectoryPicker={() => setDirectoryPickerOpen(true)}
+        onCreateTeamInWorkspace={openCreateTeam}
+        onDeleteWorkspaces={deleteWorkspaces}
         onSelectTeam={(teamId) => {
+          const team = teamsState.teams.find((item) => item.id === teamId);
+          if (team) setActiveWorkspaceId(team.workspaceId);
           active.selectTeam(teamId);
           setMobileSidebarOpen(false);
         }}
@@ -208,7 +267,26 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onSetMode={setMode}
       />
       <NotificationCenter items={notifications.items} onRemove={notifications.remove} />
-      <CreateTeamDialog open={createTeamOpen} onClose={() => setCreateTeamOpen(false)} onSubmit={createTeam} />
+      <CreateTeamDialog
+        open={createTeamOpen}
+        defaultWorkspaceId={createTeamWorkspaceId}
+        onClose={() => {
+          setCreateTeamOpen(false);
+          setCreateTeamWorkspaceId(null);
+        }}
+        onSubmit={createTeam}
+      />
+      {directoryPickerOpen ? (
+        <WorkspacePickerDialog
+          open={directoryPickerOpen}
+          onOpenChange={setDirectoryPickerOpen}
+          onSelect={(workspace) => {
+            setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
+            setActiveWorkspaceId(workspace.id);
+            notifications.push({ title: '工作区已新建', message: workspace.name, level: 'success' });
+          }}
+        />
+      ) : null}
       <AddAgentDialog
         open={addAgentOpen}
         disabled={!active.activeTeam}

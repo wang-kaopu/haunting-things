@@ -3,6 +3,7 @@ import type {
   AttachmentRef,
   ChatMessage,
   Conversation,
+  ConversationSummary,
   ConversationWithWorkspace,
   MailboxMessage,
   StoredAttachment,
@@ -62,6 +63,24 @@ export function rowToConversationWithWorkspace(row: any): ConversationWithWorksp
   return {
     ...rowToConversation(row),
     workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
+  };
+}
+
+/** 将 conversation + workspace join 行映射为会话列表摘要。 */
+export function rowToConversationSummary(row: any): ConversationSummary {
+  const conversation = rowToConversation(row);
+  return {
+    id: conversation.id,
+    name: conversation.name,
+    preview: row.preview ?? '',
+    status: conversation.status,
+    backend: conversation.backend,
+    model: conversation.currentModelId ?? conversation.model,
+    workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
+    lastStopReason: conversation.lastStopReason,
+    lastError: conversation.lastError,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
   };
 }
 

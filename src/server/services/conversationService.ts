@@ -5,6 +5,9 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationListInput,
+  ConversationListResult,
+  ConversationSummary,
   ConversationWithWorkspace,
   ConversationMcpServer,
   ConversationModels,
@@ -74,10 +77,10 @@ export class ConversationService {
   }
 
   /**
-   * 创建新 Conversation，并绑定已有或临时工作区。
+   * 创建新 Conversation，并绑定已有或对话工作区。
    *
    * @param input.backend    - Agent 后端类型（claude / codex）
-   * @param input.workspaceId - 工作区 ID；不传则创建临时工作区
+   * @param input.workspaceId - 工作区 ID；不传则创建对话工作区
    * @param input.name       - 显示名称，默认为 `<backend> conversation`
    * @param input.mcpServers - 可选的 MCP server 配置，会随 runtime 一同启动
    */
@@ -87,9 +90,11 @@ export class ConversationService {
     name?: string;
     model?: string;
     mcpServers?: ConversationMcpServer[];
-  }): ConversationWithWorkspace {
+  }): ConversationSummary {
     const now = Date.now();
-    const workspace = this.resolveOrCreateWorkspace(input.workspaceId);
+    const workspace = input.workspaceId
+      ? this.requireWorkspace(input.workspaceId)
+      : this.resolveOrCreateWorkspace(undefined);
     const conversation = this.repo.createConversation({
       id: createId(),
       backend: input.backend,
@@ -126,7 +131,7 @@ export class ConversationService {
       workspacePath: workspace.path,
       hasMcpServers: Boolean(input.mcpServers?.length),
     });
-    return { ...conversation, workspace };
+    return this.toConversationSummary(conversation, workspace);
   }
 
   /**
@@ -164,8 +169,15 @@ export class ConversationService {
   }
 
   /** 返回所有 Conversation 列表。 */
-  list(): Conversation[] {
-    return this.repo.listConversations();
+  list(input: ConversationListInput = {}): ConversationListResult {
+    if (typeof this.repo.listConversationSummaries === 'function') {
+      return this.repo.listConversationSummaries(input);
+    }
+    const data = this.repo.listConversations().flatMap((conversation) => {
+      const workspace = this.requireWorkspace(conversation.workspaceId);
+      return [this.toConversationSummary(conversation, workspace)];
+    });
+    return { data };
   }
 
   /** 返回单个 Conversation 快照。 */
@@ -482,7 +494,7 @@ export class ConversationService {
   }
 
   /** 修改会话绑定的工作区，并重置依赖 cwd 的 ACP session。 */
-  setConversationWorkspace(input: { conversationId: string; workspaceId: string }): ConversationWithWorkspace {
+  setConversationWorkspace(input: { conversationId: string; workspaceId: string }): ConversationSummary {
     const workspace = this.requireWorkspace(input.workspaceId);
     const runtime = this.runtimes.get(input.conversationId);
     if (runtime?.isActivePrompt()) {
@@ -498,9 +510,8 @@ export class ConversationService {
     });
     if (!updated) throw new Error(`Conversation not found: ${input.conversationId}`);
 
-    const result = { ...updated, workspace };
-    this.events.emit('conversation.updated', result);
-    return result;
+    this.events.emit('conversation.updated', updated);
+    return this.toConversationSummary(updated, workspace);
   }
 
   /** 将 Conversation 对外状态恢复为空闲，用于取消请求已无可用 runtime 的恢复路径。 */
@@ -521,6 +532,21 @@ export class ConversationService {
     const attachments = this.attachmentsRepo?.deleteMessageAttachment(input.messageId, input.attachmentId) ?? [];
     await this.attachmentService?.deleteStoredFiles(attachments);
     return { deleted: true };
+  }
+
+  /** 删除指定工作区下的全部 Conversation，并先停止仍在内存中的运行态。 */
+  deleteByWorkspace(workspaceId: string): { deleted: number } {
+    const conversations = this.repo.listConversationsByWorkspace(workspaceId);
+    for (const conversation of conversations) {
+      this.stop(conversation.id);
+    }
+
+    const deleted = this.repo.deleteConversationsByWorkspace(workspaceId);
+    this.logger.info('conversation_delete_by_workspace', {
+      workspaceId,
+      deleted,
+    });
+    return { deleted };
   }
 
   /**
@@ -835,7 +861,7 @@ export class ConversationService {
     const id = createId();
     const workspace: Workspace = {
       id,
-      name: 'Temporary Session',
+      name: '对话',
       path: path.join(this.dataDir, 'workspaces', id),
       kind: 'temporary',
       isTemporary: true,
@@ -850,7 +876,7 @@ export class ConversationService {
 
   /** 读取工作区，生产路径走 WorkspaceService，测试 fallback 走内存表。 */
   private requireWorkspace(workspaceId: string): Workspace {
-    const workspace = this.workspaceService?.get(workspaceId) ?? this.fallbackWorkspaces.get(workspaceId);
+    const workspace = this.workspaceService?.getRequired(workspaceId) ?? this.fallbackWorkspaces.get(workspaceId);
     if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`);
     return workspace;
   }
@@ -860,6 +886,23 @@ export class ConversationService {
     const withWorkspace = this.getConversationWithWorkspace(conversation.id);
     if (withWorkspace) return withWorkspace.workspace;
     return this.requireWorkspace(conversation.workspaceId);
+  }
+
+  /** 将持久化会话和工作区组合为列表摘要。 */
+  private toConversationSummary(conversation: Conversation, workspace: Workspace): ConversationSummary {
+    return {
+      id: conversation.id,
+      name: conversation.name,
+      preview: '',
+      status: conversation.status,
+      backend: conversation.backend,
+      model: conversation.currentModelId ?? conversation.model,
+      workspace,
+      lastStopReason: conversation.lastStopReason,
+      lastError: conversation.lastError,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
   }
 
   private getConversationWithWorkspace(conversationId: string): ConversationWithWorkspace | null {

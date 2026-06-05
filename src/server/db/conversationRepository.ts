@@ -7,6 +7,9 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationListInput,
+  ConversationListResult,
+  ConversationSummary,
   ConversationWithWorkspace,
   ConversationMcpServer,
   ConversationMode,
@@ -14,7 +17,16 @@ import type {
   StopReason,
 } from '@shared/types';
 import type { Db } from '@server/db/connection';
-import { rowToAgentEvent, rowToConversation, rowToConversationWithWorkspace, rowToMessage } from '@server/db/mappers';
+import {
+  rowToAgentEvent,
+  rowToConversation,
+  rowToConversationSummary,
+  rowToConversationWithWorkspace,
+  rowToMessage,
+} from '@server/db/mappers';
+
+const DEFAULT_CONVERSATION_LIST_LIMIT = 25;
+const MAX_CONVERSATION_LIST_LIMIT = 100;
 
 /** 负责会话、消息和 Agent 事件的持久化，是聊天流恢复的主仓库。 */
 export class ConversationRepository {
@@ -192,6 +204,20 @@ export class ConversationRepository {
     return rows.map(rowToConversation);
   }
 
+  /** 按工作区列出会话快照，用于工作区级联删除前停止运行态。 */
+  listConversationsByWorkspace(workspaceId: string): Conversation[] {
+    const rows = this.db
+      .prepare('SELECT * FROM conversations WHERE workspace_id = ? ORDER BY updated_at DESC')
+      .all(workspaceId) as any[];
+    return rows.map(rowToConversation);
+  }
+
+  /** 删除指定工作区下的所有会话，消息和运行态快照由外键级联清理。 */
+  deleteConversationsByWorkspace(workspaceId: string): number {
+    const result = this.db.prepare('DELETE FROM conversations WHERE workspace_id = ?').run(workspaceId);
+    return Number(result.changes);
+  }
+
   /** 按状态列出会话，用于应用启动时修复异常退出遗留的运行态。 */
   listConversationsByStatus(status: Conversation['status']): Conversation[] {
     const rows = this.db
@@ -216,6 +242,52 @@ export class ConversationRepository {
   listConversationsWithWorkspace(): ConversationWithWorkspace[] {
     const rows = this.db.prepare(conversationWithWorkspaceSql('ORDER BY c.updated_at DESC')).all() as any[];
     return rows.map(rowToConversationWithWorkspace);
+  }
+
+  /** 列出会话摘要，支持按工作区过滤和轻量分页。 */
+  listConversationSummaries(input: ConversationListInput = {}): ConversationListResult {
+    const limit = clampLimit(input.limit);
+    const offset = parseCursor(input.cursor);
+    const sortColumn = input.sortKey === 'createdAt' ? 'c.created_at' : 'c.updated_at';
+    const sortDirection = input.sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const where: string[] = [];
+    const params: unknown[] = [];
+
+    if (input.workspaceId?.trim()) {
+      where.push('c.workspace_id = ?');
+      params.push(input.workspaceId.trim());
+    }
+
+    if (input.status?.length) {
+      const statuses = input.status.filter(Boolean);
+      if (statuses.length) {
+        where.push(`c.status IN (${statuses.map(() => '?').join(', ')})`);
+        params.push(...statuses);
+      }
+    }
+
+    if (input.searchTerm?.trim()) {
+      where.push('(c.name LIKE ? OR COALESCE(m.content, \'\') LIKE ?)');
+      const keyword = `%${input.searchTerm.trim()}%`;
+      params.push(keyword, keyword);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const rows = this.db
+      .prepare(
+        conversationSummarySql(
+          `${whereSql} ORDER BY ${sortColumn} ${sortDirection}, c.id ${sortDirection} LIMIT ? OFFSET ?`
+        )
+      )
+      .all(...params, limit + 1, offset) as any[];
+    const pageRows = rows.slice(0, limit);
+    const nextOffset = offset + pageRows.length;
+
+    return {
+      data: pageRows.map(rowToConversationSummary),
+      nextCursor: rows.length > limit ? String(nextOffset) : undefined,
+      backwardsCursor: offset > 0 ? String(Math.max(0, offset - limit)) : undefined,
+    };
   }
 
   /** 切换会话工作区，并重置依赖 cwd 的 ACP session 状态。 */
@@ -682,10 +754,13 @@ export type ConversationRepositoryPort = Pick<
   | 'updateConversationRuntimeState'
   | 'updateConversationTurnResult'
   | 'listConversations'
+  | 'listConversationsByWorkspace'
+  | 'deleteConversationsByWorkspace'
   | 'listConversationsByStatus'
   | 'getConversation'
   | 'getConversationWithWorkspace'
   | 'listConversationsWithWorkspace'
+  | 'listConversationSummaries'
   | 'updateConversationWorkspace'
   | 'finalizeInterruptedConversation'
   | 'finalizeStreamingMessages'
@@ -723,4 +798,44 @@ function conversationWithWorkspaceSql(tail: string): string {
     JOIN workspaces w ON w.id = c.workspace_id
     ${tail}
   `;
+}
+
+/** 构造会话摘要查询，包含最后一条消息预览和工作区详情。 */
+function conversationSummarySql(tail: string): string {
+  return `
+    SELECT
+      c.*,
+      COALESCE(m.content, '') AS preview,
+      w.id AS workspace__id,
+      w.name AS workspace__name,
+      w.path AS workspace__path,
+      w.kind AS workspace__kind,
+      w.is_temporary AS workspace__is_temporary,
+      w.exists_on_disk AS workspace__exists_on_disk,
+      w.last_opened_at AS workspace__last_opened_at,
+      w.created_at AS workspace__created_at,
+      w.updated_at AS workspace__updated_at
+    FROM conversations c
+    JOIN workspaces w ON w.id = c.workspace_id
+    LEFT JOIN messages m ON m.id = (
+      SELECT id
+      FROM messages
+      WHERE conversation_id = c.id
+      ORDER BY sequence DESC
+      LIMIT 1
+    )
+    ${tail}
+  `;
+}
+
+/** 限制会话列表分页大小，避免一次加载过多摘要。 */
+function clampLimit(limit: number | undefined): number {
+  if (!limit || !Number.isFinite(limit)) return DEFAULT_CONVERSATION_LIST_LIMIT;
+  return Math.min(MAX_CONVERSATION_LIST_LIMIT, Math.max(1, Math.floor(limit)));
+}
+
+/** 解析基于 offset 的轻量 cursor。 */
+function parseCursor(cursor: string | undefined): number {
+  const parsed = Number.parseInt(cursor ?? '0', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }

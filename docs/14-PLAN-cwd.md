@@ -1,3 +1,5 @@
+> 已废弃：工作区目录选择的最新实现以 `docs/16-PLAN-cwd-2.md` 为准。当前 WebUI 固定使用启动项目路径作为唯一 root，不再提供 `workspace.roots`、`rootId` 或搜索框。
+
 1. 总体目标
 
 改造后数据关系变成：
@@ -27,6 +29,10 @@ CreateConversationInput.workspace
 CreateTeamInput.workspace
 
 所有会话和团队都只通过 workspaceId 关联工作区。
+
+当前 Web/remote 形态不做 Electron 目录选择，也不提供手工路径输入。
+renderer 通过 `workspace.roots` / `workspace.browse` 浏览服务端 allowlist 目录，再通过 `workspace.selectDirectory({ rootId, relativePath })` 注册 workspace。
+本地绝对路径创建不能通过 bridge 暴露给前端。
 
 2. 数据库 schema 方案
 
@@ -194,12 +200,6 @@ export type WorkspaceEntry = {
   size?: number;
   modifiedAt?: number;
   children?: WorkspaceEntry[];
-};
-
-export type WorkspaceCreateInput = {
-  name?: string;
-  path?: string;
-  kind?: WorkspaceKind;
 };
 
 export type WorkspaceTreeInput = {
@@ -525,7 +525,8 @@ resolveOrCreate(input: {
   throw new Error('workspaceId is required');
 }
 
-注意：不在 conversation.create 里接收 path。如果用户选择了新目录，前端先调用 workspace.create，拿到 workspace.id 后再创建 conversation。
+注意：不在 conversation.create 里接收 path，也不在 Web/remote 前端提供路径输入。
+WebUI 只能通过 `rootId + relativePath` 选择服务端 allowlist 内目录。
 
 7. ConversationService 改造
 
@@ -772,10 +773,9 @@ await connection.newSession({
 src/shared/types/bridge.ts
 src/server/app/bridge/registerBridgeHandlers.ts
 11.1 workspace API
-'workspace.create': {
-  params: { name?: string; path?: string; kind?: WorkspaceKind };
-  result: Workspace;
-};
+
+不暴露 `workspace.create({ path })` 给 renderer。
+Web/remote 前端不允许手工输入本地绝对路径，改用 `workspace.roots`、`workspace.browse`、`workspace.selectDirectory`。
 
 'workspace.createTemporary': {
   params: { name?: string };
@@ -882,10 +882,6 @@ team.create 删除 workspace 参数：
   -> workspace.list
   -> conversation.create({ workspaceId })
 
-选择本地目录
-  -> workspace.create({ path })
-  -> conversation.create({ workspaceId: workspace.id })
-
 使用临时工作区
   -> conversation.create({ workspaceId: undefined })
   -> 后端自动 createTemporaryWorkspace
@@ -973,10 +969,10 @@ AcpRuntime input.workspace
 
 Conversation.workspaceId
 Team.workspaceId
-workspace.create({ path })
 conversation.create({ workspaceId })
 team.create({ workspaceId })
 WorkspaceService.createTemporaryWorkspace()
+workspace.selectDirectory({ rootId, relativePath })
 AcpRuntime input.workspacePath
 ConversationService 通过 workspaceId join workspaces.path 后传 workspacePath
 15. 测试方案

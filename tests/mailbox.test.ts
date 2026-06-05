@@ -16,7 +16,7 @@ describe('mailbox repository', () => {
     db.prepare(
       `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('workspace-1', 'Test Team', dir, 'local', 0, 1, 1, 1);
+    ).run('workspace-1', 'Test Team', dir, 'server', 0, 1, 1, 1);
     teamsRepo.createTeam({
       id: 'team-1',
       name: 'Test Team',

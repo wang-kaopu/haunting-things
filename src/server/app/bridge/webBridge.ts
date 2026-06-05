@@ -136,7 +136,9 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
       };
     case 'attachment.delete':
       return pick(input, ['attachmentId']);
-    case 'workspace.create':
+    case 'workspace.root':
+    case 'workspace.browse':
+    case 'workspace.selectDirectory':
     case 'workspace.createTemporary':
     case 'workspace.get':
     case 'workspace.tree':
@@ -145,10 +147,11 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
     case 'workspace.mkdir':
     case 'workspace.rename':
     case 'workspace.deleteEntry':
+    case 'workspace.delete':
     case 'workspace.openPath':
     case 'workspace.revealPath':
       return {
-        ...pick(input, ['workspaceId', 'name', 'path', 'kind', 'relativePath', 'newName', 'search']),
+        ...pick(input, ['workspaceId', 'name', 'relativePath', 'newName', 'search']),
         contentLength: typeof input.content === 'string' ? input.content.length : undefined,
       };
     case 'conversation.deleteMessage':

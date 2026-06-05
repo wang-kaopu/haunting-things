@@ -1,5 +1,5 @@
 /** 工作区来源类型。 */
-export type WorkspaceKind = 'local' | 'temporary' | 'managed';
+export type WorkspaceKind = 'server' | 'temporary' | 'managed';
 
 /** 独立工作区实体，conversation/team 只通过 workspaceId 引用它。 */
 export type Workspace = {
@@ -26,11 +26,30 @@ export type WorkspaceEntry = {
   children?: WorkspaceEntry[];
 };
 
-/** 创建工作区的输入。 */
-export type WorkspaceCreateInput = {
-  name?: string;
-  path?: string;
-  kind?: WorkspaceKind;
+/** 服务端允许 WebUI 浏览的工作区根目录。 */
+export type WorkspaceRoot = {
+  id: string;
+  name: string;
+  path: string;
+};
+
+/** 服务端目录浏览列表中的单个条目。 */
+export type WorkspaceDirectoryEntry = {
+  name: string;
+  relativePath: string;
+  isDir: boolean;
+  isFile: boolean;
+  size?: number;
+  modifiedAt?: number;
+};
+
+/** 服务端目录浏览结果。 */
+export type WorkspaceDirectoryListing = {
+  root: WorkspaceRoot;
+  relativePath: string;
+  absolutePath: string;
+  parentRelativePath?: string;
+  entries: WorkspaceDirectoryEntry[];
 };
 
 /** 查询工作区文件树的输入。 */

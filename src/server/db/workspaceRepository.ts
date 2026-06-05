@@ -92,8 +92,8 @@ export class WorkspaceRepository {
     this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
   }
 
-  /** 复用或创建本地工作区。 */
-  findOrCreateLocalWorkspace(input: { path: string; name?: string }): Workspace {
+  /** 复用或创建服务端工作区。 */
+  findOrCreateServerWorkspace(input: { path: string; name?: string }): Workspace {
     const workspacePath = normalizeWorkspacePath(input.path);
     const existing = this.getWorkspaceByPath(workspacePath);
     if (existing) return this.touchWorkspace(existing.id) ?? existing;
@@ -103,7 +103,7 @@ export class WorkspaceRepository {
       id: createId(),
       name: input.name?.trim() || path.basename(workspacePath) || workspacePath,
       path: workspacePath,
-      kind: 'local',
+      kind: 'server',
       isTemporary: false,
       existsOnDisk: existsSync(workspacePath),
       lastOpenedAt: now,
@@ -112,7 +112,7 @@ export class WorkspaceRepository {
     });
   }
 
-  /** 创建应用托管的临时工作区目录。 */
+  /** 创建应用托管的对话工作区目录。 */
   createTemporaryWorkspace(input: { baseDir: string; name?: string }): Workspace {
     const id = createId();
     const workspacePath = path.join(input.baseDir, 'workspaces', id);
@@ -121,7 +121,7 @@ export class WorkspaceRepository {
     const now = Date.now();
     return this.createWorkspace({
       id,
-      name: input.name?.trim() || 'Temporary Session',
+      name: input.name?.trim() || '对话',
       path: workspacePath,
       kind: 'temporary',
       isTemporary: true,
@@ -149,6 +149,6 @@ export type WorkspaceRepositoryPort = Pick<
   | 'touchWorkspace'
   | 'updateWorkspace'
   | 'deleteWorkspace'
-  | 'findOrCreateLocalWorkspace'
+  | 'findOrCreateServerWorkspace'
   | 'createTemporaryWorkspace'
 >;
