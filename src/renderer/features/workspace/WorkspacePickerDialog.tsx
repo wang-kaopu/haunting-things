@@ -4,20 +4,21 @@ import { useWorkspacePicker } from '@renderer/features/workspace/hooks/useWorksp
 
 export type WorkspacePickerDialogProps = {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (workspace: Workspace) => void;
 };
 
 /** 从启动项目目录中选择一个子目录并注册为新的工作区分组。 */
 export function WorkspacePickerDialog({
   open,
+  onClose,
   onOpenChange,
   onSelect,
 }: WorkspacePickerDialogProps): React.ReactElement | null {
   const {
     listing,
     loading,
-    error,
     browse,
     refresh,
     goParent,
@@ -26,94 +27,119 @@ export function WorkspacePickerDialog({
 
   if (!open) return null;
 
-  async function handleSelect(): Promise<void> {
+  function close(): void {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    onOpenChange?.(false);
+  }
+
+  async function handleSelectCurrentDirectory(): Promise<void> {
     const workspace = await selectCurrentDirectory();
     onSelect(workspace);
-    onOpenChange(false);
   }
 
   const directories = listing?.entries.filter((entry) => entry.isDir) ?? [];
 
   return (
     <div
-      className="settings-overlay"
-      role="presentation"
+      className="workspace-picker-backdrop"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onOpenChange(false);
+        if (event.target === event.currentTarget) {
+          close();
+        }
       }}
     >
       <section
-        className="settings-dialog workspace-picker-dialog"
+        className="workspace-picker-panel"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="workspace-picker-title"
       >
-        <header className="settings-dialog-header">
+        <header className="workspace-picker-header">
           <div>
-            <h2 id="workspace-picker-title">新建工作区</h2>
-            <p>当前目录：{listing?.absolutePath ?? '/Users/wkp/workspace/haunting-souls'}</p>
+            <h2>选择工作区</h2>
+            <p>从当前项目目录中选择 Agent 的工作目录。</p>
           </div>
 
           <button
             type="button"
-            className="settings-close-button"
-            onClick={() => onOpenChange(false)}
-            aria-label="关闭新建工作区"
+            className="workspace-picker-close"
+            onClick={close}
+            aria-label="关闭"
           >
             ×
           </button>
         </header>
 
-        <div className="settings-panel workspace-picker-body">
-          {error ? <p className="settings-error">{error}</p> : null}
+        <section className="workspace-picker-current">
+          <span>当前目录</span>
+          <strong>{listing?.absolutePath ?? '加载中...'}</strong>
+        </section>
 
-          <section className="settings-section workspace-picker-browser">
-            <h3>文件夹</h3>
-            <div className="workspace-picker-tree">
-              {listing?.parentRelativePath ? (
-                <button type="button" className="workspace-picker-row" onClick={() => void goParent()}>
-                  <span className="workspace-picker-icon">↩</span>
-                  <span>返回上一级</span>
+        <section className="workspace-picker-tree">
+          {listing?.parentRelativePath ? (
+            <button
+              type="button"
+              className="workspace-picker-row"
+              onClick={() => void goParent()}
+            >
+              <span className="workspace-picker-row-icon">↩</span>
+              <span className="workspace-picker-row-name">返回上一级</span>
+            </button>
+          ) : null}
+
+          {loading ? (
+            <div className="workspace-picker-empty">正在加载...</div>
+          ) : null}
+
+          {!loading
+            ? directories.map((entry) => (
+                <button
+                  key={entry.relativePath}
+                  type="button"
+                  className="workspace-picker-row"
+                  onClick={() => void browse(entry.relativePath)}
+                >
+                  <span className="workspace-picker-chevron">›</span>
+                  <span className="workspace-picker-row-icon">📁</span>
+                  <span className="workspace-picker-row-name">{entry.name}</span>
                 </button>
-              ) : null}
+              ))
+            : null}
 
-              {loading ? <div className="workspace-picker-empty">正在加载...</div> : null}
-
-              {!loading
-                ? directories.map((entry) => (
-                    <button
-                      key={entry.relativePath}
-                      type="button"
-                      className="workspace-picker-row"
-                      onClick={() => void browse(entry.relativePath)}
-                    >
-                      <span className="workspace-picker-caret">›</span>
-                      <span className="workspace-picker-folder" aria-hidden="true" />
-                      <span className="workspace-picker-name">{entry.name}</span>
-                    </button>
-                  ))
-                : null}
-
-              {!loading && directories.length === 0 ? (
-                <div className="workspace-picker-empty">当前目录下没有可选择的子目录</div>
-              ) : null}
+          {!loading && directories.length === 0 ? (
+            <div className="workspace-picker-empty">
+              当前目录下没有可进入的子目录
             </div>
-          </section>
+          ) : null}
+        </section>
 
-          <footer className="workspace-picker-footer">
-            <button type="button" className="workspace-picker-secondary" onClick={() => onOpenChange(false)}>
-              取消
-            </button>
+        <footer className="workspace-picker-footer">
+          <button
+            type="button"
+            className="workspace-picker-button secondary"
+            onClick={close}
+          >
+            取消
+          </button>
 
-            <button type="button" className="workspace-picker-secondary" onClick={() => void refresh()} disabled={loading}>
-              刷新
-            </button>
+          <button
+            type="button"
+            className="workspace-picker-button secondary"
+            onClick={() => void refresh()}
+          >
+            刷新
+          </button>
 
-            <button type="button" className="workspace-picker-primary" onClick={() => void handleSelect()} disabled={loading}>
-              新建当前目录工作区
-            </button>
-          </footer>
-        </div>
+          <button
+            type="button"
+            className="workspace-picker-button primary"
+            onClick={() => void handleSelectCurrentDirectory()}
+          >
+            选择当前目录
+          </button>
+        </footer>
       </section>
     </div>
   );
