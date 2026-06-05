@@ -17,6 +17,7 @@ import type {
   AgentEvent,
   ChatMessage,
   Conversation,
+  ConversationSummary,
   ConversationStatus,
   EventMap,
   TeamAgent,
@@ -158,19 +159,37 @@ class FakeConversationService {
     | ((event: AgentEvent) => void | Promise<void>)
     | null = null;
 
-  create(input: { backend: AgentBackend; workspace?: string; name?: string }): Conversation {
+  create(input: { backend: AgentBackend; workspaceId?: string; name?: string }): ConversationSummary {
     this.nextConversationIndex += 1;
     const conversation: Conversation = {
       id: `conv-${this.nextConversationIndex}`,
       backend: input.backend,
       name: input.name || `${input.backend} conversation`,
-      workspace: input.workspace || '/tmp/team-integration',
+      workspaceId: input.workspaceId || 'workspace-team-integration',
       status: 'idle',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     this.conversations.set(conversation.id, conversation);
-    return conversation;
+    return {
+      id: conversation.id,
+      name: conversation.name,
+      preview: '',
+      status: conversation.status,
+      backend: conversation.backend,
+      workspace: {
+        id: conversation.workspaceId,
+        name: conversation.workspaceId,
+        path: '/tmp/team-integration',
+        kind: 'server',
+        isTemporary: false,
+        existsOnDisk: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
   }
 
   setMcpServers(conversationId: string, servers: any[]): void {
@@ -300,6 +319,10 @@ describe('team integration flow', () => {
 
     // 真实内存 SQLite
     db = openDatabase(':memory:');
+    db.prepare(
+      `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('workspace-team-integration', 'Team Integration', '/tmp/team-integration', 'server', 0, 1, 1, 1);
     teamsRepo = new TeamRepository(db);
     mailboxRepo = new MailboxRepository(db);
     tasksRepo = new TaskRepository(db);

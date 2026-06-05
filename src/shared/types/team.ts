@@ -1,5 +1,6 @@
 import type { AgentBackend } from '@shared/types/agent';
 import type { AttachmentRef } from '@shared/types/conversation';
+import type { Workspace } from '@shared/types/workspace';
 
 /** Team 中单个 Agent 的运行状态。 */
 export type TeamAgentStatus = 'idle' | 'active' | 'failed' | 'stopped';
@@ -19,11 +20,16 @@ export type TeamAgent = {
 export type Team = {
   id: string;
   name: string;
-  workspace: string;
+  workspaceId: string;
   leaderSlotId: string;
   agents: TeamAgent[];
   createdAt: number;
   updatedAt: number;
+};
+
+/** 附带工作区详情的团队视图。 */
+export type TeamWithWorkspace = Team & {
+  workspace: Workspace;
 };
 
 /** Team 内部成员间的异步消息（存储在 mailbox 表）。 */

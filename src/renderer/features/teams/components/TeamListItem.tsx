@@ -26,8 +26,8 @@ export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemP
         title={team.name}
         onClick={onSelect}
       >
-        <span className="sidebar-team-icon" aria-hidden="true">#</span>
         <span className="sidebar-team-name">{team.name}</span>
+        <span className="sidebar-team-time">{formatRelativeTime(team.updatedAt)}</span>
       </button>
 
       <div className="sidebar-team-menu-wrap">
@@ -65,4 +65,16 @@ export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemP
       </div>
     </div>
   );
+}
+
+/** 将更新时间格式化为侧栏紧凑相对时间。 */
+function formatRelativeTime(updatedAt: number): string {
+  const diffMs = Math.max(0, Date.now() - updatedAt);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diffMs < hour) return `${Math.max(1, Math.floor(diffMs / minute))} 分钟`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时`;
+  return `${Math.floor(diffMs / day)} 天`;
 }

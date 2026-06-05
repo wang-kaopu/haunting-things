@@ -14,6 +14,7 @@ export type AppConfig = {
   port: number;
   allowRemote: boolean;
   rendererDist: string;
+  projectRoot: string;
 };
 
 /**
@@ -42,6 +43,7 @@ export function loadConfig(): AppConfig {
     port: Number.isFinite(port) ? port : DEFAULT_PORT,
     allowRemote,
     rendererDist: path.resolve('dist/renderer'),
+    projectRoot: loadProjectRoot(),
   };
 }
 
@@ -61,4 +63,11 @@ function parseBoolean(value: string | undefined): boolean | undefined {
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
   return undefined;
+}
+
+/** 读取启动项目根目录；默认使用服务端当前工作目录。 */
+export function loadProjectRoot(): string {
+  const projectRoot = path.resolve(process.env.HAUNTING_PROJECT_ROOT?.trim() || process.cwd());
+  mkdirSync(projectRoot, { recursive: true });
+  return projectRoot;
 }

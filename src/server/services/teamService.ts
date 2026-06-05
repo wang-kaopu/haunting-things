@@ -82,12 +82,12 @@ export class TeamService {
    * 创建新 Team，自动建立 Leader conversation 并启动 MCP 服务。
    *
    * @param input.name          - Team 名称
-   * @param input.workspace     - 工作目录（不传则由 ConversationService 自动创建）
+   * @param input.workspaceId   - 工作区 ID（不传则由 ConversationService 自动创建对话工作区）
    * @param input.leaderBackend - Leader Agent 使用的后端（claude / codex）
    */
   async create(input: {
     name: string;
-    workspace?: string;
+    workspaceId?: string;
     leaderBackend: AgentBackend;
     leaderModel?: string;
   }): Promise<Team> {
@@ -95,12 +95,12 @@ export class TeamService {
       name: input.name,
       leaderBackend: input.leaderBackend,
       leaderModel: input.leaderModel,
-      hasWorkspace: Boolean(input.workspace),
+      hasWorkspace: Boolean(input.workspaceId),
     });
     const leaderConversation = this.conversations.create({
       backend: input.leaderBackend,
       model: input.leaderModel,
-      workspace: input.workspace,
+      workspaceId: input.workspaceId,
       name: `${input.name} - Leader`,
     });
     const leader: TeamAgent = {
@@ -116,7 +116,7 @@ export class TeamService {
     const team = this.teamsRepo.createTeam({
       id: createId(),
       name: input.name,
-      workspace: leaderConversation.workspace,
+      workspaceId: leaderConversation.workspace.id,
       leaderSlotId: leader.slotId,
       agents: [leader],
       createdAt: now,
@@ -126,7 +126,7 @@ export class TeamService {
     this.logger.info('team_create_done', {
       teamId: team.id,
       leaderSlotId: leader.slotId,
-      workspace: team.workspace,
+      workspaceId: team.workspaceId,
     });
     return team;
   }
@@ -177,6 +177,28 @@ export class TeamService {
     return { deleted: true };
   }
 
+  /** 删除指定工作区下的所有 Team，并复用单个 Team 删除的运行态和附件清理流程。 */
+  async deleteByWorkspace(workspaceId: string): Promise<{ deleted: number }> {
+    const teams = this.teamsRepo.listTeams().filter((team) => team.workspaceId === workspaceId);
+    for (const team of teams) {
+      await this.delete(team.id);
+    }
+
+    this.logger.info('team_delete_by_workspace', {
+      workspaceId,
+      deleted: teams.length,
+    });
+    return { deleted: teams.length };
+  }
+
+  /** 统计指定工作区下的 Team 数量。 */
+  countByWorkspace(workspaceId: string): number {
+    if (typeof this.teamsRepo.countTeamsByWorkspace === 'function') {
+      return this.teamsRepo.countTeamsByWorkspace(workspaceId);
+    }
+    return this.teamsRepo.listTeams().filter((team) => team.workspaceId === workspaceId).length;
+  }
+
   /**
    * 向 Team 添加新 Agent（Teammate），并为新 conversation 注入当前 Team MCP 配置。
    */
@@ -196,7 +218,7 @@ export class TeamService {
     const conversation = this.conversations.create({
       backend: input.backend,
       model: input.model,
-      workspace: team.workspace,
+      workspaceId: team.workspaceId,
       name: `${team.name} - ${input.name}`,
     });
     const agent: TeamAgent = {

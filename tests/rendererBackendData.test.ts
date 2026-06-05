@@ -18,7 +18,7 @@ describe('renderer backend data normalization', () => {
       {
         id: 'team-1',
         name: 'Legacy',
-        workspace: '/tmp/project',
+        workspaceId: 'workspace-1',
         leaderSlotId: undefined,
         agents: undefined,
         createdAt: 1,
@@ -30,7 +30,7 @@ describe('renderer backend data normalization', () => {
       {
         id: 'team-1',
         name: 'Legacy',
-        workspace: '/tmp/project',
+        workspaceId: 'workspace-1',
         leaderSlotId: '',
         agents: [],
         createdAt: 1,
@@ -72,7 +72,7 @@ describe('renderer backend data normalization', () => {
         id: 'conv-1',
         backend: 'codex',
         name: 'Alpha',
-        workspace: '/tmp/project',
+        workspaceId: 'workspace-1',
         model: 'gpt-5',
         status: 'idle',
         acpSessionId: 'session-1',

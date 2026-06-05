@@ -3,10 +3,14 @@ import type {
   AttachmentRef,
   ChatMessage,
   Conversation,
+  ConversationSummary,
+  ConversationWithWorkspace,
   MailboxMessage,
   StoredAttachment,
   Team,
+  TeamWithWorkspace,
   TeamTask,
+  Workspace,
 } from '@shared/types';
 
 /**
@@ -17,7 +21,7 @@ export function rowToConversation(row: any): Conversation {
     id: row.id,
     backend: row.backend,
     name: row.name,
-    workspace: row.workspace,
+    workspaceId: row.workspace_id,
     model: row.model ?? undefined,
     status: row.status,
     acpSessionId: row.acp_session_id ?? undefined,
@@ -36,6 +40,47 @@ export function rowToConversation(row: any): Conversation {
     sessionRestoredAt: row.session_restored_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+/** 将 workspaces 表行映射为共享领域类型。 */
+export function rowToWorkspace(row: any): Workspace {
+  return {
+    id: row.id,
+    name: row.name,
+    path: row.path,
+    kind: row.kind,
+    isTemporary: row.is_temporary === 1,
+    existsOnDisk: row.exists_on_disk === 1,
+    lastOpenedAt: row.last_opened_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** 将 conversation + workspace join 行映射为带工作区详情的会话视图。 */
+export function rowToConversationWithWorkspace(row: any): ConversationWithWorkspace {
+  return {
+    ...rowToConversation(row),
+    workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
+  };
+}
+
+/** 将 conversation + workspace join 行映射为会话列表摘要。 */
+export function rowToConversationSummary(row: any): ConversationSummary {
+  const conversation = rowToConversation(row);
+  return {
+    id: conversation.id,
+    name: conversation.name,
+    preview: row.preview ?? '',
+    status: conversation.status,
+    backend: conversation.backend,
+    model: conversation.currentModelId ?? conversation.model,
+    workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
+    lastStopReason: conversation.lastStopReason,
+    lastError: conversation.lastError,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
   };
 }
 
@@ -120,11 +165,19 @@ export function rowToTeam(row: any): Team {
   return {
     id: row.id,
     name: row.name,
-    workspace: row.workspace,
+    workspaceId: row.workspace_id,
     leaderSlotId: row.leader_slot_id,
     agents: parseTeamAgents(row.agents),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+/** 将 team + workspace join 行映射为带工作区详情的团队视图。 */
+export function rowToTeamWithWorkspace(row: any): TeamWithWorkspace {
+  return {
+    ...rowToTeam(row),
+    workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
   };
 }
 
@@ -177,4 +230,18 @@ function parseTeamAgents(value: unknown): Team['agents'] {
   } catch {
     return [];
   }
+}
+
+function readWorkspaceJoinRow(row: any): any {
+  return {
+    id: row.workspace__id,
+    name: row.workspace__name,
+    path: row.workspace__path,
+    kind: row.workspace__kind,
+    is_temporary: row.workspace__is_temporary,
+    exists_on_disk: row.workspace__exists_on_disk,
+    last_opened_at: row.workspace__last_opened_at,
+    created_at: row.workspace__created_at,
+    updated_at: row.workspace__updated_at,
+  };
 }

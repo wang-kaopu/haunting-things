@@ -1,4 +1,3 @@
-import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type {
   AgentBackend,
@@ -6,6 +5,10 @@ import type {
   ChatMessage,
   Conversation,
   ConversationCommands,
+  ConversationListInput,
+  ConversationListResult,
+  ConversationSummary,
+  ConversationWithWorkspace,
   ConversationMcpServer,
   ConversationModels,
   ConversationMode,
@@ -13,6 +16,7 @@ import type {
   PermissionResponse,
   StopReason,
   StoredAttachment,
+  Workspace,
 } from '@shared/types';
 import { classifyAgentEvent } from '@server/agentEventPolicy';
 import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
@@ -24,6 +28,7 @@ import { createLogger } from '@server/utils/logger';
 import type { AttachmentService } from '@server/services/attachmentService';
 import { AcpRuntime } from '@server/runtime/acpRuntime';
 import { MemoryContextService } from '@server/services/memoryContextService';
+import type { WorkspaceService } from '@server/services/workspaceService';
 
 const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
   claude: ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'],
@@ -42,6 +47,7 @@ const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
 export class ConversationService {
   private readonly logger = createLogger('conversation');
   private readonly memoryContext: MemoryContextService;
+  private readonly fallbackWorkspaces = new Map<string, Workspace>();
   /** 以 `conversationId` 映射运行时实例（懒加载）。 */
   private readonly runtimes = new Map<string, AcpRuntime>();
   /** 以 `conversationId` 映射待注入的 MCP server 配置列表。 */
@@ -63,6 +69,7 @@ export class ConversationService {
     private readonly repo: ConversationRepositoryPort,
     private readonly events: EventBus,
     private readonly dataDir: string,
+    private readonly workspaceService?: WorkspaceService,
     private readonly attachmentsRepo?: AttachmentRepositoryPort,
     private readonly attachmentService?: AttachmentService
   ) {
@@ -70,28 +77,29 @@ export class ConversationService {
   }
 
   /**
-   * 创建新 Conversation，自动初始化工作目录。
+   * 创建新 Conversation，并绑定已有或对话工作区。
    *
    * @param input.backend    - Agent 后端类型（claude / codex）
-   * @param input.workspace  - 工作目录；不传则在 dataDir/workspaces 下自动创建
+   * @param input.workspaceId - 工作区 ID；不传则创建对话工作区
    * @param input.name       - 显示名称，默认为 `<backend> conversation`
    * @param input.mcpServers - 可选的 MCP server 配置，会随 runtime 一同启动
    */
   create(input: {
     backend: AgentBackend;
-    workspace?: string;
+    workspaceId?: string;
     name?: string;
     model?: string;
     mcpServers?: ConversationMcpServer[];
-  }): Conversation {
+  }): ConversationSummary {
     const now = Date.now();
-    const workspace = input.workspace?.trim() || path.join(this.dataDir, 'workspaces', createId());
-    mkdirSync(workspace, { recursive: true });
+    const workspace = input.workspaceId
+      ? this.requireWorkspace(input.workspaceId)
+      : this.resolveOrCreateWorkspace(undefined);
     const conversation = this.repo.createConversation({
       id: createId(),
       backend: input.backend,
       name: input.name || `${input.backend} conversation`,
-      workspace,
+      workspaceId: workspace.id,
       model: input.model?.trim() || undefined,
       status: 'idle',
       acpSessionId: undefined,
@@ -119,10 +127,11 @@ export class ConversationService {
       conversationId: conversation.id,
       backend: conversation.backend,
       model: conversation.model,
-      workspace: conversation.workspace,
+      workspaceId: conversation.workspaceId,
+      workspacePath: workspace.path,
       hasMcpServers: Boolean(input.mcpServers?.length),
     });
-    return conversation;
+    return this.toConversationSummary(conversation, workspace);
   }
 
   /**
@@ -160,13 +169,25 @@ export class ConversationService {
   }
 
   /** 返回所有 Conversation 列表。 */
-  list(): Conversation[] {
-    return this.repo.listConversations();
+  list(input: ConversationListInput = {}): ConversationListResult {
+    if (typeof this.repo.listConversationSummaries === 'function') {
+      return this.repo.listConversationSummaries(input);
+    }
+    const data = this.repo.listConversations().flatMap((conversation) => {
+      const workspace = this.requireWorkspace(conversation.workspaceId);
+      return [this.toConversationSummary(conversation, workspace)];
+    });
+    return { data };
   }
 
   /** 返回单个 Conversation 快照。 */
   get(conversationId: string): Conversation | null {
     return this.repo.getConversation(conversationId);
+  }
+
+  /** 返回单个带工作区详情的 Conversation 快照。 */
+  getWithWorkspace(conversationId: string): ConversationWithWorkspace | null {
+    return this.getConversationWithWorkspace(conversationId);
   }
 
   /** 返回指定 Conversation 的历史消息。 */
@@ -472,22 +493,68 @@ export class ConversationService {
     }
   }
 
+  /** 修改会话绑定的工作区，并重置依赖 cwd 的 ACP session。 */
+  setConversationWorkspace(input: { conversationId: string; workspaceId: string }): ConversationSummary {
+    const workspace = this.requireWorkspace(input.workspaceId);
+    const runtime = this.runtimes.get(input.conversationId);
+    if (runtime?.isActivePrompt()) {
+      throw new Error('Cannot change workspace while prompt is running');
+    }
+
+    runtime?.stop('stopped');
+    this.runtimes.delete(input.conversationId);
+
+    const updated = this.repo.updateConversationWorkspace({
+      conversationId: input.conversationId,
+      workspaceId: input.workspaceId,
+    });
+    if (!updated) throw new Error(`Conversation not found: ${input.conversationId}`);
+
+    this.events.emit('conversation.updated', updated);
+    return this.toConversationSummary(updated, workspace);
+  }
+
   /** 将 Conversation 对外状态恢复为空闲，用于取消请求已无可用 runtime 的恢复路径。 */
   private markConversationIdle(conversationId: string): void {
     this.repo.updateConversationStatus(conversationId, 'idle');
     this.events.emit('conversation.status', { conversationId, status: 'idle' });
   }
 
+  /** 删除单条消息，并清理不再被引用的附件文件。 */
   async deleteMessage(input: { messageId: string }): Promise<{ deleted: true }> {
     const attachments = this.attachmentsRepo?.deleteMessage(input.messageId) ?? [];
     await this.attachmentService?.deleteStoredFiles(attachments);
     return { deleted: true };
   }
 
+  /** 删除单条消息上的一个附件关联，并清理孤立附件文件。 */
   async deleteMessageAttachment(input: { messageId: string; attachmentId: string }): Promise<{ deleted: true }> {
     const attachments = this.attachmentsRepo?.deleteMessageAttachment(input.messageId, input.attachmentId) ?? [];
     await this.attachmentService?.deleteStoredFiles(attachments);
     return { deleted: true };
+  }
+
+  /** 删除指定工作区下的全部 Conversation，并先停止仍在内存中的运行态。 */
+  deleteByWorkspace(workspaceId: string): { deleted: number } {
+    const conversations = this.repo.listConversationsByWorkspace(workspaceId);
+    for (const conversation of conversations) {
+      this.stop(conversation.id);
+    }
+
+    const deleted = this.repo.deleteConversationsByWorkspace(workspaceId);
+    this.logger.info('conversation_delete_by_workspace', {
+      workspaceId,
+      deleted,
+    });
+    return { deleted };
+  }
+
+  /** 统计指定工作区下的 Conversation 数量。 */
+  countByWorkspace(workspaceId: string): number {
+    if (typeof this.repo.countConversationsByWorkspace === 'function') {
+      return this.repo.countConversationsByWorkspace(workspaceId);
+    }
+    return this.repo.listConversationsByWorkspace(workspaceId).length;
   }
 
   /**
@@ -615,18 +682,20 @@ export class ConversationService {
     if (existing) return existing;
 
     const mcpServers = this.getConversationMcpServers(conversation.id);
+    const workspace = this.resolveConversationWorkspace(conversation);
     this.logger.info('runtime_create', {
       conversationId: conversation.id,
       backend: conversation.backend,
       model: conversation.currentModelId ?? conversation.model,
       startupMode: conversation.sessionMode,
-      workspace: conversation.workspace,
+      workspaceId: conversation.workspaceId,
+      workspacePath: workspace.path,
       mcpServerCount: mcpServers.length,
     });
     const runtime = new AcpRuntime({
       conversationId: conversation.id,
       backend: conversation.backend,
-      workspace: conversation.workspace,
+      workspacePath: workspace.path,
       model: conversation.currentModelId ?? conversation.model,
       startupMode: conversation.sessionMode,
       mcpServers,
@@ -783,6 +852,70 @@ export class ConversationService {
       this.mcpServers.set(conversationId, persisted);
     }
     return persisted;
+  }
+
+  /** 解析或创建工作区，生产路径使用 WorkspaceService。 */
+  private resolveOrCreateWorkspace(workspaceId?: string): Workspace {
+    if (this.workspaceService) {
+      return this.workspaceService.resolveOrCreate({
+        workspaceId,
+        createTemporaryWhenMissing: true,
+      });
+    }
+
+    if (workspaceId) return this.requireWorkspace(workspaceId);
+
+    const now = Date.now();
+    const id = createId();
+    const workspace: Workspace = {
+      id,
+      name: '对话',
+      path: path.join(this.dataDir, 'workspaces', id),
+      kind: 'temporary',
+      isTemporary: true,
+      existsOnDisk: true,
+      lastOpenedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.fallbackWorkspaces.set(id, workspace);
+    return workspace;
+  }
+
+  /** 读取工作区，生产路径走 WorkspaceService，测试 fallback 走内存表。 */
+  private requireWorkspace(workspaceId: string): Workspace {
+    const workspace = this.workspaceService?.getRequired(workspaceId) ?? this.fallbackWorkspaces.get(workspaceId);
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`);
+    return workspace;
+  }
+
+  /** 根据 conversation.workspaceId 解析真实工作区路径。 */
+  private resolveConversationWorkspace(conversation: Conversation): Workspace {
+    const withWorkspace = this.getConversationWithWorkspace(conversation.id);
+    if (withWorkspace) return withWorkspace.workspace;
+    return this.requireWorkspace(conversation.workspaceId);
+  }
+
+  /** 将持久化会话和工作区组合为列表摘要。 */
+  private toConversationSummary(conversation: Conversation, workspace: Workspace): ConversationSummary {
+    return {
+      id: conversation.id,
+      name: conversation.name,
+      preview: '',
+      status: conversation.status,
+      backend: conversation.backend,
+      model: conversation.currentModelId ?? conversation.model,
+      workspace,
+      lastStopReason: conversation.lastStopReason,
+      lastError: conversation.lastError,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
+  }
+
+  private getConversationWithWorkspace(conversationId: string): ConversationWithWorkspace | null {
+    if (typeof this.repo.getConversationWithWorkspace !== 'function') return null;
+    return this.repo.getConversationWithWorkspace(conversationId);
   }
 
   /** 持久化命令快照；测试替身缺少该方法时跳过。 */

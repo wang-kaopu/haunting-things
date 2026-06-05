@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { AgentTurnPhase, Team } from '@shared/types';
+import type { AgentTurnPhase, Team, Workspace } from '@shared/types';
 import { SidebarAgentList } from '@renderer/features/teams/components/SidebarAgentList';
 import { TeamList } from '@renderer/features/teams/components/TeamList';
 
@@ -11,8 +11,10 @@ export type SidebarProps = {
   activeTeamId: string | null;
   activeSlotId: string | null;
   phases?: Record<string, AgentTurnPhase>;
-  onCreateTeamClick: () => void;
+  workspaces: Workspace[];
   onAddAgentClick: () => void;
+  onOpenDirectoryPicker: () => void;
+  onCreateTeamInWorkspace: (workspaceId?: string) => void;
   onSelectTeam: (teamId: string) => void;
   onSelectAgent: (slotId: string) => void;
   onDeleteTeam: (teamId: string) => Promise<void>;
@@ -33,8 +35,10 @@ export function Sidebar({
   activeTeamId,
   activeSlotId,
   phases,
-  onCreateTeamClick,
+  workspaces,
   onAddAgentClick,
+  onOpenDirectoryPicker,
+  onCreateTeamInWorkspace,
   onSelectTeam,
   onSelectAgent,
   onDeleteTeam,
@@ -70,19 +74,21 @@ export function Sidebar({
 
       <section className="sidebar-section sidebar-teams-section">
         <div className="sidebar-section-header">
-          <span>Teams</span>
+          <span className="sidebar-section-title">Teams</span>
           <button
             type="button"
             className="sidebar-section-action"
-            onClick={onCreateTeamClick}
+            onClick={onOpenDirectoryPicker}
           >
-            创建
+            新建工作区
           </button>
         </div>
 
         <TeamList
           teams={teams}
+          workspaces={workspaces}
           activeTeamId={activeTeamId}
+          onCreateTeamInWorkspace={onCreateTeamInWorkspace}
           onSelectTeam={onSelectTeam}
           onDeleteTeam={onDeleteTeam}
         />

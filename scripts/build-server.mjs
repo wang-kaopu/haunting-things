@@ -1,4 +1,8 @@
 import { build } from "esbuild";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 await build({
   entryPoints: [
@@ -14,8 +18,8 @@ await build({
   packages: "external",
   sourcemap: true,
   alias: {
-    "@server": path.resolve(__dirname, "src/server"),
-    "@renderer": path.resolve(__dirname, "src/renderer"),
-    "@shared": path.resolve(__dirname, "src/shared"),
+    "@server": path.resolve(projectRoot, "src/server"),
+    "@renderer": path.resolve(projectRoot, "src/renderer"),
+    "@shared": path.resolve(projectRoot, "src/shared"),
   },
 });

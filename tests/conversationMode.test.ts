@@ -74,7 +74,7 @@ describe('ConversationService mode snapshots', () => {
     const events = new EventBus();
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversation);
+    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
 
     const emitted: unknown[] = [];
     vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
@@ -101,7 +101,7 @@ describe('ConversationService mode snapshots', () => {
     const events = new EventBus();
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversation);
+    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
     const snapshot = {
       conversationId: conversation.id,
       mode: 'plan',
@@ -145,7 +145,7 @@ describe('ConversationService mode snapshots', () => {
     const events = new EventBus();
     const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'codex', name: 'Codex' });
-    const runtime = (conversations as any).getRuntime(conversation);
+    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
     const snapshot = {
       conversationId: conversation.id,
       mode: 'full-access',

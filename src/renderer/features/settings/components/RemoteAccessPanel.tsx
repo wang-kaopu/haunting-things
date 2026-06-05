@@ -74,7 +74,7 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
 
       <button
         type="button"
-        className="settings-copy-button"
+        className="panel-dialog-copy-button"
         onClick={() => void navigator.clipboard.writeText(url)}
       >
         复制

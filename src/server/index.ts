@@ -9,8 +9,11 @@ import { MailboxRepository } from '@server/db/mailboxRepository';
 import { TaskRepository } from '@server/db/taskRepository';
 import { TeamRepository } from '@server/db/teamRepository';
 import { UserRepository } from '@server/db/userRepository';
+import { WorkspaceRepository } from '@server/db/workspaceRepository';
 import { AuthService } from '@server/services/authService';
 import { AttachmentService } from '@server/services/attachmentService';
+import { WorkspaceService } from '@server/services/workspaceService';
+import { WorkspaceRootService } from '@server/services/workspaceRootService';
 import { EventBus } from '@server/events';
 import { ConversationService } from '@server/services/conversationService';
 import { createLogger } from '@server/utils/logger';
@@ -29,6 +32,7 @@ const conversationsRepo = new ConversationRepository(db);
 const teamsRepo = new TeamRepository(db);
 const mailboxRepo = new MailboxRepository(db);
 const tasksRepo = new TaskRepository(db);
+const workspacesRepo = new WorkspaceRepository(db);
 const auth = new AuthService(usersRepo);
 
 if (process.argv.includes('--reset-password')) {
@@ -45,7 +49,9 @@ await auth.ensureAdmin();
 
 const events = new EventBus();
 const attachmentService = new AttachmentService(path.join(config.dataDir, 'attachments'));
-const conversations = new ConversationService(conversationsRepo, events, config.dataDir, attachmentsRepo, attachmentService);
+const workspaceRootService = new WorkspaceRootService(config.projectRoot);
+const workspaceService = new WorkspaceService(workspacesRepo, workspaceRootService, config.dataDir);
+const conversations = new ConversationService(conversationsRepo, events, config.dataDir, workspaceService, attachmentsRepo, attachmentService);
 conversations.recoverStaleRuntimeState();
 const teams = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations, events, attachmentsRepo, attachmentService);
 const app = createApp({ auth, logger, rendererDist: config.rendererDist, attachments: attachmentsRepo });
@@ -63,6 +69,7 @@ const serverManager = new ServerManager({
       attachmentService,
       conversations,
       teams,
+      workspaces: workspaceService,
       serverInfo: () => serverManager.info(),
       setRemoteAccess: ({ allowRemote }) => serverManager.setRemoteAccess(allowRemote),
     });

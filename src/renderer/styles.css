@@ -236,12 +236,18 @@ label,
 .sidebar-members-section {
   flex: 0 0 auto;
   max-height: 220px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .sidebar-teams-section {
   flex: 1;
   min-height: 0;
+}
+
+.sidebar-conversations-section {
+  flex: 0 1 220px;
+  min-height: 120px;
+  margin-bottom: 12px;
 }
 
 .sidebar-section-header {
@@ -259,8 +265,9 @@ label,
   color: var(--accent);
   font-size: 12px;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px 6px;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
 .sidebar-section-action:hover {
@@ -270,6 +277,18 @@ label,
 .sidebar-section-action:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.sidebar-section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-teams-section .sidebar-section-title {
+  color: #0d0d0d;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 /* ---- Sidebar Agent List ---- */
@@ -342,11 +361,33 @@ label,
   font-size: 12px;
 }
 
-/* ---- Sidebar Team List ---- */
+.workspace-switcher {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 
-/* ---- Sidebar Team List (和 Members 同风格) ---- */
+.workspace-switcher select {
+  height: 34px;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 12px;
+}
 
-.sidebar-team-list {
+.workspace-switcher__temporary {
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202124;
+  font-size: 12px;
+}
+
+.workspace-switcher__temporary:hover {
+  background: var(--sidebar-hover);
+}
+
+.conversation-summary-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -354,34 +395,201 @@ label,
   overflow-y: auto;
 }
 
+.conversation-summary-item {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 2px;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.conversation-summary-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.conversation-summary-title,
+.conversation-summary-preview,
+.conversation-summary-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-summary-title {
+  color: #0d0d0d;
+  font-size: 13px;
+}
+
+.conversation-summary-preview,
+.conversation-summary-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---- Sidebar Team List ---- */
+
+/* ---- Sidebar Team List (和 Members 同风格) ---- */
+
+.sidebar-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar-team-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-team-group__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 4px;
+  color: #0d0d0d;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.sidebar-team-group.temporary .sidebar-team-group__header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sidebar-team-group__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-team-group__identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-team-group.temporary .sidebar-team-group__identity {
+  grid-template-columns: minmax(0, 1fr);
+  padding-left: 24px;
+}
+
+.sidebar-team-group__folder-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  color: var(--muted);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-team-group__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-team-group__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.sidebar-team-group__header:hover .sidebar-team-group__actions,
+.sidebar-team-group__header:focus-within .sidebar-team-group__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-team-group__menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.sidebar-team-group__menu {
+  position: fixed;
+  left: auto;
+  bottom: auto;
+  min-width: 150px;
+  z-index: 1000;
+}
+
+.sidebar-group-icon-button {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sidebar-group-icon-button:hover {
+  background: #dedede;
+}
+
+.sidebar-group-icon-button svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-group-icon-button svg circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.sidebar-team-group__empty {
+  margin: 0 8px 0 48px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 28px;
+}
+
 .sidebar-team-item {
   width: 100%;
   height: 32px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  align-items: center;
-  gap: 4px;
   border-radius: 8px;
   background: transparent;
   position: relative;
 }
 
-.sidebar-team-item:hover {
-  background: #ececec;
-}
-
-.sidebar-team-item.selected {
-  background: #e7e7e7;
-}
-
 .sidebar-team-main {
   min-width: 0;
+  width: 100%;
   height: 32px;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 0 8px;
+  padding: 0 8px 0 48px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -392,7 +600,11 @@ label,
 .sidebar-team-main:hover,
 .sidebar-team-main.selected {
   border-color: transparent;
-  background: transparent;
+  background: var(--sidebar-hover);
+}
+
+.sidebar-team-item.selected .sidebar-team-main {
+  background: var(--sidebar-active);
 }
 
 .sidebar-team-icon {
@@ -412,6 +624,13 @@ label,
   white-space: nowrap;
   color: var(--text, #0d0d0d);
   font-size: 13px;
+  font-weight: 400;
+}
+
+.sidebar-team-time {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .sidebar-team-menu-wrap {
@@ -495,6 +714,98 @@ label,
   justify-content: center;
   color: var(--muted);
   font-size: 14px;
+}
+
+.chat-workspace-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: #fbfbfb;
+  padding: 12px;
+  color: #202124;
+  font-size: 13px;
+}
+
+.workspace-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.workspace-panel__header button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #5f6368;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.workspace-panel__meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+
+.workspace-panel__empty,
+.workspace-panel__error {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.workspace-panel__error {
+  color: var(--danger);
+}
+
+.workspace-tree,
+.workspace-tree ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.workspace-tree .workspace-tree {
+  padding-left: 14px;
+}
+
+.workspace-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.workspace-tree__row:hover {
+  background: #f1f1f1;
+}
+
+.workspace-tree__icon {
+  width: 12px;
+  color: #8a8f98;
+  flex: 0 0 auto;
+}
+
+.workspace-tree__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ================================================================
@@ -1292,6 +1603,22 @@ label,
   font-size: 13px;
 }
 
+.custom-select-popover.sidebar-team-group__menu {
+  position: fixed;
+  left: auto;
+  bottom: auto;
+  min-width: 150px;
+  z-index: 1000;
+}
+
+.custom-select-popover.sidebar-team-group__menu .custom-select-option {
+  color: #0d0d0d;
+}
+
+.custom-select-popover.sidebar-team-group__menu .custom-select-option:hover {
+  background: #f4f4f4;
+}
+
 .model-select .custom-select-trigger {
   max-width: 240px;
 }
@@ -1635,8 +1962,7 @@ label,
    Modals & Permission Dialog — 新 风格
    ================================================================ */
 
-.modal-backdrop,
-.permission-overlay {
+.modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -1647,8 +1973,7 @@ label,
   backdrop-filter: blur(8px);
 }
 
-.modal,
-.permission-dialog {
+.modal {
   width: min(480px, calc(100vw - 32px));
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
@@ -1661,8 +1986,7 @@ label,
   gap: 16px;
 }
 
-.modal h3,
-.permission-dialog h3 {
+.modal h3 {
   margin: 0;
   color: #0d0d0d;
   font-size: 18px;
@@ -1700,16 +2024,14 @@ label,
   background: #e9e9e9;
 }
 
-.modal-actions,
-.permission-actions {
+.modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 2px;
 }
 
-.modal-actions button,
-.permission-actions button {
+.modal-actions button {
   height: 36px;
   min-width: 72px;
   border-radius: 999px;
@@ -1718,95 +2040,431 @@ label,
   font-size: 14px;
 }
 
-.modal-actions button[type="submit"],
-.permission-actions button:first-child {
+.modal-actions button[type="submit"] {
   background: #0d0d0d;
   color: #ffffff;
 }
 
-.modal-actions button[type="submit"]:hover,
-.permission-actions button:first-child:hover {
+.modal-actions button[type="submit"]:hover {
   background: #2f2f2f;
 }
 
-.modal .secondary,
-.permission-actions .secondary {
+.modal .secondary {
   margin-top: 0;
   background: #f4f4f4;
   color: #0d0d0d;
 }
 
-.modal .secondary:hover,
-.permission-actions .secondary:hover {
+.modal .secondary:hover {
   background: #e9e9e9;
+}
+
+.workspace-picker-content {
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-picker-current {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--panel-dialog-border);
+  border-radius: 14px;
+  background: var(--panel-dialog-subtle-bg);
+}
+
+.workspace-picker-current span {
+  color: var(--panel-dialog-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.workspace-picker-current strong {
+  min-width: 0;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.workspace-picker-tree {
+  min-height: 300px;
+  max-height: 380px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--panel-dialog-border);
+  border-radius: 14px;
+  background: var(--panel-dialog-bg);
+}
+
+.workspace-picker-row {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 18px 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--panel-dialog-text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.workspace-picker-row:hover {
+  background: var(--panel-dialog-hover-bg);
+}
+
+.workspace-picker-chevron {
+  color: #9ca3af;
+  font-size: 18px;
+}
+
+.workspace-picker-row-icon {
+  display: inline-grid;
+  place-items: center;
+  font-size: 16px;
+}
+
+.workspace-picker-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-picker-empty {
+  padding: 24px;
+  color: var(--panel-dialog-muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+.workspace-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.workspace-picker-button {
+  min-width: 72px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.workspace-picker-button.secondary {
+  background: var(--panel-dialog-hover-bg);
+  color: var(--panel-dialog-text);
+}
+
+.workspace-picker-button.secondary:hover {
+  background: var(--panel-dialog-active-bg);
+}
+
+.workspace-picker-button.primary {
+  background: var(--panel-dialog-text);
+  color: #ffffff;
+}
+
+.workspace-picker-button.primary:hover {
+  background: #000000;
 }
 
 /* ---- Permission Dialog 选项卡片化 ---- */
 
-.permission-body {
+.permission-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.permission-dialog {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100dvh - 64px);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #111111;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.18),
+    0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.permission-header {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.permission-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.permission-heading {
+  min-width: 0;
+}
+
+.permission-eyebrow {
+  margin: 0 0 3px;
+  color: #7b8190;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.permission-dialog h3 {
   margin: 0;
-  max-height: 240px;
+  color: #111111;
+  font-size: 20px;
+  line-height: 1.28;
+  font-weight: 650;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.permission-detail {
+  min-height: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 16px;
+  background: #f6f6f7;
+}
+
+.permission-detail-header {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: #777d8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.permission-copy {
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #202124;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.permission-copy:hover {
+  background: #eeeeef;
+}
+
+.permission-body {
+  max-height: 210px;
+  margin: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 10px 14px 14px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 12px;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #f7f7f8;
-  border: 1px solid #ececec;
-  border-radius: 12px;
-  color: #353740;
-  font-size: 13px;
 }
 
 .permission-options {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .permission-option {
+  min-height: 42px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: flex-start;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #ececec;
+  padding: 9px 10px;
+  border: none;
   border-radius: 12px;
-  background: #ffffff;
-  color: #0d0d0d;
+  background: transparent;
+  color: #202124;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .permission-option:hover {
-  background: #f7f7f8;
+  background: #f5f5f5;
 }
 
-.permission-option input {
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
-  accent-color: #0d0d0d;
+.permission-option.selected {
+  background: #f1f1f1;
 }
 
-.permission-option-content {
+.permission-option-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.permission-option-indicator {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border: 1.5px solid #a7adb8;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.permission-option.selected .permission-option-indicator {
+  border-color: #111111;
+}
+
+.permission-option.selected .permission-option-indicator::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #111111;
+}
+
+.permission-option-label {
   min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.permission-option-content strong {
+  color: #202124;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 520;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.permission-desc {
-  color: #6b7280;
-  font-size: 12px;
+.permission-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.permission-button {
+  height: 40px;
+  min-width: 78px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.permission-button.primary {
+  background: #111111;
+  color: #ffffff;
+}
+
+.permission-button.primary:hover {
+  background: #2f2f2f;
+}
+
+.permission-button.secondary {
+  background: #f3f3f3;
+  color: #202124;
+}
+
+.permission-button.secondary:hover {
+  background: #e9e9e9;
+}
+
+.permission-button:focus-visible,
+.permission-copy:focus-visible,
+.permission-option:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
+}
+
+@media (max-width: 640px) {
+  .permission-overlay {
+    padding: 14px;
+    align-items: end;
+  }
+
+  .permission-dialog {
+    width: 100%;
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .permission-dialog h3 {
+    font-size: 18px;
+  }
+
+  .permission-body {
+    max-height: 180px;
+  }
+
+  .permission-actions {
+    flex-direction: column;
+  }
+
+  .permission-button {
+    width: 100%;
+  }
 }
 
 /* ================================================================
-   Settings — 新 风格设置面板
+   Panel Dialog — 面板式弹窗共享特征
    ================================================================ */
 
-.settings-overlay {
+:root {
+  --panel-dialog-bg: #ffffff;
+  --panel-dialog-text: #0d0d0d;
+  --panel-dialog-muted: #6b7280;
+  --panel-dialog-border: #ececec;
+  --panel-dialog-row-border: #f0f0f0;
+  --panel-dialog-hover-bg: #f4f4f4;
+  --panel-dialog-active-bg: #e9e9e9;
+  --panel-dialog-subtle-bg: #f7f7f8;
+  --panel-dialog-error-bg: #fff1f0;
+  --panel-dialog-error-text: #b42318;
+  --panel-dialog-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.panel-dialog-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -1817,7 +2475,7 @@ label,
   backdrop-filter: blur(8px);
 }
 
-.settings-dialog {
+.panel-dialog {
   width: min(680px, calc(100vw - 32px));
   max-height: min(760px, calc(100vh - 48px));
   display: grid;
@@ -1825,36 +2483,34 @@ label,
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
-  background: #ffffff;
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.06);
+  background: var(--panel-dialog-bg);
+  box-shadow: var(--panel-dialog-shadow);
 }
 
-.settings-dialog-header {
+.panel-dialog-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #ececec;
+  border-bottom: 1px solid var(--panel-dialog-border);
 }
 
-.settings-dialog-header h2 {
+.panel-dialog-header h2 {
   margin: 0;
-  color: #0d0d0d;
+  color: var(--panel-dialog-text);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.settings-dialog-header p {
+.panel-dialog-header p {
   margin-top: 4px;
-  color: #6b7280;
+  color: var(--panel-dialog-muted);
   font-size: 13px;
 }
 
-.settings-close-button {
+.panel-dialog-close-button {
   width: 32px;
   height: 32px;
   display: inline-grid;
@@ -1862,48 +2518,48 @@ label,
   padding: 0;
   border: none;
   border-radius: 999px;
-  background: #f4f4f4;
-  color: #0d0d0d;
+  background: var(--panel-dialog-hover-bg);
+  color: var(--panel-dialog-text);
   font-size: 20px;
   line-height: 1;
 }
 
-.settings-close-button:hover {
-  background: #e9e9e9;
+.panel-dialog-close-button:hover {
+  background: var(--panel-dialog-active-bg);
 }
 
-/* ---- Settings Panel ---- */
+/* ---- Panel Dialog Content ---- */
 
-.settings-panel {
+.panel-dialog-panel {
   min-height: 0;
   overflow-y: auto;
   padding: 18px 24px 24px;
 }
 
-.settings-section {
+.panel-dialog-section {
   display: grid;
   gap: 8px;
 }
 
-.settings-section h3 {
+.panel-dialog-section h3 {
   margin: 0 0 8px;
-  color: #6b7280;
+  color: var(--panel-dialog-muted);
   font-size: 12px;
   font-weight: 500;
 }
 
-.settings-item {
+.panel-dialog-item {
   display: grid;
   gap: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--panel-dialog-row-border);
   padding: 14px 0;
 }
 
-.settings-item:first-of-type {
+.panel-dialog-item:first-of-type {
   border-top: none;
 }
 
-.settings-item-main {
+.panel-dialog-item-main {
   min-height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1911,43 +2567,43 @@ label,
   gap: 16px;
 }
 
-.settings-item-copy {
+.panel-dialog-item-copy {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.settings-item-copy strong {
-  color: #0d0d0d;
+.panel-dialog-item-copy strong {
+  color: var(--panel-dialog-text);
   font-size: 14px;
   font-weight: 500;
 }
 
-.settings-item-copy span {
-  color: #6b7280;
+.panel-dialog-item-copy span {
+  color: var(--panel-dialog-muted);
   font-size: 12px;
   line-height: 1.4;
 }
 
-.settings-item-detail {
+.panel-dialog-item-detail {
   display: grid;
   gap: 8px;
 }
 
-/* ---- Switch ---- */
+/* ---- Panel Dialog Controls ---- */
 
-.settings-switch {
+.panel-dialog-switch {
   display: inline-flex;
   align-items: center;
 }
 
-.settings-switch input {
+.panel-dialog-switch input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.settings-switch span {
+.panel-dialog-switch span {
   width: 38px;
   height: 22px;
   border-radius: 999px;
@@ -1957,7 +2613,7 @@ label,
   transition: background 120ms ease;
 }
 
-.settings-switch span::before {
+.panel-dialog-switch span::before {
   content: "";
   position: absolute;
   top: 3px;
@@ -1965,25 +2621,25 @@ label,
   width: 16px;
   height: 16px;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--panel-dialog-bg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
   transition: transform 120ms ease;
 }
 
-.settings-switch input:checked + span {
-  background: #0d0d0d;
+.panel-dialog-switch input:checked + span {
+  background: var(--panel-dialog-text);
 }
 
-.settings-switch input:checked + span::before {
+.panel-dialog-switch input:checked + span::before {
   transform: translateX(16px);
 }
 
-.settings-switch input:disabled + span {
+.panel-dialog-switch input:disabled + span {
   cursor: not-allowed;
   opacity: 0.48;
 }
 
-/* ---- URL 列表信息卡 ---- */
+/* ---- Panel Dialog Info Cards ---- */
 
 .remote-url-list {
   display: grid;
@@ -1995,10 +2651,10 @@ label,
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  border: 1px solid #ececec;
+  border: 1px solid var(--panel-dialog-border);
   border-radius: 14px;
   padding: 12px;
-  background: #f7f7f8;
+  background: var(--panel-dialog-subtle-bg);
 }
 
 .remote-url-row code {
@@ -2010,55 +2666,153 @@ label,
 }
 
 .remote-url-label {
-  color: #6b7280;
+  color: var(--panel-dialog-muted);
   font-size: 12px;
 }
 
-.settings-copy-button {
+.panel-dialog-copy-button {
   height: 32px;
   min-width: 56px;
   border: none;
   border-radius: 999px;
-  background: #ffffff;
-  color: #0d0d0d;
+  background: var(--panel-dialog-bg);
+  color: var(--panel-dialog-text);
   padding: 0 12px;
   font-size: 13px;
 }
 
-.settings-copy-button:hover {
-  background: #ececec;
+.panel-dialog-copy-button:hover {
+  background: var(--panel-dialog-border);
 }
 
-.settings-muted {
+.panel-dialog-muted {
   margin: 0;
-  color: #6b7280;
+  color: var(--panel-dialog-muted);
   font-size: 12px;
   line-height: 1.5;
 }
 
-.settings-error {
+.panel-dialog-error {
   margin: 0;
   border-radius: 12px;
-  background: #fff1f0;
-  color: #b42318;
+  background: var(--panel-dialog-error-bg);
+  color: var(--panel-dialog-error-text);
   padding: 10px 12px;
   font-size: 13px;
 }
 
 /* ---- 防止全局样式污染 ---- */
 
-.settings-dialog button {
+.panel-dialog button {
   font: inherit;
   cursor: pointer;
 }
 
-.settings-dialog button:disabled {
+.panel-dialog button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
 
-.settings-dialog button:hover {
+.panel-dialog button:hover {
   border-color: transparent;
+}
+
+/* ---- 创建团队面板 ---- */
+
+.create-team-dialog {
+  width: min(620px, calc(100vw - 32px));
+  overflow: visible;
+}
+
+.create-team-dialog .panel-dialog-panel {
+  overflow: visible;
+}
+
+.create-team-item-main {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+}
+
+.create-team-field-control {
+  min-width: 0;
+}
+
+.create-team-field-control input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0d0d0d;
+  padding: 0 12px;
+  font-size: 14px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.create-team-field-control input:focus {
+  outline: none;
+  border-color: #0d0d0d;
+  box-shadow: 0 0 0 3px rgba(13, 13, 13, 0.08);
+}
+
+.create-team-type-select {
+  width: 100%;
+}
+
+.create-team-type-select .custom-select-trigger {
+  width: 100%;
+  max-width: none;
+  height: 42px;
+  justify-content: space-between;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0 12px;
+  font-size: 14px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.create-team-type-select.open .custom-select-trigger,
+.create-team-type-select .custom-select-trigger:hover {
+  background: #f4f4f4;
+}
+
+.create-team-type-select .custom-select-trigger:focus-visible {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px #d9d9d9;
+}
+
+.create-team-type-select .custom-select-popover {
+  top: calc(100% + 6px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  min-width: 100%;
+}
+
+.create-team-actions {
+  padding-top: 8px;
+}
+
+.create-team-actions .secondary {
+  margin-top: 0;
+  background: #f4f4f4;
+  color: #0d0d0d;
+}
+
+.create-team-actions .secondary:hover {
+  background: #e9e9e9;
+}
+
+@media (max-width: 640px) {
+  .create-team-item-main {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
 }
 
 /* ================================================================
@@ -2199,6 +2953,14 @@ label,
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  .chat-workspace-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-panel {
+    display: none;
   }
 
   .messages-wrap {

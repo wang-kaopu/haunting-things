@@ -8,6 +8,7 @@ import {
 } from '@agentclientprotocol/sdk';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
@@ -183,7 +184,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     private readonly input: {
       conversationId: string;
       backend: AgentBackend;
-      workspace: string;
+      workspacePath: string;
       model?: string;
       startupMode?: string;
       mcpServers?: ConversationMcpServer[];
@@ -192,6 +193,11 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   ) {
     super();
     this.logger = createLogger(`acp.${input.backend}`);
+  }
+
+  /** 当前是否有正在执行的 prompt turn。 */
+  isActivePrompt(): boolean {
+    return this.activePrompt;
   }
 
   /**
@@ -485,7 +491,8 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     if (this.connection) return;
 
     const bridgePackage = getBridgePackageVersioned(this.input.backend);
-    const cwd = path.resolve(this.input.workspace || process.cwd());
+    const cwd = path.resolve(this.input.workspacePath || process.cwd());
+    this.validateWorkspaceCwd(cwd);
     this.logger.info('bridge_start', {
       conversationId: this.input.conversationId,
       backend: this.input.backend,
@@ -633,6 +640,13 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
       await this.setSessionModel(startupModel);
     }
     await this.setSessionMode(this.input.startupMode?.trim() || this.getStartupMode());
+  }
+
+  /** 确认 runtime cwd 对应真实目录，避免 bridge 在不存在的工作区内启动。 */
+  private validateWorkspaceCwd(cwd: string): void {
+    if (!existsSync(cwd)) {
+      throw new Error(`Workspace path does not exist: ${cwd}`);
+    }
   }
 
   /**

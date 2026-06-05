@@ -68,16 +68,18 @@ export function ChatLayout({
         usage={usage}
         onOpenSidebar={onOpenSidebar}
       />
-      {messages.length === 0 ? (
-        <ChatEmpty />
-      ) : (
-        <MessageList
-          messages={messages}
-          activePhase={activePhase}
-          agents={team.agents}
-          activeAgent={activeAgent}
-        />
-      )}
+      <div className="chat-workspace-shell">
+        {messages.length === 0 ? (
+          <ChatEmpty />
+        ) : (
+          <MessageList
+            messages={messages}
+            activePhase={activePhase}
+            agents={team.agents}
+            activeAgent={activeAgent}
+          />
+        )}
+      </div>
       <SendBox
         disabled={!team || !activeAgent}
         activeAgent={activeAgent}

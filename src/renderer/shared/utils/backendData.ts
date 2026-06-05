@@ -9,8 +9,10 @@ import type {
   ChatRole,
   Conversation,
   ConversationCommands,
+  ConversationListResult,
   ConversationMode,
   ConversationModels,
+  ConversationSummary,
   ConversationStatus,
   ConversationUsage,
   MailboxMessage,
@@ -23,6 +25,12 @@ import type {
   TeamAgentStatus,
   TeamMailboxEntry,
   User,
+  Workspace,
+  WorkspaceDirectoryEntry,
+  WorkspaceDirectoryListing,
+  WorkspaceEntry,
+  WorkspaceKind,
+  WorkspaceRoot,
 } from '@shared/types';
 
 type RecordValue = Record<string, unknown>;
@@ -35,6 +43,7 @@ const chatMessageTypes = new Set<ChatMessageType>(['text', 'thinking', 'tool_cal
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
 const stopReasons = new Set<StopReason>(['done', 'cancelled', 'failed', 'stopped']);
+const workspaceKinds = new Set<WorkspaceKind>(['server', 'temporary', 'managed']);
 
 /**
  * 安全读取 HTTP JSON 响应。
@@ -91,7 +100,7 @@ export function normalizeConversation(value: unknown): Conversation | null {
     id,
     backend,
     name: asString(input.name),
-    workspace: asString(input.workspace),
+    workspaceId: asString(input.workspaceId),
     model: optionalString(input.model),
     status,
     acpSessionId: optionalString(input.acpSessionId),
@@ -106,6 +115,136 @@ export function normalizeConversation(value: unknown): Conversation | null {
     usageUpdatedAt: optionalNumber(input.usageUpdatedAt),
     createdAt,
     updatedAt,
+  };
+}
+
+/** 归一化 Workspace 快照。 */
+export function normalizeWorkspace(value: unknown): Workspace | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const workspacePath = asString(input.path);
+  const createdAt = asRequiredNumber(input.createdAt);
+  const updatedAt = asRequiredNumber(input.updatedAt);
+  if (!id || !workspacePath || createdAt === null || updatedAt === null) return null;
+  return {
+    id,
+    name: asString(input.name, workspacePath),
+    path: workspacePath,
+    kind: enumValue(input.kind, workspaceKinds, 'server'),
+    isTemporary: Boolean(input.isTemporary),
+    existsOnDisk: input.existsOnDisk !== false,
+    lastOpenedAt: optionalNumber(input.lastOpenedAt),
+    createdAt,
+    updatedAt,
+  };
+}
+
+/** 归一化服务端工作区根目录。 */
+export function normalizeWorkspaceRoot(value: unknown): WorkspaceRoot | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const rootPath = asString(input.path);
+  if (!id || !rootPath) return null;
+  return {
+    id,
+    name: asString(input.name, rootPath),
+    path: rootPath,
+  };
+}
+
+/** 归一化服务端目录浏览结果。 */
+export function normalizeWorkspaceDirectoryListing(value: unknown): WorkspaceDirectoryListing | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const root = normalizeWorkspaceRoot(input.root);
+  if (!root) return null;
+  return {
+    root,
+    relativePath: asString(input.relativePath, '.'),
+    absolutePath: asString(input.absolutePath, root.path),
+    parentRelativePath: optionalString(input.parentRelativePath),
+    entries: normalizeArray(input.entries, normalizeWorkspaceDirectoryEntry),
+  };
+}
+
+/** 归一化服务端目录浏览条目。 */
+export function normalizeWorkspaceDirectoryEntry(value: unknown): WorkspaceDirectoryEntry | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const name = asString(input.name);
+  const relativePath = asString(input.relativePath);
+  if (!name || !relativePath) return null;
+  return {
+    name,
+    relativePath,
+    isDir: Boolean(input.isDir),
+    isFile: Boolean(input.isFile),
+    size: optionalNumber(input.size),
+    modifiedAt: optionalNumber(input.modifiedAt),
+  };
+}
+
+/** 归一化会话摘要。 */
+export function normalizeConversationSummary(value: unknown): ConversationSummary | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const id = asString(input.id);
+  const status = enumValue(input.status, conversationStatuses, undefined);
+  const backend = enumValue(input.backend, agentBackends, undefined);
+  const workspace = normalizeWorkspace(input.workspace);
+  const createdAt = asRequiredNumber(input.createdAt);
+  const updatedAt = asRequiredNumber(input.updatedAt);
+  if (!id || !status || !backend || !workspace || createdAt === null || updatedAt === null) return null;
+
+  return {
+    id,
+    name: asString(input.name, '未命名会话'),
+    preview: asString(input.preview),
+    status,
+    backend,
+    model: optionalString(input.model),
+    workspace,
+    lastStopReason: enumValue(input.lastStopReason, stopReasons, undefined),
+    lastError: optionalString(input.lastError),
+    createdAt,
+    updatedAt,
+  };
+}
+
+/** 归一化会话摘要列表分页结果。 */
+export function normalizeConversationListResult(value: unknown): ConversationListResult {
+  const input = asRecord(value);
+  if (!input) return { data: [] };
+  return {
+    data: normalizeArray(input.data, normalizeConversationSummary),
+    nextCursor: optionalString(input.nextCursor),
+    backwardsCursor: optionalString(input.backwardsCursor),
+  };
+}
+
+/** 归一化工作区文件树。 */
+export function normalizeWorkspaceEntryList(value: unknown): WorkspaceEntry[] {
+  return normalizeArray(value, normalizeWorkspaceEntry);
+}
+
+function normalizeWorkspaceEntry(value: unknown): WorkspaceEntry | null {
+  const input = asRecord(value);
+  if (!input) return null;
+  const name = asString(input.name);
+  const fullPath = asString(input.fullPath);
+  const relativePath = asString(input.relativePath);
+  if (!name || !fullPath || !relativePath) return null;
+  return {
+    name,
+    fullPath,
+    relativePath,
+    isDir: Boolean(input.isDir),
+    isFile: Boolean(input.isFile),
+    size: optionalNumber(input.size),
+    modifiedAt: optionalNumber(input.modifiedAt),
+    children: normalizeWorkspaceEntryList(input.children),
   };
 }
 
@@ -131,7 +270,7 @@ export function normalizeTeam(value: unknown): Team | null {
   return {
     id,
     name: asString(input.name, '未命名团队'),
-    workspace: asString(input.workspace),
+    workspaceId: asString(input.workspaceId),
     leaderSlotId: asString(input.leaderSlotId, agents.find((agent) => agent.role === 'leader')?.slotId ?? agents[0]?.slotId ?? ''),
     agents,
     createdAt: asNumber(input.createdAt, Date.now()),

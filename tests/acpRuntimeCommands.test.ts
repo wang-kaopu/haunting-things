@@ -8,7 +8,7 @@ describe('AcpRuntime available commands', () => {
     const runtime = new AcpRuntime({
       conversationId: 'conv-1',
       backend: 'claude',
-      workspace: '/tmp/workspace',
+      workspacePath: process.cwd(),
     });
 
     const received: ConversationCommands[] = [];

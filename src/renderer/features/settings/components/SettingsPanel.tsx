@@ -17,8 +17,8 @@ export function SettingsPanel({
   onSetRemoteAccess,
 }: SettingsPanelProps): React.ReactElement {
   return (
-    <div className="settings-panel">
-      <section className="settings-section">
+    <div className="panel-dialog-panel">
+      <section className="panel-dialog-section">
         <h3>通用</h3>
 
         <RemoteAccessSetting
