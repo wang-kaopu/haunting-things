@@ -1962,8 +1962,7 @@ label,
    Modals & Permission Dialog — 新 风格
    ================================================================ */
 
-.modal-backdrop,
-.permission-overlay {
+.modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -1974,8 +1973,7 @@ label,
   backdrop-filter: blur(8px);
 }
 
-.modal,
-.permission-dialog {
+.modal {
   width: min(480px, calc(100vw - 32px));
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
@@ -1988,8 +1986,7 @@ label,
   gap: 16px;
 }
 
-.modal h3,
-.permission-dialog h3 {
+.modal h3 {
   margin: 0;
   color: #0d0d0d;
   font-size: 18px;
@@ -2027,16 +2024,14 @@ label,
   background: #e9e9e9;
 }
 
-.modal-actions,
-.permission-actions {
+.modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 2px;
 }
 
-.modal-actions button,
-.permission-actions button {
+.modal-actions button {
   height: 36px;
   min-width: 72px;
   border-radius: 999px;
@@ -2045,26 +2040,22 @@ label,
   font-size: 14px;
 }
 
-.modal-actions button[type="submit"],
-.permission-actions button:first-child {
+.modal-actions button[type="submit"] {
   background: #0d0d0d;
   color: #ffffff;
 }
 
-.modal-actions button[type="submit"]:hover,
-.permission-actions button:first-child:hover {
+.modal-actions button[type="submit"]:hover {
   background: #2f2f2f;
 }
 
-.modal .secondary,
-.permission-actions .secondary {
+.modal .secondary {
   margin-top: 0;
   background: #f4f4f4;
   color: #0d0d0d;
 }
 
-.modal .secondary:hover,
-.permission-actions .secondary:hover {
+.modal .secondary:hover {
   background: #e9e9e9;
 }
 
@@ -2189,63 +2180,268 @@ label,
 
 /* ---- Permission Dialog 选项卡片化 ---- */
 
-.permission-body {
+.permission-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.permission-dialog {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100dvh - 64px);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #111111;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.18),
+    0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.permission-header {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.permission-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.permission-heading {
+  min-width: 0;
+}
+
+.permission-eyebrow {
+  margin: 0 0 3px;
+  color: #7b8190;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.permission-dialog h3 {
   margin: 0;
-  max-height: 240px;
+  color: #111111;
+  font-size: 20px;
+  line-height: 1.28;
+  font-weight: 650;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.permission-detail {
+  min-height: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 16px;
+  background: #f6f6f7;
+}
+
+.permission-detail-header {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: #777d8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.permission-copy {
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #202124;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.permission-copy:hover {
+  background: #eeeeef;
+}
+
+.permission-body {
+  max-height: 210px;
+  margin: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 10px 14px 14px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 12px;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #f7f7f8;
-  border: 1px solid #ececec;
-  border-radius: 12px;
-  color: #353740;
-  font-size: 13px;
 }
 
 .permission-options {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .permission-option {
+  min-height: 42px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: flex-start;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #ececec;
+  padding: 9px 10px;
+  border: none;
   border-radius: 12px;
-  background: #ffffff;
-  color: #0d0d0d;
+  background: transparent;
+  color: #202124;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .permission-option:hover {
-  background: #f7f7f8;
+  background: #f5f5f5;
 }
 
-.permission-option input {
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
-  accent-color: #0d0d0d;
+.permission-option.selected {
+  background: #f1f1f1;
 }
 
-.permission-option-content {
+.permission-option-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.permission-option-indicator {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border: 1.5px solid #a7adb8;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.permission-option.selected .permission-option-indicator {
+  border-color: #111111;
+}
+
+.permission-option.selected .permission-option-indicator::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #111111;
+}
+
+.permission-option-label {
   min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.permission-option-content strong {
+  color: #202124;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 520;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.permission-desc {
-  color: #6b7280;
-  font-size: 12px;
+.permission-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.permission-button {
+  height: 40px;
+  min-width: 78px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.permission-button.primary {
+  background: #111111;
+  color: #ffffff;
+}
+
+.permission-button.primary:hover {
+  background: #2f2f2f;
+}
+
+.permission-button.secondary {
+  background: #f3f3f3;
+  color: #202124;
+}
+
+.permission-button.secondary:hover {
+  background: #e9e9e9;
+}
+
+.permission-button:focus-visible,
+.permission-copy:focus-visible,
+.permission-option:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
+}
+
+@media (max-width: 640px) {
+  .permission-overlay {
+    padding: 14px;
+    align-items: end;
+  }
+
+  .permission-dialog {
+    width: 100%;
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .permission-dialog h3 {
+    font-size: 18px;
+  }
+
+  .permission-body {
+    max-height: 180px;
+  }
+
+  .permission-actions {
+    flex-direction: column;
+  }
+
+  .permission-button {
+    width: 100%;
+  }
 }
 
 /* ================================================================

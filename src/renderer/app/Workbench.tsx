@@ -309,40 +309,140 @@ function PermissionDialog({
   onRespond: (optionId: string) => void;
   onDismiss: () => void;
 }): React.ReactElement {
-  const [selected, setSelected] = useState(permission.options[0]?.id ?? '');
+  const meta = getPermissionMeta(permission);
+  const formattedInput = formatPermissionInput(permission);
+  const [selected, setSelected] = useState(() => getDefaultPermissionOption(permission.options));
+
   return (
     <div className="permission-overlay">
-      <div className="permission-dialog">
-        <h3>{permission.title}</h3>
-        {permission.body ? <pre className="permission-body">{permission.body}</pre> : null}
-        <div className="permission-options">
-          {permission.options.map((opt) => (
-            <label key={opt.id} className="permission-option">
-              <input
-                type="radio"
-                name="permission"
-                value={opt.id}
-                checked={selected === opt.id}
-                onChange={() => setSelected(opt.id)}
-              />
-              <span className="permission-option-content">
-                <strong>{opt.label}</strong>
-                {opt.description ? (
-                  <span className="permission-desc">{opt.description}</span>
-                ) : null}
-              </span>
-            </label>
-          ))}
+      <section
+        className="permission-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="permission-dialog-title"
+      >
+        <header className="permission-header">
+          <div className="permission-icon" aria-hidden="true">
+            ⌘
+          </div>
+          <div className="permission-heading">
+            <p className="permission-eyebrow">需要授权</p>
+            <h3 id="permission-dialog-title">{meta.displayTitle}</h3>
+          </div>
+        </header>
+
+        {formattedInput ? (
+          <section className="permission-detail">
+            <div className="permission-detail-header">
+              <span>Tool arguments</span>
+              <button
+                type="button"
+                className="permission-copy"
+                onClick={() => {
+                  void navigator.clipboard.writeText(formattedInput).catch((err) => {
+                    console.warn('[permission] failed to copy tool arguments', err);
+                  });
+                }}
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="permission-body">{formattedInput}</pre>
+          </section>
+        ) : null}
+
+        <div className="permission-options" role="radiogroup" aria-label="权限选项">
+          {permission.options.map((opt) => {
+            const checked = selected === opt.id;
+
+            return (
+              <label
+                key={opt.id}
+                className={checked ? 'permission-option selected' : 'permission-option'}
+              >
+                <input
+                  className="permission-option-input"
+                  type="radio"
+                  name="permission"
+                  value={opt.id}
+                  checked={checked}
+                  onChange={() => setSelected(opt.id)}
+                />
+                <span className="permission-option-indicator" aria-hidden="true" />
+                <span className="permission-option-label">{opt.label}</span>
+              </label>
+            );
+          })}
         </div>
-        <div className="permission-actions">
-          <button type="button" onClick={() => onRespond(selected)} disabled={!selected}>
+
+        <footer className="permission-actions">
+          <button
+            type="button"
+            className="permission-button primary"
+            onClick={() => onRespond(selected)}
+            disabled={!selected}
+          >
             确认
           </button>
-          <button type="button" className="secondary" onClick={onDismiss}>
+          <button
+            type="button"
+            className="permission-button secondary"
+            onClick={onDismiss}
+          >
             关闭
           </button>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
+}
+
+type PermissionMeta = {
+  toolName: string;
+  displayTitle: string;
+};
+
+/** 从权限标题中提取更适合展示的工具名。 */
+function getPermissionMeta(permission: PermissionRequest): PermissionMeta {
+  const title = permission.title.trim();
+  const parts = title.split('__').filter(Boolean);
+  const toolName = parts.at(-1) ?? title;
+
+  return {
+    toolName,
+    displayTitle: `允许调用 ${toolName}？`,
+  };
+}
+
+/** 优先展示结构化工具参数，避免把双重转义后的正文直接暴露给用户。 */
+function formatPermissionInput(permission: PermissionRequest): string {
+  if (permission.rawInput !== undefined) {
+    return JSON.stringify(permission.rawInput, null, 2) ?? String(permission.rawInput);
+  }
+
+  if (!permission.body) return '';
+
+  try {
+    return JSON.stringify(JSON.parse(permission.body), null, 2) ?? permission.body;
+  } catch {
+    return permission.body;
+  }
+}
+
+/** 权限确认默认偏保守：优先选择单次允许，避免默认永久授权。 */
+function getDefaultPermissionOption(options: PermissionRequest['options']): string {
+  const allowOnce = options.find((option) => {
+    const label = option.label.toLowerCase();
+    const originalLabel = option.label;
+    const isAlways =
+      label.includes('always') ||
+      originalLabel.includes('永久') ||
+      originalLabel.includes('总是') ||
+      originalLabel.includes('始终');
+    const isAllow = label.includes('allow') || originalLabel.includes('允许');
+
+    return isAllow && !isAlways;
+  });
+
+  return allowOnce?.id ?? options[0]?.id ?? '';
 }
