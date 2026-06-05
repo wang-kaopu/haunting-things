@@ -15,7 +15,6 @@ export type SidebarProps = {
   onAddAgentClick: () => void;
   onOpenDirectoryPicker: () => void;
   onCreateTeamInWorkspace: (workspaceId?: string) => void;
-  onDeleteWorkspaces: (workspaceIds: string[], label: string) => Promise<void>;
   onSelectTeam: (teamId: string) => void;
   onSelectAgent: (slotId: string) => void;
   onDeleteTeam: (teamId: string) => Promise<void>;
@@ -40,7 +39,6 @@ export function Sidebar({
   onAddAgentClick,
   onOpenDirectoryPicker,
   onCreateTeamInWorkspace,
-  onDeleteWorkspaces,
   onSelectTeam,
   onSelectAgent,
   onDeleteTeam,
@@ -91,7 +89,6 @@ export function Sidebar({
           workspaces={workspaces}
           activeTeamId={activeTeamId}
           onCreateTeamInWorkspace={onCreateTeamInWorkspace}
-          onDeleteWorkspaces={onDeleteWorkspaces}
           onSelectTeam={onSelectTeam}
           onDeleteTeam={onDeleteTeam}
         />

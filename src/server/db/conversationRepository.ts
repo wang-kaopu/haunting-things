@@ -212,6 +212,12 @@ export class ConversationRepository {
     return rows.map(rowToConversation);
   }
 
+  /** 统计某个工作区下的会话数量，用于判断工作区是否可自动清理。 */
+  countConversationsByWorkspace(workspaceId: string): number {
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM conversations WHERE workspace_id = ?').get(workspaceId) as any;
+    return Number(row?.count ?? 0);
+  }
+
   /** 删除指定工作区下的所有会话，消息和运行态快照由外键级联清理。 */
   deleteConversationsByWorkspace(workspaceId: string): number {
     const result = this.db.prepare('DELETE FROM conversations WHERE workspace_id = ?').run(workspaceId);
@@ -755,6 +761,7 @@ export type ConversationRepositoryPort = Pick<
   | 'updateConversationTurnResult'
   | 'listConversations'
   | 'listConversationsByWorkspace'
+  | 'countConversationsByWorkspace'
   | 'deleteConversationsByWorkspace'
   | 'listConversationsByStatus'
   | 'getConversation'

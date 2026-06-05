@@ -20,14 +20,14 @@ export function RemoteAccessSetting({
   const switching = loading || serverInfo?.restarting;
 
   return (
-    <div className="settings-item settings-item-remote">
-      <div className="settings-item-main">
-        <div className="settings-item-copy">
+    <div className="panel-dialog-item">
+      <div className="panel-dialog-item-main">
+        <div className="panel-dialog-item-copy">
           <strong>远程访问</strong>
           <span>允许同一网络或 Tailscale 设备访问当前服务。</span>
         </div>
 
-        <label className="settings-switch" aria-label="远程访问">
+        <label className="panel-dialog-switch" aria-label="远程访问">
           <input
             type="checkbox"
             checked={allowRemote}
@@ -40,28 +40,28 @@ export function RemoteAccessSetting({
         </label>
       </div>
 
-      {error ? <p className="settings-error">{error}</p> : null}
+      {error ? <p className="panel-dialog-error">{error}</p> : null}
 
       {!serverInfo ? (
-        <p className="settings-muted">正在读取服务信息...</p>
+        <p className="panel-dialog-muted">正在读取服务信息...</p>
       ) : null}
 
       {serverInfo?.restarting ? (
-        <p className="settings-muted">正在切换监听地址...</p>
+        <p className="panel-dialog-muted">正在切换监听地址...</p>
       ) : null}
 
       {serverInfo && allowRemote && urls.length > 0 ? (
-        <div className="settings-item-detail">
+        <div className="panel-dialog-item-detail">
           <div className="remote-url-list">
             {urls.map((url) => (
               <RemoteUrlRow key={url} url={url} />
             ))}
           </div>
 
-          <p className="settings-muted">
+          <p className="panel-dialog-muted">
             在其他设备浏览器中打开以上地址，然后使用当前账号密码登录。
           </p>
-          <p className="settings-muted">
+          <p className="panel-dialog-muted">
             切换远程访问会短暂重启 HTTP/WebSocket 监听，页面会自动重连。
           </p>
         </div>
@@ -80,7 +80,7 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
 
       <button
         type="button"
-        className="settings-copy-button"
+        className="panel-dialog-copy-button"
         onClick={() => void navigator.clipboard.writeText(url)}
       >
         复制

@@ -147,7 +147,6 @@ function summarizeInvokeParams(name: string, data: unknown): unknown {
     case 'workspace.mkdir':
     case 'workspace.rename':
     case 'workspace.deleteEntry':
-    case 'workspace.delete':
     case 'workspace.openPath':
     case 'workspace.revealPath':
       return {

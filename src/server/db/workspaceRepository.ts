@@ -87,7 +87,7 @@ export class WorkspaceRepository {
     return this.getWorkspace(input.id);
   }
 
-  /** 删除工作区记录；有关联 conversation/team 时由外键阻止。 */
+  /** 删除工作区记录；仅供服务层在确认没有下级引用后调用。 */
   deleteWorkspace(id: string): void {
     this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
   }

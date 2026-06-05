@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import type { Team, Workspace } from '@shared/types';
 import { TeamListItem } from '@renderer/features/teams/components/TeamListItem';
 
@@ -8,7 +8,6 @@ export type TeamListProps = {
   workspaces: Workspace[];
   activeTeamId: string | null;
   onCreateTeamInWorkspace: (workspaceId?: string) => void;
-  onDeleteWorkspaces: (workspaceIds: string[], label: string) => Promise<void>;
   onSelectTeam: (teamId: string) => void;
   onDeleteTeam: (teamId: string) => Promise<void>;
 };
@@ -19,7 +18,6 @@ export function TeamList({
   workspaces,
   activeTeamId,
   onCreateTeamInWorkspace,
-  onDeleteWorkspaces,
   onSelectTeam,
   onDeleteTeam,
 }: TeamListProps): React.ReactElement {
@@ -36,7 +34,6 @@ export function TeamList({
           <TeamGroupHeader
             group={group}
             onCreateTeamInWorkspace={onCreateTeamInWorkspace}
-            onDeleteWorkspaces={onDeleteWorkspaces}
           />
           <div className="sidebar-team-group__items">
             {group.teams.map((team) => (
@@ -60,7 +57,6 @@ type TeamGroup = {
   key: string;
   label: string;
   kind: 'workspace' | 'temporary';
-  workspaceIds: string[];
   createWorkspaceId?: string;
   teams: Team[];
 };
@@ -73,7 +69,6 @@ function groupTeamsByWorkspace(teams: Team[], workspaces: Workspace[]): TeamGrou
     key: 'temporary-conversations',
     label: '对话',
     kind: 'temporary',
-    workspaceIds: [],
     teams: [],
   };
 
@@ -83,7 +78,6 @@ function groupTeamsByWorkspace(teams: Team[], workspaces: Workspace[]): TeamGrou
       key: workspace.id,
       label: workspace.name,
       kind: 'workspace',
-      workspaceIds: [workspace.id],
       createWorkspaceId: workspace.id,
       teams: [],
     });
@@ -92,9 +86,6 @@ function groupTeamsByWorkspace(teams: Team[], workspaces: Workspace[]): TeamGrou
   for (const team of teams) {
     const workspace = workspaceById.get(team.workspaceId);
     if (!workspace || workspace.isTemporary) {
-      if (workspace?.id && !temporaryGroup.workspaceIds.includes(workspace.id)) {
-        temporaryGroup.workspaceIds.push(workspace.id);
-      }
       temporaryGroup.teams.push(team);
       continue;
     }
@@ -103,7 +94,6 @@ function groupTeamsByWorkspace(teams: Team[], workspaces: Workspace[]): TeamGrou
       key: workspace.id,
       label: workspace.name,
       kind: 'workspace',
-      workspaceIds: [workspace.id],
       createWorkspaceId: workspace.id,
       teams: [],
     };
@@ -117,56 +107,14 @@ function groupTeamsByWorkspace(teams: Team[], workspaces: Workspace[]): TeamGrou
   ];
 }
 
-/** 渲染工作区分组标题，并承载分组级更多菜单和新建 Team 操作。 */
+/** 渲染工作区分组标题，并承载分组内新建 Team 操作。 */
 function TeamGroupHeader({
   group,
   onCreateTeamInWorkspace,
-  onDeleteWorkspaces,
 }: {
   group: TeamGroup;
   onCreateTeamInWorkspace: (workspaceId?: string) => void;
-  onDeleteWorkspaces: (workspaceIds: string[], label: string) => Promise<void>;
 }): React.ReactElement {
-  const menuRef = useRef<HTMLSpanElement | null>(null);
-  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const deleteLabel = group.kind === 'temporary' ? '删除对话' : '删除工作区';
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    function handlePointerDown(event: PointerEvent): void {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') setMenuOpen(false);
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [menuOpen]);
-
-  function toggleMenu(): void {
-    const rect = menuButtonRef.current?.getBoundingClientRect();
-    if (rect) {
-      setMenuPosition({
-        top: rect.bottom + 4,
-        right: Math.max(8, window.innerWidth - rect.right),
-      });
-    }
-    setMenuOpen((current) => !current);
-  }
-
   return (
     <div className="sidebar-team-group__header">
       <span className="sidebar-team-group__identity">
@@ -176,42 +124,6 @@ function TeamGroupHeader({
         </span>
       </span>
       <span className="sidebar-team-group__actions">
-        <span className="sidebar-team-group__menu-wrap" ref={menuRef}>
-          <button
-            ref={menuButtonRef}
-            type="button"
-            className="sidebar-group-icon-button"
-            aria-label={`更多操作：${group.label}`}
-            onClick={toggleMenu}
-          >
-            <MoreIcon />
-          </button>
-          {menuOpen ? (
-            <div
-              className="custom-select-popover sidebar-team-group__menu"
-              role="menu"
-              style={menuPosition ? { top: menuPosition.top, right: menuPosition.right } : undefined}
-            >
-              <button
-                type="button"
-                className="custom-select-option"
-                role="menuitem"
-                disabled={deleting || group.workspaceIds.length === 0}
-                onClick={() => {
-                  setDeleting(true);
-                  void onDeleteWorkspaces(group.workspaceIds, group.label).finally(() => {
-                    setDeleting(false);
-                    setMenuOpen(false);
-                  });
-                }}
-              >
-                <span className="custom-select-option-label">
-                  {deleting ? '删除中...' : deleteLabel}
-                </span>
-              </button>
-            </div>
-          ) : null}
-        </span>
         <button
           type="button"
           className="sidebar-group-icon-button"
@@ -231,17 +143,6 @@ function FolderIcon(): React.ReactElement {
     <svg className="sidebar-team-group__folder-icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3.5 7.25A2.25 2.25 0 0 1 5.75 5h4.1l1.8 2.25h6.6A2.25 2.25 0 0 1 20.5 9.5v6.75a2.25 2.25 0 0 1-2.25 2.25H5.75a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
       <path d="M3.5 9h17" />
-    </svg>
-  );
-}
-
-/** 更多操作图标。 */
-function MoreIcon(): React.ReactElement {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <circle cx="5" cy="10" r="1.4" />
-      <circle cx="10" cy="10" r="1.4" />
-      <circle cx="15" cy="10" r="1.4" />
     </svg>
   );
 }

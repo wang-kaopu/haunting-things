@@ -38,6 +38,7 @@ export function WorkspacePickerDialog({
   async function handleSelectCurrentDirectory(): Promise<void> {
     const workspace = await selectCurrentDirectory();
     onSelect(workspace);
+    close();
   }
 
   const directories = listing?.entries.filter((entry) => entry.isDir) ?? [];

@@ -549,6 +549,14 @@ export class ConversationService {
     return { deleted };
   }
 
+  /** 统计指定工作区下的 Conversation 数量。 */
+  countByWorkspace(workspaceId: string): number {
+    if (typeof this.repo.countConversationsByWorkspace === 'function') {
+      return this.repo.countConversationsByWorkspace(workspaceId);
+    }
+    return this.repo.listConversationsByWorkspace(workspaceId).length;
+  }
+
   /**
    * 停止指定 Conversation 的 ACP 进程并释放 runtime。
    */

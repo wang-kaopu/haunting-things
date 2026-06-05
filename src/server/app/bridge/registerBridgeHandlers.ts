@@ -41,7 +41,10 @@ export function registerBridgeHandlers(input: {
   bridge.register('workspace.browse', (params) => workspaces.browse(params));
   bridge.register('workspace.selectDirectory', (params) => workspaces.selectDirectory(params));
   bridge.register('workspace.createTemporary', (params) => workspaces.createTemporary(params));
-  bridge.register('workspace.list', () => workspaces.list());
+  bridge.register('workspace.list', () => {
+    cleanupEmptyWorkspaces();
+    return workspaces.list();
+  });
   bridge.register('workspace.get', ({ workspaceId }) => workspaces.get(workspaceId));
   bridge.register('workspace.tree', (params) => workspaces.tree(params));
   bridge.register('workspace.readTextFile', (params) => workspaces.readTextFile(params));
@@ -49,17 +52,6 @@ export function registerBridgeHandlers(input: {
   bridge.register('workspace.mkdir', (params) => workspaces.mkdir(params));
   bridge.register('workspace.rename', (params) => workspaces.rename(params));
   bridge.register('workspace.deleteEntry', (params) => workspaces.deleteEntry(params));
-  bridge.register('workspace.delete', async ({ workspaceId }) => {
-    workspaces.getRequired(workspaceId);
-    const deletedTeams = await teams.deleteByWorkspace(workspaceId);
-    const deletedConversations = conversations.deleteByWorkspace(workspaceId);
-    workspaces.delete({ workspaceId });
-    return {
-      deleted: true,
-      deletedTeams: deletedTeams.deleted,
-      deletedConversations: deletedConversations.deleted,
-    };
-  });
   bridge.register('workspace.openPath', (params) => workspaces.openPath(params));
   bridge.register('workspace.revealPath', (params) => workspaces.revealPath(params));
   bridge.register('conversation.create', (params) => conversations.create(params));
@@ -85,7 +77,12 @@ export function registerBridgeHandlers(input: {
   bridge.register('conversation.deleteMessage', (params) => conversations.deleteMessage(params));
   bridge.register('conversation.deleteMessageAttachment', (params) => conversations.deleteMessageAttachment(params));
   bridge.register('team.create', (params) => teams.create(params));
-  bridge.register('team.delete', ({ teamId }) => teams.delete(teamId));
+  bridge.register('team.delete', async ({ teamId }) => {
+    const team = teams.get(teamId);
+    const result = await teams.delete(teamId);
+    if (team?.workspaceId) cleanupEmptyWorkspace(team.workspaceId);
+    return result;
+  });
   bridge.register('team.addAgent', (params) => teams.addAgent(params));
   bridge.register('team.removeAgent', (params) => teams.removeAgent(params));
   bridge.register('team.setAgentModel', (params) => teams.setAgentModel(params));
@@ -109,4 +106,20 @@ export function registerBridgeHandlers(input: {
   });
   bridge.register('server.info', input.serverInfo);
   bridge.register('server.setRemoteAccess', input.setRemoteAccess);
+
+  /** 删除没有任何 Team/Conversation 引用的工作区记录。 */
+  function cleanupEmptyWorkspace(workspaceId: string): void {
+    workspaces.deleteIfUnreferenced({
+      workspaceId,
+      teamCount: teams.countByWorkspace(workspaceId),
+      conversationCount: conversations.countByWorkspace(workspaceId),
+    });
+  }
+
+  /** 每次列出工作区前做一次轻量清理，避免空工作区在侧边栏长期残留。 */
+  function cleanupEmptyWorkspaces(): void {
+    for (const workspace of workspaces.list()) {
+      cleanupEmptyWorkspace(workspace.id);
+    }
+  }
 }

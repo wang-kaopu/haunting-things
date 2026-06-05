@@ -128,32 +128,8 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
 
   async function deleteTeam(teamId: string): Promise<void> {
     await teamsState.deleteTeam(teamId);
-    notifications.push({ title: '团队已删除', message: '团队和成员已移除。', level: 'warning' });
-  }
-
-  /** 删除一个或多个工作区记录，并清理其下 Team 与 Conversation。 */
-  async function deleteWorkspaces(workspaceIds: string[], label: string): Promise<void> {
-    const uniqueIds = [...new Set(workspaceIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return;
-    const confirmed = window.confirm(`删除“${label}”会删除其下的 Team 和 Conversation，磁盘文件不会被删除。继续？`);
-    if (!confirmed) return;
-
-    let deletedTeams = 0;
-    let deletedConversations = 0;
-    for (const workspaceId of uniqueIds) {
-      const result = await bridge.invoke('workspace.delete', { workspaceId });
-      deletedTeams += result.deletedTeams;
-      deletedConversations += result.deletedConversations;
-    }
-
-    await teamsState.refreshTeams();
     await refreshWorkspaces();
-    setActiveWorkspaceId((current) => (current && uniqueIds.includes(current) ? null : current));
-    notifications.push({
-      title: '工作区已删除',
-      message: `已删除 ${deletedTeams} 个 Team 和 ${deletedConversations} 个 Conversation。`,
-      level: 'warning',
-    });
+    notifications.push({ title: '团队已删除', message: '团队和成员已移除。', level: 'warning' });
   }
 
   async function setModel(model: string): Promise<void> {
@@ -236,7 +212,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onAddAgentClick={() => setAddAgentOpen(true)}
         onOpenDirectoryPicker={() => setDirectoryPickerOpen(true)}
         onCreateTeamInWorkspace={openCreateTeam}
-        onDeleteWorkspaces={deleteWorkspaces}
         onSelectTeam={(teamId) => {
           const team = teamsState.teams.find((item) => item.id === teamId);
           if (team) setActiveWorkspaceId(team.workspaceId);

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { AgentBackend } from '@shared/types';
+import { CustomSelect } from '@renderer/shared/components/CustomSelect';
+import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 import type { CreateTeamInput } from '@renderer/shared/types/ui';
 
 export type CreateTeamDialogProps = {
@@ -37,70 +39,100 @@ export function CreateTeamDialog({ open, defaultWorkspaceId, onClose, onSubmit }
   if (!open) return null;
 
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+    <PanelDialogShell
+      open={open}
+      as="form"
+      className="create-team-dialog"
+      titleId="create-team-title"
+      title="创建团队"
+      description="配置团队名称和 Leader 使用的 Agent 类型。"
+      closeLabel="关闭创建团队"
+      closeDisabled={submitting}
+      closeOnBackdrop
+      onClose={onClose}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const name = form.name.trim();
+        if (!name) {
+          setError('请输入团队名称。');
+          return;
+        }
+        try {
+          setSubmitting(true);
+          setError('');
+          await onSubmit({
+            name,
+            leaderBackend: form.leaderBackend,
+            workspaceId: form.workspaceId || undefined,
+          });
+          setForm({
+            name: '',
+            leaderBackend: 'codex',
+            workspaceId: '',
+          });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setSubmitting(false);
+        }
       }}
     >
-      <form
-        className="modal panel"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          const name = form.name.trim();
-          if (!name) {
-            setError('请输入团队名称。');
-            return;
-          }
-          try {
-            setSubmitting(true);
-            setError('');
-            await onSubmit({
-              name,
-              leaderBackend: form.leaderBackend,
-              workspaceId: form.workspaceId || undefined,
-            });
-            setForm({
-              name: '',
-              leaderBackend: 'codex',
-              workspaceId: '',
-            });
-          } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-          } finally {
-            setSubmitting(false);
-          }
-        }}
-      >
-        <h3>创建团队</h3>
-        <label className="field">
-          <span>团队名称</span>
-          <input
-            value={form.name}
-            autoFocus
-            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-          />
-        </label>
-        <label className="field">
-          <span>Leader 后端</span>
-          <select
-            value={form.leaderBackend}
-            onChange={(event) => setForm((current) => ({ ...current, leaderBackend: event.target.value as AgentBackend }))}
-          >
-            <option value="codex">Codex</option>
-            <option value="claude">Claude Code</option>
-          </select>
-        </label>
-        {error ? <p className="error-text">{error}</p> : null}
-        <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onClose} disabled={submitting}>
-            取消
-          </button>
-          <button type="submit" disabled={submitting}>
-            {submitting ? '创建中...' : '创建'}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="panel-dialog-panel">
+        <section className="panel-dialog-section">
+          <h3>团队</h3>
+
+          <div className="panel-dialog-item">
+            <div className="panel-dialog-item-main create-team-item-main">
+              <label className="panel-dialog-item-copy" htmlFor="create-team-name">
+                <strong>团队名称</strong>
+                <span>用于侧边栏和会话上下文展示。</span>
+              </label>
+
+              <div className="create-team-field-control">
+                <input
+                  id="create-team-name"
+                  value={form.name}
+                  autoFocus
+                  disabled={submitting}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="panel-dialog-item">
+            <div className="panel-dialog-item-main create-team-item-main">
+              <div className="panel-dialog-item-copy">
+                <strong>类型</strong>
+                <span>选择 Leader 后续任务使用的 Agent 类型。</span>
+              </div>
+
+              <CustomSelect
+                className="model-select create-team-type-select"
+                ariaLabel="类型"
+                value={form.leaderBackend}
+                disabled={submitting}
+                options={[
+                  { value: 'codex', label: 'Codex' },
+                  { value: 'claude', label: 'Claude Code' },
+                ]}
+                onChange={(value) => setForm((current) => ({ ...current, leaderBackend: value as AgentBackend }))}
+              />
+            </div>
+          </div>
+
+          {error ? <p className="panel-dialog-error">{error}</p> : null}
+
+          <div className="modal-actions create-team-actions">
+            <button type="button" className="secondary" onClick={onClose} disabled={submitting}>
+              取消
+            </button>
+            <button type="submit" disabled={submitting}>
+              {submitting ? '创建中...' : '创建'}
+            </button>
+          </div>
+        </section>
+      </div>
+    </PanelDialogShell>
   );
 }

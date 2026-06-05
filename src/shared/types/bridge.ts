@@ -90,10 +90,6 @@ export type InvokeMap = {
     params: { workspaceId: string; relativePath: string };
     result: { deleted: true };
   };
-  'workspace.delete': {
-    params: { workspaceId: string };
-    result: { deleted: true; deletedTeams: number; deletedConversations: number };
-  };
   'workspace.openPath': {
     params: { workspaceId: string; relativePath?: string };
     result: { opened: true };

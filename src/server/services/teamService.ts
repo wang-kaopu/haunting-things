@@ -191,6 +191,14 @@ export class TeamService {
     return { deleted: teams.length };
   }
 
+  /** 统计指定工作区下的 Team 数量。 */
+  countByWorkspace(workspaceId: string): number {
+    if (typeof this.teamsRepo.countTeamsByWorkspace === 'function') {
+      return this.teamsRepo.countTeamsByWorkspace(workspaceId);
+    }
+    return this.teamsRepo.listTeams().filter((team) => team.workspaceId === workspaceId).length;
+  }
+
   /**
    * 向 Team 添加新 Agent（Teammate），并为新 conversation 注入当前 Team MCP 配置。
    */

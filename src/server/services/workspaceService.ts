@@ -81,9 +81,29 @@ export class WorkspaceService {
     return this.repo.getWorkspace(workspaceId);
   }
 
-  /** 删除工作区记录；调用方必须先清理关联的 Team 和 Conversation。 */
+  /** 工作区不能被用户直接删除，只能在没有下级引用时由系统自动清理。 */
   delete(input: { workspaceId: string }): { deleted: true } {
     this.getRequired(input.workspaceId);
+    throw new Error('Workspace cannot be deleted directly');
+  }
+
+  /**
+   * 自动删除没有任何 Team/Conversation 引用的工作区记录。
+   *
+   * @param input.workspaceId - 待检查工作区 ID
+   * @param input.teamCount - 当前工作区下的 Team 数量
+   * @param input.conversationCount - 当前工作区下的 Conversation 数量
+   * @returns 是否实际删除了工作区记录
+   */
+  deleteIfUnreferenced(input: {
+    workspaceId: string;
+    teamCount: number;
+    conversationCount: number;
+  }): { deleted: boolean } {
+    const workspace = this.repo.getWorkspace(input.workspaceId);
+    if (!workspace) return { deleted: false };
+    if (input.teamCount > 0 || input.conversationCount > 0) return { deleted: false };
+
     this.repo.deleteWorkspace(input.workspaceId);
     return { deleted: true };
   }

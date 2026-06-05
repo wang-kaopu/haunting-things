@@ -35,6 +35,12 @@ export class TeamRepository {
     return rows.map(rowToTeam);
   }
 
+  /** 统计某个工作区下的团队数量，用于判断工作区是否可自动清理。 */
+  countTeamsByWorkspace(workspaceId: string): number {
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM teams WHERE workspace_id = ?').get(workspaceId) as any;
+    return Number(row?.count ?? 0);
+  }
+
   /** 按 ID 读取带工作区详情的团队视图。 */
   getTeamWithWorkspace(id: string): TeamWithWorkspace | null {
     const row = this.db.prepare(teamWithWorkspaceSql('WHERE t.id = ?')).get(id) as any;
@@ -55,7 +61,14 @@ export class TeamRepository {
 
 export type TeamRepositoryPort = Pick<
   TeamRepository,
-  'createTeam' | 'updateTeam' | 'getTeam' | 'listTeams' | 'getTeamWithWorkspace' | 'listTeamsWithWorkspace' | 'deleteTeam'
+  | 'createTeam'
+  | 'updateTeam'
+  | 'getTeam'
+  | 'listTeams'
+  | 'countTeamsByWorkspace'
+  | 'getTeamWithWorkspace'
+  | 'listTeamsWithWorkspace'
+  | 'deleteTeam'
 >;
 
 /** 构造团队与工作区 join 查询，避免多个读取方法重复列清单。 */

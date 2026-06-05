@@ -82,6 +82,25 @@ describe('WorkspaceService', () => {
     expect(service.resolveOrCreate({ workspaceId: workspace.id }).id).toBe(workspace.id);
   });
 
+  it('only deletes workspace records through automatic empty-workspace cleanup', async () => {
+    const workspace = await service.selectDirectory({ relativePath: 'project' });
+
+    expect(() => service.delete({ workspaceId: workspace.id })).toThrow('Workspace cannot be deleted directly');
+    expect(service.deleteIfUnreferenced({
+      workspaceId: workspace.id,
+      teamCount: 1,
+      conversationCount: 0,
+    })).toEqual({ deleted: false });
+    expect(service.get(workspace.id)).not.toBeNull();
+
+    expect(service.deleteIfUnreferenced({
+      workspaceId: workspace.id,
+      teamCount: 0,
+      conversationCount: 0,
+    })).toEqual({ deleted: true });
+    expect(service.get(workspace.id)).toBeNull();
+  });
+
   it('rejects paths escaping roots and workspace directories', () => {
     expect(() => resolveInsideRoot(rootDir, '../outside')).toThrow('Path escapes project root');
     expect(() => resolveInsideWorkspace(projectDir, '../outside.txt')).toThrow('Path escapes workspace');
