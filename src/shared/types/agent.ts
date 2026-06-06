@@ -53,123 +53,100 @@ export type AgentEventMemoryFields = {
   messageId?: string;
 };
 
+type AgentEventBase = {
+  id: string;
+  conversationId: string;
+  turnId: string;
+  at: number;
+};
+
+type AgentTurnStartedEventPayload = AgentEventBase & {
+  type: 'agent.turn.started';
+  backend: AgentBackend;
+};
+
+type AgentThinkingEventPayload = AgentEventBase & {
+  type: 'agent.thinking';
+};
+
+type AgentPlanEventPayload = AgentEventBase & {
+  type: 'agent.plan';
+  entries: string[];
+  raw?: unknown;
+};
+
+type AgentReplyDeltaEventPayload = AgentEventBase & {
+  type: 'agent.reply.delta';
+  messageId: string;
+  delta: string;
+};
+
+type AgentReplyDoneEventPayload = AgentEventBase & {
+  type: 'agent.reply.done';
+  messageId: string;
+  content: string;
+};
+
+type AgentToolBase = AgentEventBase & {
+  toolCallId: string;
+  toolName?: string;
+  title?: string;
+  kind?: string;
+  status?: string;
+  raw?: unknown;
+};
+
+type AgentToolCallEventPayload = AgentToolBase & {
+  type: 'agent.tool.call';
+  toolName: string;
+  input?: unknown;
+};
+
+type AgentToolUpdateEventPayload = AgentToolBase & {
+  type: 'agent.tool.update';
+  content?: unknown;
+};
+
+type AgentToolResultEventPayload = AgentToolBase & {
+  type: 'agent.tool.result';
+  output?: unknown;
+  isError?: boolean;
+};
+
+type AgentPermissionRequestEventPayload = AgentEventBase & {
+  type: 'agent.permission.request';
+  callId: string;
+  title: string;
+  body?: string;
+  options: PermissionOption[];
+};
+
+type AgentErrorEventPayload = AgentEventBase & {
+  type: 'agent.error';
+  source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
+  message: string;
+  detail?: unknown;
+};
+
+type AgentDoneEventPayload = AgentEventBase & {
+  type: 'agent.done';
+  status: ConversationStatus;
+  stopReason?: StopReason;
+};
+
 /** 标准化的 Agent 运行过程事件。 */
 export type AgentEventPayload =
-  | {
-      id: string;
-      type: 'agent.turn.started';
-      conversationId: string;
-      turnId: string;
-      backend: AgentBackend;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.thinking';
-      conversationId: string;
-      turnId: string;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.plan';
-      conversationId: string;
-      turnId: string;
-      entries: string[];
-      raw?: unknown;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.reply.delta';
-      conversationId: string;
-      turnId: string;
-      messageId: string;
-      delta: string;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.reply.done';
-      conversationId: string;
-      turnId: string;
-      messageId: string;
-      content: string;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.tool.call';
-      conversationId: string;
-      turnId: string;
-      toolCallId: string;
-      toolName: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      input?: unknown;
-      raw?: unknown;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.tool.update';
-      conversationId: string;
-      turnId: string;
-      toolCallId: string;
-      toolName?: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      content?: unknown;
-      raw?: unknown;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.tool.result';
-      conversationId: string;
-      turnId: string;
-      toolCallId: string;
-      toolName?: string;
-      title?: string;
-      kind?: string;
-      status?: string;
-      output?: unknown;
-      isError?: boolean;
-      raw?: unknown;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.permission.request';
-      conversationId: string;
-      turnId: string;
-      callId: string;
-      title: string;
-      body?: string;
-      options: PermissionOption[];
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.error';
-      conversationId: string;
-      turnId: string;
-      source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
-      message: string;
-      detail?: unknown;
-      at: number;
-    }
-  | {
-      id: string;
-      type: 'agent.done';
-      conversationId: string;
-      turnId: string;
-      status: ConversationStatus;
-      stopReason?: StopReason;
-      at: number;
-    };
+  | AgentTurnStartedEventPayload
+  | AgentThinkingEventPayload
+  | AgentPlanEventPayload
+  | AgentReplyDeltaEventPayload
+  | AgentReplyDoneEventPayload
+  | AgentToolCallEventPayload
+  | AgentToolUpdateEventPayload
+  | AgentToolResultEventPayload
+  | AgentPermissionRequestEventPayload
+  | AgentErrorEventPayload
+  | AgentDoneEventPayload;
 
 export type AgentEvent = AgentEventPayload & AgentEventMemoryFields;
 

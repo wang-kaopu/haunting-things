@@ -57,59 +57,94 @@ type AcpRuntimeEvents = {
   }];
 };
 
-type AcpRuntimeAgentEventInput =
-  | { type: 'agent.turn.started'; backend: AgentBackend }
-  | { type: 'agent.thinking' }
-  | { type: 'agent.plan'; entries: string[]; raw?: unknown }
-  | { type: 'agent.reply.delta'; messageId: string; delta: string }
-  | { type: 'agent.reply.done'; messageId: string; content: string }
-  | {
-    type: 'agent.tool.call';
-    toolCallId: string;
-    toolName: string;
-    title?: string;
-    kind?: string;
-    status?: string;
-    input?: unknown;
-    raw?: unknown;
-  }
-  | {
-    type: 'agent.tool.update';
-    toolCallId: string;
-    toolName?: string;
-    title?: string;
-    kind?: string;
-    status?: string;
-    content?: unknown;
-    raw?: unknown;
-  }
-  | {
-    type: 'agent.tool.result';
-    toolCallId: string;
-    toolName?: string;
-    title?: string;
-    kind?: string;
-    status?: string;
-    output?: unknown;
-    isError?: boolean;
-    raw?: unknown;
-  }
-  | {
-    type: 'agent.permission.request';
-    callId: string;
-    title: string;
-    body?: string;
-    options: PermissionRequest['options'];
-    toolCall?: unknown;
-    rawInput?: unknown;
-  }
-  | {
-    type: 'agent.error';
-    source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
-    message: string;
-    detail?: unknown;
-  }
-  | { type: 'agent.done'; status: ConversationStatus; stopReason?: StopReason };
+interface AgentTurnStartedEventInput {
+  type: 'agent.turn.started';
+  backend: AgentBackend;
+}
+
+interface AgentThinkingEventInput {
+  type: 'agent.thinking';
+}
+
+interface AgentPlanEventInput {
+  type: 'agent.plan';
+  entries: string[];
+  raw?: unknown;
+}
+
+interface AgentReplyDeltaEventInput {
+  type: 'agent.reply.delta';
+  messageId: string;
+  delta: string;
+}
+
+interface AgentReplyDoneEventInput {
+  type: 'agent.reply.done';
+  messageId: string;
+  content: string;
+}
+
+interface AgentToolBase {
+  toolCallId: string;
+  toolName?: string;
+  title?: string;
+  kind?: string;
+  status?: string;
+  raw?: unknown;
+}
+
+interface AgentToolCallEventInput extends AgentToolBase {
+  type: 'agent.tool.call';
+  toolName: string;
+  input?: unknown;
+}
+
+interface AgentToolUpdateEventInput extends AgentToolBase {
+  type: 'agent.tool.update';
+  content?: unknown;
+}
+
+interface AgentToolResultEventInput extends AgentToolBase {
+  type: 'agent.tool.result';
+  output?: unknown;
+  isError?: boolean;
+}
+
+interface AgentPermissionRequestEventInput {
+  type: 'agent.permission.request';
+  callId: string;
+  title: string;
+  body?: string;
+  options: PermissionRequest['options'];
+  toolCall?: unknown;
+  rawInput?: unknown;
+}
+
+interface AgentErrorEventInput {
+  type: 'agent.error';
+  source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
+  message: string;
+  detail?: unknown;
+}
+
+interface AgentDoneEventInput {
+  type: 'agent.done';
+  status: ConversationStatus;
+  stopReason?: StopReason;
+}
+
+export type AcpRuntimeAgentEventInput =
+  | AgentTurnStartedEventInput
+  | AgentThinkingEventInput
+  | AgentPlanEventInput
+  | AgentReplyDeltaEventInput
+  | AgentReplyDoneEventInput
+  | AgentToolCallEventInput
+  | AgentToolUpdateEventInput
+  | AgentToolResultEventInput
+  | AgentPermissionRequestEventInput
+  | AgentErrorEventInput
+  | AgentDoneEventInput;
 
 /** 追踪单条 SDK 请求，用于进程退出时批量 reject。 */
 type PendingRequest = {
