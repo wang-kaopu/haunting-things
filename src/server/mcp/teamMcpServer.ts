@@ -6,6 +6,7 @@ import type { AgentBackend, ConversationCommands, MailboxMessage, Team, TeamAgen
 import { createId } from '@server/id';
 import { createLogger } from '@server/utils/logger';
 
+/** stdio MCP 代理发往本地 TCP bridge 的请求载荷。 */
 type TcpRequest = {
   authToken?: string;
   tool?: string;
@@ -13,6 +14,7 @@ type TcpRequest = {
   fromSlotId?: string;
 };
 
+/** Agent 侧 stdio MCP 代理连接 Team TCP bridge 所需的启动配置。 */
 export type StdioMcpConfig = {
   name: string;
   command: string;
@@ -20,6 +22,7 @@ export type StdioMcpConfig = {
   env: Record<string, string>;
 };
 
+/** Team MCP bridge 调用 TeamService 所需的业务回调。 */
 type TeamCallbacks = {
   addAgent: (input: { teamId: string; name: string; backend: AgentBackend; model?: string }) => Promise<TeamAgent>;
   taskCreate: (input: {
@@ -55,6 +58,9 @@ export class TeamMcpServer {
     private readonly callbacks: TeamCallbacks
   ) { }
 
+  /**
+   * 启动本地 TCP bridge，供 Team 内 Agent 的 MCP stdio 代理连接。
+   */
   async start(): Promise<void> {
     if (this.server) return;
     this.server = net.createServer((socket) => this.handleSocket(socket));
@@ -76,6 +82,9 @@ export class TeamMcpServer {
     this.port = 0;
   }
 
+  /**
+   * 为指定团队成员生成 stdio MCP server 的启动命令和环境变量。
+   */
   getStdioConfig(slotId: string): StdioMcpConfig {
     const team = this.resolveTeam();
     const invocation = resolveTeamMcpStdioInvocation();
@@ -187,6 +196,7 @@ export class TeamMcpServer {
     return `Message queued for ${target.name}`;
   }
 
+  /** 处理 team_add_agent 工具调用并返回新成员摘要。 */
   private async addAgent(args: Record<string, unknown>): Promise<string> {
     const name = String(args.name || '').trim();
     const backend = String(args.backend || '').trim();

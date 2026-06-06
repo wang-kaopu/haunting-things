@@ -1,5 +1,6 @@
 import type React from 'react';
 
+/** 面板式弹窗的共享基础属性。 */
 type PanelDialogShellBaseProps = {
   open: boolean;
   titleId: string;
@@ -13,6 +14,7 @@ type PanelDialogShellBaseProps = {
   onClose: () => void;
 };
 
+/** 面板式弹窗骨架属性；表单模式要求提供提交回调。 */
 export type PanelDialogShellProps =
   | (PanelDialogShellBaseProps & {
       as?: 'section';

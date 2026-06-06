@@ -12,10 +12,12 @@ const COOKIE_NAME = 'hs_session';
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_ADMIN_PASSWORD = '123456';
 
+/** 认证服务启动后暴露给 UI 的初始账号状态。 */
 export type AuthState = {
   initialPassword: string | null;
 };
 
+/** JWT 中保存的最小用户身份信息。 */
 type TokenPayload = {
   userId: string;
   username: string;

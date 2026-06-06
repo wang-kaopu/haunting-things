@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AgentTurnPhase, ConversationCommands, ConversationMode, TeamAgent } from '@shared/types';
 import { formatAgentStatus, formatPhase } from '@renderer/shared/utils/format';
 
+/** 团队成员卡片展示的 Agent 状态、运行时快照和选中回调。 */
 export type TeamMemberCardProps = {
   agent: TeamAgent;
   active: boolean;

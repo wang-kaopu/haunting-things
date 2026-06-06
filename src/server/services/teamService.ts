@@ -25,6 +25,7 @@ type TeamSession = {
   mcpServer: TeamMcpServer;
 };
 
+/** 投递 mailbox 时附带的附件 ID，写库后再解析为附件引用。 */
 type DeliverMailboxMessage = MailboxMessage & {
   attachmentIds?: string[];
 };
@@ -787,6 +788,7 @@ export class TeamService {
     ]);
   }
 
+  /** 将内部 mailbox 消息包装成前端时间线条目。 */
   private buildMailboxEntry(team: Team, message: MailboxMessage): TeamMailboxEntry {
     return {
       message,
@@ -796,11 +798,13 @@ export class TeamService {
     };
   }
 
+  /** 根据 slotId 找到团队成员展示名，用户消息固定显示 user。 */
   private resolveAgentName(team: Team, agentId: string): string {
     if (agentId === 'user') return 'user';
     return team.agents.find((agent) => agent.slotId === agentId)?.name ?? agentId;
   }
 
+  /** 通过 conversationId 反查所属团队和成员。 */
   private findTeamAgentByConversationId(conversationId: string): { team: Team; agent: TeamAgent } | null {
     for (const team of this.teamsRepo.listTeams()) {
       const agent = team.agents.find((item) => item.conversationId === conversationId);
@@ -809,6 +813,7 @@ export class TeamService {
     return null;
   }
 
+  /** 为 mailbox 消息批量挂载附件引用，避免逐条查询。 */
   private withMailboxAttachments(messages: MailboxMessage[]): MailboxMessage[] {
     if (!this.attachmentsRepo || messages.length === 0) return messages;
     const byMessageId = this.attachmentsRepo.listMailboxAttachmentsForMessages(messages.map((item) => item.id));
@@ -874,6 +879,7 @@ function formatMailbox(
   ].join('\n');
 }
 
+/** 将 mailbox 未读消息格式化为中文 UI 提示。 */
 function formatMailboxDisplay(messages: MailboxMessage[], team: Team): string {
   if (messages.length === 0) {
     return '无新的团队消息。';
@@ -884,11 +890,13 @@ function formatMailboxDisplay(messages: MailboxMessage[], team: Team): string {
     .join('\n');
 }
 
+/** 将 mailbox 发送方 slotId 格式化为展示名。 */
 function formatMailboxSender(agentId: string, team: Team): string {
   if (agentId === 'user') return 'user';
   return team.agents.find((item) => item.slotId === agentId)?.name ?? agentId;
 }
 
+/** 为带图片附件的 mailbox 消息追加本地化附件提示。 */
 function formatAttachmentNote(message: MailboxMessage, locale: 'en' | 'zh'): string {
   const imageCount = message.attachments?.filter((item) => item.kind === 'image').length ?? 0;
   if (imageCount === 0) return '';

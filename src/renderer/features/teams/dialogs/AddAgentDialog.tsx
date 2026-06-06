@@ -3,6 +3,7 @@ import type React from 'react';
 import type { AgentBackend } from '@shared/types';
 import type { AddAgentInput } from '@renderer/shared/types/ui';
 
+/** 添加 Agent 弹窗的默认值、提交状态和关闭/提交回调。 */
 export type AddAgentDialogProps = {
   open: boolean;
   disabled?: boolean;
@@ -12,6 +13,7 @@ export type AddAgentDialogProps = {
   onSubmit: (input: AddAgentInput) => Promise<void>;
 };
 
+/** 添加 Agent 表单当前填写的名称、后端和模型。 */
 export type AddAgentFormState = {
   name: string;
   backend: AgentBackend;

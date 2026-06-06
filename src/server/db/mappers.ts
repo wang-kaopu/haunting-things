@@ -232,6 +232,7 @@ function parseTeamAgents(value: unknown): Team['agents'] {
   }
 }
 
+/** 从 conversation join 查询结果中还原 workspace 子对象字段。 */
 function readWorkspaceJoinRow(row: any): any {
   return {
     id: row.workspace__id,

@@ -219,6 +219,7 @@ function redactObject(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, blocked.has(key) ? '***' : value]));
 }
 
+/** 将 Bridge 日志值转换为一行可读文本。 */
 function formatBridgeValue(value: unknown): string {
   if (value == null) return String(value);
   if (typeof value === 'string') return JSON.stringify(value);

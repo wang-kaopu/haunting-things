@@ -22,6 +22,7 @@ export function ImageAttachmentPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  /** 从文件选择或拖拽结果中筛选图片并交给上层上传。 */
   async function addFiles(files: FileList | File[]): Promise<void> {
     const images = Array.from(files).filter((file) => file.type.startsWith('image/'));
     if (images.length === 0) return;

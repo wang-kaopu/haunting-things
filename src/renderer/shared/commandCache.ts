@@ -2,8 +2,10 @@ import type { AcpAvailableCommand, AgentBackend, ConversationCommands } from '@s
 
 const STORAGE_KEY = 'haunting-souls.command-cache.v1';
 
+/** 按 Agent 后端保存的命令快照缓存。 */
 type CommandCacheRecord = Partial<Record<AgentBackend, CachedCommands>>;
 
+/** 本地缓存中的命令列表和更新时间。 */
 type CachedCommands = {
   commands: AcpAvailableCommand[];
   updatedAt: number;
@@ -32,6 +34,7 @@ export function writeCachedCommands(backend: AgentBackend, snapshot: Conversatio
   writeCache(cache);
 }
 
+/** 从 localStorage 读取命令缓存，异常时返回空缓存。 */
 function readCache(): CommandCacheRecord {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -44,6 +47,7 @@ function readCache(): CommandCacheRecord {
   }
 }
 
+/** 将命令缓存写入 localStorage；不可用时静默降级。 */
 function writeCache(cache: CommandCacheRecord): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));

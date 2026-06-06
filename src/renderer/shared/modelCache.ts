@@ -2,8 +2,10 @@ import type { AcpModelInfo, AgentBackend, ConversationModels } from '@shared/typ
 
 const STORAGE_KEY = 'haunting-souls.model-cache.v1';
 
+/** 按 Agent 后端保存的模型快照缓存。 */
 type ModelCacheRecord = Partial<Record<AgentBackend, CachedModels>>;
 
+/** 本地缓存中的模型列表、当前模型和更新时间。 */
 type CachedModels = {
   currentModelId?: string;
   models: AcpModelInfo[];
@@ -36,6 +38,7 @@ export function writeCachedModels(backend: AgentBackend, snapshot: ConversationM
   writeCache(cache);
 }
 
+/** 从 localStorage 读取模型缓存，异常时返回空缓存。 */
 function readCache(): ModelCacheRecord {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -48,6 +51,7 @@ function readCache(): ModelCacheRecord {
   }
 }
 
+/** 将模型缓存写入 localStorage；不可用时静默降级。 */
 function writeCache(cache: ModelCacheRecord): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));

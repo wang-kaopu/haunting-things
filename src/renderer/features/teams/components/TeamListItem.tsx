@@ -2,6 +2,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import type { Team } from '@shared/types';
 
+/** 单个团队条目的团队数据、选中态和操作回调。 */
 export type TeamListItemProps = {
   team: Team;
   active: boolean;

@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { WorkspaceEntry } from '@shared/types';
 
+/** 工作区文件树的顶层条目集合。 */
 export type WorkspaceTreeProps = {
   entries: WorkspaceEntry[];
 };

@@ -13,6 +13,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   next();
 }
 
+/** 将常见 HTTP 状态码转换为日志中展示的短文本。 */
 function statusMessage(statusCode: number): string {
   if (statusCode >= 200 && statusCode < 300) return 'OK';
   if (statusCode === 304) return 'Not Modified';

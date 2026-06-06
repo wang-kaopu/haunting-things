@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { ServerInfo } from '@shared/types';
 
+/** 远程访问设置项需要的服务状态和切换回调。 */
 export type RemoteAccessSettingProps = {
   serverInfo: ServerInfo | null;
   loading?: boolean;
@@ -70,6 +71,7 @@ export function RemoteAccessSetting({
   );
 }
 
+/** 展示一个远程访问地址，并提供复制入口。 */
 function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
   return (
     <div className="remote-url-row">
@@ -89,6 +91,7 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
   );
 }
 
+/** 根据地址主机名判断远程地址来源标签。 */
 function formatRemoteUrlLabel(url: string): string {
   try {
     const { hostname } = new URL(url);
@@ -103,6 +106,7 @@ function formatRemoteUrlLabel(url: string): string {
   }
 }
 
+/** 判断 IPv4 地址是否位于 Tailscale CGNAT 网段。 */
 function isTailscaleIp(ip: string): boolean {
   const [a, b] = ip.split('.').map(Number);
   return a === 100 && b >= 64 && b <= 127;

@@ -1,5 +1,6 @@
 import type { AgentEvent } from '@shared/types';
 
+/** Agent 事件在持久化、实时推送和活动提示中的处理策略。 */
 export type AgentEventPolicy = {
   persist: boolean;
   realtime: boolean;

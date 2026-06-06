@@ -3,6 +3,7 @@ import type React from 'react';
 import type { ConversationModels, TeamAgent } from '@shared/types';
 import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
+/** Agent 模型选择器需要的模型快照与设置回调。 */
 export type ModelPickerProps = {
   agent?: TeamAgent | null;
   models?: ConversationModels | null;
@@ -22,6 +23,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
     setError('');
   }, [agent?.conversationId, current]);
 
+  /** 提交新的模型选择，并避免重复提交当前模型。 */
   async function submit(model: string): Promise<void> {
     const nextModel = model.trim();
     if (!nextModel || submitting || nextModel === current) return;

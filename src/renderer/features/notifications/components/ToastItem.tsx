@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { AppNotification } from '@renderer/shared/types/ui';
 
+/** 单条通知项的内容和关闭回调。 */
 export type ToastItemProps = {
   item: AppNotification;
   onClose: () => void;

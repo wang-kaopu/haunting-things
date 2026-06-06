@@ -3,6 +3,7 @@ import type { Team } from '@shared/types';
 import { useWorkspaceTree } from '@renderer/features/workspace/hooks/useWorkspaceTree';
 import { WorkspaceTree } from '@renderer/features/workspace/WorkspaceTree';
 
+/** 工作区侧栏面板需要的当前团队上下文。 */
 export type WorkspacePanelProps = {
   team: Team;
 };

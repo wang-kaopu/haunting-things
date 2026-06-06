@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { ConversationSummary } from '@shared/types';
 
+/** 工作区内会话摘要列表的数据输入。 */
 export type ConversationSummaryListProps = {
   conversations: ConversationSummary[];
 };

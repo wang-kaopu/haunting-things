@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { Team, Workspace } from '@shared/types';
 import { TeamListItem } from '@renderer/features/teams/components/TeamListItem';
 
+/** 侧边栏团队列表的分组数据、选中态和团队操作回调。 */
 export type TeamListProps = {
   teams: Team[];
   workspaces: Workspace[];
@@ -53,6 +54,7 @@ export function TeamList({
   );
 }
 
+/** 团队按工作区聚合后的侧边栏分组。 */
 type TeamGroup = {
   key: string;
   label: string;

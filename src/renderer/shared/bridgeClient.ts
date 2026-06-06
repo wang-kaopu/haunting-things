@@ -2,19 +2,25 @@ import type { BridgeEventName, BridgeInvokeName, BridgeServerMessage } from '@sh
 import { createBridgeId } from '@shared/bridge';
 import type { EventMap, InvokeMap } from '@shared/types';
 
+/** 等待后端 Bridge RPC 响应的 Promise 处理器。 */
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
 };
 
+/** Bridge 事件订阅回调，按事件名推导 payload。 */
 type EventHandler<Name extends BridgeEventName> = (data: EventMap[Name]) => void;
 
+/** 浏览器端 Bridge 客户端，负责 RPC 调用、事件订阅和 WebSocket 重连。 */
 class BrowserBridge {
   private socket: WebSocket | null = null;
   private readonly pending = new Map<string, Pending>();
   private readonly handlers = new Map<string, Set<(data: unknown) => void>>();
   private reconnectTimer: number | null = null;
 
+  /**
+   * 调用后端 Bridge RPC，并按 API 名称推导请求参数和返回值。
+   */
   invoke<Name extends BridgeInvokeName>(
     name: Name,
     data: InvokeMap[Name]['params']
@@ -34,6 +40,9 @@ class BrowserBridge {
     });
   }
 
+  /**
+   * 订阅后端 Bridge 推送事件，并返回取消订阅函数。
+   */
   on<Name extends BridgeEventName>(name: Name, handler: EventHandler<Name>): () => void {
     const set = this.handlers.get(name) ?? new Set();
     set.add(handler as (data: unknown) => void);
@@ -42,6 +51,7 @@ class BrowserBridge {
     return () => set.delete(handler as (data: unknown) => void);
   }
 
+  /** 建立或复用 WebSocket 连接。 */
   private connect(): void {
     if (
       this.socket &&
@@ -68,6 +78,7 @@ class BrowserBridge {
     });
   }
 
+  /** 在连接打开后发送已序列化的 RPC 调用消息。 */
   private send(payload: string, meta: { id: string; name: string }): void {
     const socket = this.socket;
     if (!socket) return;
@@ -96,6 +107,7 @@ class BrowserBridge {
     );
   }
 
+  /** 分发后端返回的 RPC 结果或实时事件。 */
   private handleMessage(raw: string): void {
     let message: BridgeServerMessage;
     try {
@@ -118,6 +130,7 @@ class BrowserBridge {
     }
   }
 
+  /** WebSocket 断开后延迟重连，避免立即自旋。 */
   private scheduleReconnect(): void {
     if (this.reconnectTimer !== null) return;
     this.reconnectTimer = window.setTimeout(() => {

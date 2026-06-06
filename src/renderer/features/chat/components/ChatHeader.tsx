@@ -3,6 +3,7 @@ import type { AgentTurnPhase, ConversationUsage, Team, TeamAgent } from '@shared
 import { formatPhase } from '@renderer/shared/utils/format';
 import { UsageChip } from '@renderer/features/chat/components/UsageChip';
 
+/** 聊天顶部栏展示的团队、Agent、阶段和移动端侧栏入口。 */
 export type ChatHeaderProps = {
   team: Team | null;
   activeAgent: TeamAgent | null;

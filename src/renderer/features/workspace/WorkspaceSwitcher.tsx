@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { Workspace } from '@shared/types';
 
+/** 工作区过滤器的可选工作区、当前选择和创建入口。 */
 export type WorkspaceSwitcherProps = {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;

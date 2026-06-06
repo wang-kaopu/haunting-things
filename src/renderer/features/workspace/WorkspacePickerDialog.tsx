@@ -3,6 +3,7 @@ import type { Workspace } from '@shared/types';
 import { useWorkspacePicker } from '@renderer/features/workspace/hooks/useWorkspacePicker';
 import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 
+/** 工作区选择弹窗的打开状态和选中目录回调。 */
 export type WorkspacePickerDialogProps = {
   open: boolean;
   onClose?: () => void;
@@ -28,6 +29,7 @@ export function WorkspacePickerDialog({
 
   if (!open) return null;
 
+  /** 兼容受控和非受控两种弹窗关闭方式。 */
   function close(): void {
     if (onClose) {
       onClose();
@@ -36,6 +38,7 @@ export function WorkspacePickerDialog({
     onOpenChange?.(false);
   }
 
+  /** 将当前浏览目录注册为工作区并关闭弹窗。 */
   async function handleSelectCurrentDirectory(): Promise<void> {
     const workspace = await selectCurrentDirectory();
     onSelect(workspace);

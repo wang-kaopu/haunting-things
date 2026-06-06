@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+/** Markdown 代码块的源码文本与可选语言标记。 */
 export type CodeBlockProps = {
   code: string;
   language?: string;

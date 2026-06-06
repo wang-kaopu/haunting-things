@@ -2,6 +2,7 @@ import type React from 'react';
 import type { ServerInfo } from '@shared/types';
 import { RemoteAccessSetting } from '@renderer/features/settings/components/RemoteAccessSetting';
 
+/** 设置面板聚合展示的服务信息与偏好设置回调。 */
 export type SettingsPanelProps = {
   serverInfo: ServerInfo | null;
   loading?: boolean;

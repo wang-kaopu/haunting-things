@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { initializeSchema } from '@server/db/schema';
 
+/** better-sqlite3 数据库连接类型。 */
 export type Db = Database.Database;
 
 /**

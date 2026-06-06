@@ -5,6 +5,7 @@ export type TeamSendInvocation =
   | { name: 'team.sendMessage'; params: { teamId: string; content: string; files?: string[] } }
   | { name: 'team.sendMessageToAgent'; params: { teamId: string; slotId: string; content: string; files?: string[] } };
 
+/** Team 发送框提交的正文和附件 ID。 */
 export type TeamSendPayload = {
   content: string;
   files?: string[];

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 
+/** 单次 HTTP 请求在异步调用链中携带的追踪上下文。 */
 export type RequestContext = {
   requestId: string;
   userId?: string;
@@ -38,6 +39,7 @@ export function createRequestId(): string {
   return randomBytes(8).readBigUInt64BE().toString();
 }
 
+/** 从 Express 请求头中读取单值字符串，数组头取第一项。 */
 function readHeader(req: Request, name: string): string {
   const value = req.headers[name];
   if (Array.isArray(value)) return value[0] ?? '';

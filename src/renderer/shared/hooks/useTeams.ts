@@ -138,6 +138,7 @@ export function useTeams(): UseTeamsResult {
   };
 }
 
+/** 将会话运行状态映射成侧边栏 Agent 状态。 */
 function conversationStatusToAgentStatus(status: ConversationStatus): TeamAgent['status'] {
   if (status === 'running') return 'active';
   if (status === 'failed') return 'failed';

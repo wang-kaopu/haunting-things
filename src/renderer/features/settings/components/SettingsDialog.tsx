@@ -3,6 +3,7 @@ import type { ServerInfo } from '@shared/types';
 import { SettingsPanel } from '@renderer/features/settings/components/SettingsPanel';
 import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 
+/** 设置弹窗的打开状态、服务信息和远程访问切换入口。 */
 export type SettingsDialogProps = {
   open: boolean;
   serverInfo: ServerInfo | null;

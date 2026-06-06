@@ -5,6 +5,7 @@ const PORT = Number.parseInt(process.env.PORT || '25808', 10);
 let serverProcess: ChildProcess | null = null;
 let windowRef: BrowserWindow | null = null;
 
+/** 确保内置 HTTP 服务已启动，桌面窗口才能加载本地地址。 */
 async function ensureServer(): Promise<void> {
   if (await isServerReady()) return;
   serverProcess = spawn(process.execPath, ['dist-server/server/index.js'], {
@@ -18,6 +19,7 @@ async function ensureServer(): Promise<void> {
   throw new Error('Server did not become ready');
 }
 
+/** 探测本地 HTTP 服务是否已经能响应认证接口。 */
 async function isServerReady(): Promise<boolean> {
   try {
     const res = await fetch(`http://127.0.0.1:${PORT}/api/auth/user`);

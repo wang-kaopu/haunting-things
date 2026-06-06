@@ -2,6 +2,7 @@ import type React from 'react';
 import type { ConversationCommands } from '@shared/types';
 import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
+/** Agent 命令下拉菜单的命令快照与选择回调。 */
 export type AgentCommandsMenuProps = {
   commands?: ConversationCommands | null;
   disabled?: boolean;
@@ -17,6 +18,7 @@ export function AgentCommandsMenu({
   const commandList = Array.isArray(commands?.commands) ? commands.commands : [];
   const count = commandList.length;
 
+  /** 规范化命令名后交给发送框插入。 */
   function selectCommand(commandName: string): void {
     const normalized = commandName.trim();
     if (!normalized) return;

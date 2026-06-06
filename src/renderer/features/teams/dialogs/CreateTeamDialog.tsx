@@ -5,6 +5,7 @@ import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 import type { CreateTeamInput } from '@renderer/shared/types/ui';
 
+/** 创建团队弹窗的打开状态、默认工作区和提交回调。 */
 export type CreateTeamDialogProps = {
   open: boolean;
   defaultWorkspaceId?: string | null;
@@ -12,6 +13,7 @@ export type CreateTeamDialogProps = {
   onSubmit: (input: CreateTeamInput) => Promise<void>;
 };
 
+/** 创建团队表单当前填写的名称、Leader 后端和工作区。 */
 export type CreateTeamFormState = {
   name: string;
   leaderBackend: AgentBackend;

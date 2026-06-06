@@ -18,6 +18,7 @@ import { useTeams } from '@renderer/shared/hooks/useTeams';
 import type { AddAgentInput, CreateTeamInput } from '@renderer/shared/types/ui';
 import { normalizePermissionRequest, normalizeWorkspace } from '@renderer/shared/utils/backendData';
 
+/** 主工作台接收的登录用户与退出回调。 */
 export type WorkbenchProps = {
   user: { id: string; username: string };
   onLogout: () => void;
@@ -97,11 +98,13 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     };
   }, []);
 
+  /** 退出当前登录会话，并让应用回到登录页。 */
   async function logout(): Promise<void> {
     await fetch('/logout', { method: 'POST', credentials: 'include' });
     onLogout();
   }
 
+  /** 创建团队后切换到新团队，并刷新工作区列表。 */
   async function createTeam(input: CreateTeamInput): Promise<void> {
     const team = await teamsState.createTeam(input);
     setActiveWorkspaceId(team.workspaceId || null);
@@ -118,6 +121,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     setCreateTeamOpen(true);
   }
 
+  /** 向当前团队添加 Agent，并立即选中新成员。 */
   async function addAgent(input: AddAgentInput): Promise<void> {
     if (!active.activeTeam) return;
     const agent = await teamsState.addAgent(active.activeTeam.id, input);
@@ -126,12 +130,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.push({ title: 'Agent 已添加', message: agent.name, level: 'success' });
   }
 
+  /** 删除团队后刷新工作区派生数据并推送通知。 */
   async function deleteTeam(teamId: string): Promise<void> {
     await teamsState.deleteTeam(teamId);
     await refreshWorkspaces();
     notifications.push({ title: '团队已删除', message: '团队和成员已移除。', level: 'warning' });
   }
 
+  /** 切换当前 Agent 的模型，并同步团队状态。 */
   async function setModel(model: string): Promise<void> {
     if (!active.activeTeam || !active.activeAgent) return;
     if (active.activeAgent.model === model.trim()) return;
@@ -140,6 +146,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.push({ title: '模型已切换', message: model.trim(), level: 'success' });
   }
 
+  /** 切换当前 Agent 的权限模式。 */
   async function setMode(mode: string): Promise<void> {
     if (!active.activeAgent?.conversationId) return;
     const nextMode = mode.trim();
@@ -151,6 +158,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.push({ title: '权限模式已切换', message: nextMode, level: 'success' });
   }
 
+  /** 将权限请求加入队列；同一会话和 callId 的请求会被更新。 */
   function enqueuePermission(request: PermissionRequest): void {
     setPermissionQueue((current) => {
       const index = current.findIndex((item) => item.conversationId === request.conversationId && item.callId === request.callId);
@@ -161,12 +169,14 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     });
   }
 
+  /** 从队列中移除已经处理或关闭的权限请求。 */
   function removePermission(request: PermissionRequest): void {
     setPermissionQueue((current) =>
       current.filter((item) => item.conversationId !== request.conversationId || item.callId !== request.callId)
     );
   }
 
+  /** 将用户选择提交给后端，并根据结果关闭或保留权限提示。 */
   async function respondToPermission(request: PermissionRequest, response: PermissionResponse): Promise<void> {
     try {
       const result = await bridge.invoke('conversation.respondPermission', {
@@ -300,6 +310,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   );
 }
 
+/** 展示单个权限请求，并允许用户选择授权选项或关闭。 */
 function PermissionDialog({
   permission,
   onRespond,
@@ -397,6 +408,7 @@ function PermissionDialog({
   );
 }
 
+/** 权限弹窗展示标题所需的工具名元数据。 */
 type PermissionMeta = {
   toolName: string;
   displayTitle: string;

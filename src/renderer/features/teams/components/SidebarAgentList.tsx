@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AgentTurnPhase, TeamAgent } from '@shared/types';
 import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
 
+/** 侧边栏成员列表的 Agent 集合、选中项和运行阶段快照。 */
 export type SidebarAgentListProps = {
   agents: TeamAgent[];
   activeSlotId: string | null;

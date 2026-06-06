@@ -33,6 +33,7 @@ import type {
   WorkspaceRoot,
 } from '@shared/types';
 
+/** 后端未知 JSON 对象的宽松记录类型。 */
 type RecordValue = Record<string, unknown>;
 
 const agentBackends = new Set<AgentBackend>(['claude', 'codex']);
@@ -229,6 +230,7 @@ export function normalizeWorkspaceEntryList(value: unknown): WorkspaceEntry[] {
   return normalizeArray(value, normalizeWorkspaceEntry);
 }
 
+/** 归一化单个工作区文件树节点。 */
 function normalizeWorkspaceEntry(value: unknown): WorkspaceEntry | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -652,6 +654,7 @@ export function normalizeServerInfo(value: unknown): ServerInfo | null {
   };
 }
 
+/** 归一化 Team mailbox 原始消息。 */
 function normalizeMailboxMessage(value: unknown): MailboxMessage | null {
   const input = asRecord(value);
   if (!input) return null;
@@ -673,6 +676,7 @@ function normalizeMailboxMessage(value: unknown): MailboxMessage | null {
   };
 }
 
+/** 归一化 Agent 命令快照中的单个命令。 */
 function normalizeCommand(value: unknown): ConversationCommands['commands'][number] | null {
   const input = asRecord(value);
   const name = asString(input?.name);
@@ -684,6 +688,7 @@ function normalizeCommand(value: unknown): ConversationCommands['commands'][numb
   };
 }
 
+/** 归一化权限请求中的单个可选操作。 */
 function normalizePermissionOption(value: unknown): PermissionOption | null {
   const input = asRecord(value);
   const id = asString(input?.id);
@@ -695,41 +700,52 @@ function normalizePermissionOption(value: unknown): PermissionOption | null {
   };
 }
 
+/** 使用指定归一化函数过滤数组中的无效项。 */
 function normalizeArray<T>(value: unknown, normalize: (item: unknown) => T | null): T[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => normalize(item)).filter((item): item is T => item !== null);
 }
 
+/** 将未知值收窄为普通对象记录。 */
 function asRecord(value: unknown): RecordValue | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : null;
 }
 
+/** 读取字符串值；非字符串时返回兜底值。 */
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
+/** 读取可选字符串，空字符串视为缺失。 */
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
 }
 
+/** 读取可选有限数字。 */
 function optionalNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/** 读取有限数字；无效时返回兜底值。 */
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+/** 读取必填有限数字；无效时返回 null。 */
 function asRequiredNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+/** 读取布尔值；无效时返回兜底值。 */
 function asBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+/** 从字符串集合中读取枚举值；无效时返回必填兜底值。 */
 function enumValue<T extends string>(value: unknown, values: Set<T>, fallback: T): T;
+/** 从字符串集合中读取枚举值；无效时允许返回 undefined。 */
 function enumValue<T extends string>(value: unknown, values: Set<T>, fallback: T | undefined): T | undefined;
+/** 从字符串集合中读取枚举值，并应用重载签名定义的兜底策略。 */
 function enumValue<T extends string>(value: unknown, values: Set<T>, fallback: T | undefined): T | undefined {
   return typeof value === 'string' && values.has(value as T) ? (value as T) : fallback;
 }

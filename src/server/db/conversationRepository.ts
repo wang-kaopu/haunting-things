@@ -720,6 +720,7 @@ export class ConversationRepository {
     };
   }
 
+  /** 计算会话下一条消息的递增序号。 */
   private nextMessageSequence(conversationId: string): number {
     const row = this.db
       .prepare('SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM messages WHERE conversation_id = ?')
@@ -727,6 +728,7 @@ export class ConversationRepository {
     return row.next;
   }
 
+  /** 计算会话下一条 Agent 事件的递增序号。 */
   private nextAgentEventSequence(conversationId: string): number {
     const row = this.db
       .prepare('SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM agent_events WHERE conversation_id = ?')

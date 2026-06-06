@@ -1,13 +1,21 @@
 import pino from 'pino';
 import { getRequestContext } from '@server/utils/requestContext';
 
+/** 日志输出支持的级别。 */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/** 日志附加字段，写入前会经过敏感字段脱敏。 */
 export type LogFields = Record<string, unknown>;
+
+/** 日志输出格式：便于本地阅读的文本或机器可解析 JSON。 */
 export type LogFormat = 'pretty' | 'json';
+
+/** 单次日志写入的脱敏例外配置。 */
 export type LogOptions = {
   reveal?: string[];
 };
 
+/** 脱敏后准备输出的结构化日志载荷。 */
 type SanitizedPayload = {
   time: string;
   level: LogLevel;
@@ -26,22 +34,35 @@ const jsonLogger = pino({
 export class Logger {
   constructor(private readonly scope: string) {}
 
+  /**
+   * 写入调试日志；只有 LOG_LEVEL=debug 时才会输出。
+   */
   debug(message: string, fields: LogFields = {}, options: LogOptions = {}): void {
     this.write('debug', message, fields, options);
   }
 
+  /**
+   * 写入普通运行日志。
+   */
   info(message: string, fields: LogFields = {}, options: LogOptions = {}): void {
     this.write('info', message, fields, options);
   }
 
+  /**
+   * 写入需要关注但不一定中断流程的警告日志。
+   */
   warn(message: string, fields: LogFields = {}, options: LogOptions = {}): void {
     this.write('warn', message, fields, options);
   }
 
+  /**
+   * 写入错误日志，并保持同样的请求上下文和脱敏规则。
+   */
   error(message: string, fields: LogFields = {}, options: LogOptions = {}): void {
     this.write('error', message, fields, options);
   }
 
+  /** 应用请求上下文、字段脱敏和输出格式后写入日志。 */
   private write(level: LogLevel, message: string, fields: LogFields, options: LogOptions): void {
     if (level === 'debug' && process.env.LOG_LEVEL !== 'debug') return;
 
@@ -120,6 +141,7 @@ export function formatValue(value: unknown): string {
   }
 }
 
+/** 将 ISO 时间格式化为 pretty 日志行使用的本地时间文本。 */
 function formatTimestamp(isoTime: string): string {
   const date = new Date(isoTime);
   const pad = (value: number, size = 2) => String(value).padStart(size, '0');
@@ -129,6 +151,7 @@ function formatTimestamp(isoTime: string): string {
   ].join(' ');
 }
 
+/** 将请求上下文字段压缩成 pretty 日志中的方括号片段。 */
 function formatContext(payload: Pick<SanitizedPayload, 'request_id' | 'user_id'>): string {
   const entries = [
     payload.request_id ? `request_id=${payload.request_id}` : '',
@@ -137,6 +160,7 @@ function formatContext(payload: Pick<SanitizedPayload, 'request_id' | 'user_id'>
   return `[${entries.join(',')}]`;
 }
 
+/** 对单个日志字段值执行密钥和凭据脱敏。 */
 function sanitizeValue(key: string, value: unknown, revealKeys: Set<string>): unknown {
   if (revealKeys.has(normalizeKey(key))) return value;
   if (isSensitiveKey(key)) return '***';
@@ -148,6 +172,7 @@ function sanitizeValue(key: string, value: unknown, revealKeys: Set<string>): un
     .replace(/AKIA[0-9A-Z]{16}/g, 'AKIA***');
 }
 
+/** 判断字段名是否属于默认需要隐藏的敏感信息。 */
 function isSensitiveKey(key: string): boolean {
   const normalized = normalizeKey(key);
   return (
@@ -163,6 +188,7 @@ function isSensitiveKey(key: string): boolean {
   );
 }
 
+/** 归一化字段名，便于大小写和分隔符不敏感地匹配敏感字段。 */
 function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[_-]/g, '');
 }

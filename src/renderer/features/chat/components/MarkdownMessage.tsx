@@ -5,6 +5,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import { CodeBlock } from '@renderer/features/chat/components/CodeBlock';
 import '@renderer/features/chat/components/markdown.css';
 
+/** Agent 消息 Markdown 渲染所需的正文和附加样式。 */
 export type MarkdownMessageProps = {
   content: string;
   className?: string;

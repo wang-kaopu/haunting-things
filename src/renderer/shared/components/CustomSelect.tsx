@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type React from 'react';
 
+/** 自制下拉框的单个选项，支持描述、危险态和禁用态。 */
 export type CustomSelectOption = {
   value: string;
   label: string;
@@ -9,6 +10,7 @@ export type CustomSelectOption = {
   disabled?: boolean;
 };
 
+/** 自制下拉框的当前值、选项集合和变更回调。 */
 export type CustomSelectProps = {
   value: string;
   options: CustomSelectOption[];
@@ -46,12 +48,14 @@ export function CustomSelect({
   useEffect(() => {
     if (!open) return;
 
+    /** 点击组件外部时关闭下拉面板。 */
     function handlePointerDown(event: PointerEvent): void {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     }
 
+    /** 按 Escape 时关闭下拉面板。 */
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === 'Escape') {
         setOpen(false);
@@ -67,6 +71,7 @@ export function CustomSelect({
     };
   }, [open]);
 
+  /** 选择可用选项后触发上层变更并关闭面板。 */
   function selectValue(nextValue: string): void {
     if (disabled) return;
     const option = options.find((item) => item.value === nextValue);

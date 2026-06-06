@@ -9,6 +9,7 @@ import { saveServerPreferences } from '@server/serverPreferences';
 import { WebBridge } from '@server/app/bridge/webBridge';
 import type { ServerInfo } from '@shared/types';
 
+/** 当前运行中的 HTTP、WebSocket 和 Bridge 服务实例。 */
 export type ServerInstance = {
   server: http.Server;
   wss: WebSocketServer;
@@ -85,6 +86,9 @@ export class ServerManager {
     this.instance = null;
   }
 
+  /**
+   * 切换监听地址并在失败时回滚到上一个监听模式。
+   */
   private async restart(allowRemote: boolean): Promise<void> {
     if (allowRemote === this.instance?.allowRemote) return;
 
@@ -117,6 +121,9 @@ export class ServerManager {
     }
   }
 
+  /**
+   * 启动一组新的 HTTP、WebSocket 和 Bridge 实例。
+   */
   private async startInstance(allowRemote: boolean): Promise<void> {
     const host = resolveListenHost(allowRemote);
     const server = http.createServer(this.input.app);
@@ -150,6 +157,9 @@ export class ServerManager {
     };
   }
 
+  /**
+   * 关闭指定服务实例，并终止仍未正常关闭的 WebSocket 连接。
+   */
   private async stopInstance(instance: ServerInstance | null, reason: string): Promise<void> {
     if (!instance) return;
 
@@ -173,6 +183,7 @@ export class ServerManager {
   }
 }
 
+/** 返回远程访问开启时可展示给用户的局域网地址。 */
 function getServerUrls(port: number, allowRemote: boolean): string[] {
   const urls = new Set<string>();
   if (!allowRemote) return [];
@@ -180,6 +191,7 @@ function getServerUrls(port: number, allowRemote: boolean): string[] {
   return [...urls];
 }
 
+/** 枚举本机非回环 IPv4 地址，供远程访问 URL 展示使用。 */
 function getNonInternalIPv4(): string[] {
   const ips: string[] = [];
   for (const entries of Object.values(networkInterfaces())) {

@@ -62,6 +62,7 @@ export function SendBox({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
+  /** 发送当前正文和附件，并在成功后清空输入状态。 */
   async function submit(): Promise<void> {
     const trimmed = content.trim();
     if ((!trimmed && attachments.length === 0) || disabled || sending || uploading) return;
@@ -82,6 +83,7 @@ export function SendBox({
     }
   }
 
+  /** 请求后端停止当前 Agent 回合。 */
   async function cancelTurn(): Promise<void> {
     if (disabled || cancelling) return;
 
@@ -96,6 +98,7 @@ export function SendBox({
     }
   }
 
+  /** 批量上传图片附件，粘贴图片会自动补齐稳定文件名。 */
   async function uploadImages(files: File[], options: { pasted?: boolean } = {}): Promise<void> {
     if (disabled || files.length === 0) return;
     try {
@@ -116,6 +119,7 @@ export function SendBox({
     }
   }
 
+  /** 拦截剪贴板中的图片并上传为消息附件。 */
   async function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>): Promise<void> {
     const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
@@ -123,6 +127,7 @@ export function SendBox({
     await uploadImages(imageFiles, { pasted: true });
   }
 
+  /** 删除已经上传但尚未发送的附件。 */
   async function removeAttachment(id: string): Promise<void> {
     try {
       setError('');
@@ -133,6 +138,7 @@ export function SendBox({
     }
   }
 
+  /** 将选中的 slash command 插入到输入框开头并聚焦。 */
   function insertCommand(commandName: string): void {
     const normalized = commandName.trim().replace(/^\/+/, '');
     if (!normalized || disabled || sending) return;
@@ -211,6 +217,7 @@ export function SendBox({
   );
 }
 
+/** 判断当前阶段是否允许用户中断生成。 */
 function isCancellablePhase(phase?: AgentTurnPhase): boolean {
   return (
     phase === 'thinking' ||
@@ -221,6 +228,7 @@ function isCancellablePhase(phase?: AgentTurnPhase): boolean {
   );
 }
 
+/** 校验并上传单张图片，返回后端生成的附件引用。 */
 async function uploadImage(file: File, fileName?: string): Promise<AttachmentRef> {
   if (!ALLOWED_IMAGE_MIME.has(file.type)) {
     throw new Error(`不支持的图片类型：${file.type || file.name}`);
@@ -240,6 +248,7 @@ async function uploadImage(file: File, fileName?: string): Promise<AttachmentRef
   return attachment;
 }
 
+/** 为粘贴图片生成不会与当前附件冲突的文件名。 */
 function nextPastedImageName(file: File, usedNames: Set<string>): string {
   const extension = extensionForMime(file.type);
   for (let index = 0; ; index += 1) {
@@ -248,6 +257,7 @@ function nextPastedImageName(file: File, usedNames: Set<string>): string {
   }
 }
 
+/** 将允许的图片 MIME 类型映射为文件扩展名。 */
 function extensionForMime(mimeType: string): string {
   switch (mimeType) {
     case 'image/jpeg':
@@ -261,6 +271,7 @@ function extensionForMime(mimeType: string): string {
   }
 }
 
+/** 读取浏览器 File 内容，生成 attachment.upload 需要的 data URL。 */
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

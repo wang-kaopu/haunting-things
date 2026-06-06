@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ConversationMode, TeamAgent } from '@shared/types';
 import { CustomSelect } from '@renderer/shared/components/CustomSelect';
 
+/** 单个后端权限模式在选择器中的展示项。 */
 type PermissionModeOption = {
   id: string;
   label: string;
@@ -55,6 +56,7 @@ const CODEX_MODE_OPTIONS: PermissionModeOption[] = [
   },
 ];
 
+/** 权限模式选择器需要的当前 Agent、模式快照和设置回调。 */
 export type PermissionModePickerProps = {
   agent?: TeamAgent | null;
   mode?: ConversationMode | null;
@@ -83,6 +85,7 @@ export function PermissionModePicker({
     setError('');
   }, [agent?.conversationId]);
 
+  /** 提交新的权限模式，并忽略当前已生效的模式。 */
   async function submit(nextMode: string): Promise<void> {
     if (!agent || submitting || nextMode === current) {
       return;

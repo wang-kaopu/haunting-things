@@ -288,6 +288,7 @@ function assertNoLegacyWorkspaceSchema(db: Db): void {
   );
 }
 
+/** 在迁移过程中确保指定列存在，不存在时追加列定义。 */
 function ensureColumn(db: Db, table: string, column: string, definition: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (columns.some((item) => item.name === column)) return;

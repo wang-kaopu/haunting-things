@@ -9,11 +9,13 @@ import { phaseFromAgentEvent } from '@renderer/shared/utils/format';
 
 const MAX_AGENT_EVENTS_IN_MEMORY = 200;
 
+/** 当前会话流 Hook 需要的活动团队和 Agent。 */
 export type UseConversationStreamInput = {
   activeTeam: Team | null;
   activeAgent: TeamAgent | null;
 };
 
+/** 当前会话流 Hook 暴露的消息、事件、阶段和发送控制入口。 */
 export type UseConversationStreamResult = {
   messages: ChatMessage[];
   activePhase?: AgentTurnPhase;
@@ -165,10 +167,12 @@ export function useConversationStream({
   };
 }
 
+/** 判断取消当前回合时是否可以忽略的竞态错误。 */
 function isRecoverableCancelError(error?: string): boolean {
   return error === 'runtime not found' || error === 'no active prompt';
 }
 
+/** 合并单条流式消息，保证同一会话内按序展示。 */
 function mergeStreamMessage(current: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
   const scoped = current.filter((item) => item.conversationId === incoming.conversationId);
   const index = scoped.findIndex((item) => item.id === incoming.id);
@@ -181,6 +185,7 @@ function mergeStreamMessage(current: ChatMessage[], incoming: ChatMessage): Chat
   return next.sort(sortMessage);
 }
 
+/** 将首屏加载消息与实时流消息合并，避免覆盖更完整的内容。 */
 function mergeLoadedMessages(
   conversationId: string,
   loaded: ChatMessage[],
@@ -199,6 +204,7 @@ function mergeLoadedMessages(
   return Array.from(byId.values()).sort(sortMessage);
 }
 
+/** 在流式与持久化消息冲突时保留内容更完整的一条。 */
 function preferRicherMessage(oldMessage: ChatMessage, newMessage: ChatMessage): ChatMessage {
   const mergedSequence =
     newMessage.sequence > 0 ? newMessage.sequence : oldMessage.sequence > 0 ? oldMessage.sequence : newMessage.sequence;
@@ -221,6 +227,7 @@ function preferRicherMessage(oldMessage: ChatMessage, newMessage: ChatMessage): 
   return { ...newMessage, sequence: mergedSequence };
 }
 
+/** 按服务端序列排序，序列相同再使用创建时间兜底。 */
 function sortMessage(a: ChatMessage, b: ChatMessage): number {
   if (a.sequence !== b.sequence) return a.sequence - b.sequence;
   return a.createdAt - b.createdAt;

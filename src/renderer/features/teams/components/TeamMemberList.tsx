@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AgentTurnPhase, ConversationCommands, ConversationMode, TeamAgent } from '@shared/types';
 import { TeamMemberCard } from '@renderer/features/teams/components/TeamMemberCard';
 
+/** 团队成员列表的 Agent 集合、选中项和按会话索引的运行时快照。 */
 export type TeamMemberListProps = {
   agents: TeamAgent[];
   activeSlotId: string | null;

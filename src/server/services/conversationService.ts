@@ -815,10 +815,12 @@ export class ConversationService {
     return runtime;
   }
 
+  /** 根据附件 ID 列表读取可发送给 runtime 的附件记录。 */
   private resolveAttachments(ids: string[]): StoredAttachment[] {
     return this.attachmentsRepo?.listAttachments(ids) ?? [];
   }
 
+  /** 为聊天消息批量挂载附件引用，避免逐条查询。 */
   private withMessageAttachments(messages: ChatMessage[]): ChatMessage[] {
     if (!this.attachmentsRepo || messages.length === 0) return messages;
     const byMessageId = this.attachmentsRepo.listMessageAttachmentsForMessages(messages.map((item) => item.id));
@@ -913,6 +915,7 @@ export class ConversationService {
     };
   }
 
+  /** 从仓储读取带工作区信息的会话；测试替身缺少该方法时返回 null。 */
   private getConversationWithWorkspace(conversationId: string): ConversationWithWorkspace | null {
     if (typeof this.repo.getConversationWithWorkspace !== 'function') return null;
     return this.repo.getConversationWithWorkspace(conversationId);

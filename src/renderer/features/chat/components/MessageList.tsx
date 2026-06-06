@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AgentTurnPhase, ChatMessage, TeamAgent } from '@shared/types';
 import { MessageBubble } from '@renderer/features/chat/components/MessageBubble';
 
+/** 聊天消息列表的消息、当前阶段和 Agent 归属上下文。 */
 export type MessageListProps = {
   messages: ChatMessage[];
   activePhase?: AgentTurnPhase;

@@ -2,6 +2,7 @@ import type React from 'react';
 import type { ConversationUsage } from '@shared/types';
 import { formatUsagePercent, formatUsageShort } from '@renderer/shared/utils/format';
 
+/** 上下文用量徽标接收的用量快照。 */
 export type UsageChipProps = {
   usage?: ConversationUsage | null;
 };

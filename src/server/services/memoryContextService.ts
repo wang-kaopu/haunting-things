@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@shared/types';
 import type { MemoryContextRepositoryPort } from '@server/port/memoryContextRepositoryPort';
 
+/** 构造会话恢复兜底上下文时使用的读取范围和长度限制。 */
 export type MemoryContextBuildInput = {
   conversationId: string;
   beforeSequence?: number;

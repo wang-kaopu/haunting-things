@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { normalizeAuthResponse, normalizeAuthUser, readJsonResponse } from '@renderer/shared/utils/backendData';
 import { Workbench } from '@renderer/app/Workbench';
 
+/** 前端登录态中使用的最小用户信息。 */
 type AuthUser = {
   id: string;
   username: string;
 };
 
+/** 应用入口组件预留属性。 */
 export type AppProps = {};
 
 /**

@@ -36,6 +36,7 @@ import { createLogger } from '@server/utils/logger';
 import { getBridgePackageVersioned } from '@server/runtime/agentRegistry';
 import { ndjsonFromChildProcess } from '@server/runtime/ndjsonTransport';
 
+/** ACP runtime 内部 EventEmitter 事件名和参数元组映射。 */
 type AcpRuntimeEvents = {
   message: [ChatMessage];
   agentEvent: [AgentEvent];
@@ -57,33 +58,39 @@ type AcpRuntimeEvents = {
   }];
 };
 
+/** Agent 回合开始事件输入。 */
 interface AgentTurnStartedEventInput {
   type: 'agent.turn.started';
   backend: AgentBackend;
 }
 
+/** Agent 进入思考阶段事件输入。 */
 interface AgentThinkingEventInput {
   type: 'agent.thinking';
 }
 
+/** Agent 输出计划内容事件输入。 */
 interface AgentPlanEventInput {
   type: 'agent.plan';
   entries: string[];
   raw?: unknown;
 }
 
+/** Agent 回复流式增量事件输入。 */
 interface AgentReplyDeltaEventInput {
   type: 'agent.reply.delta';
   messageId: string;
   delta: string;
 }
 
+/** Agent 回复完成事件输入。 */
 interface AgentReplyDoneEventInput {
   type: 'agent.reply.done';
   messageId: string;
   content: string;
 }
 
+/** 工具调用、更新和结果事件共享的工具字段。 */
 interface AgentToolBase {
   toolCallId: string;
   toolName?: string;
@@ -93,23 +100,27 @@ interface AgentToolBase {
   raw?: unknown;
 }
 
+/** 工具调用开始事件输入；toolName 在调用开始时必须存在。 */
 interface AgentToolCallEventInput extends AgentToolBase {
   type: 'agent.tool.call';
   toolName: string;
   input?: unknown;
 }
 
+/** 工具执行过程更新事件输入。 */
 interface AgentToolUpdateEventInput extends AgentToolBase {
   type: 'agent.tool.update';
   content?: unknown;
 }
 
+/** 工具执行结果事件输入。 */
 interface AgentToolResultEventInput extends AgentToolBase {
   type: 'agent.tool.result';
   output?: unknown;
   isError?: boolean;
 }
 
+/** Agent 请求用户授权时的事件输入。 */
 interface AgentPermissionRequestEventInput {
   type: 'agent.permission.request';
   callId: string;
@@ -120,6 +131,7 @@ interface AgentPermissionRequestEventInput {
   rawInput?: unknown;
 }
 
+/** Runtime、模型或工具层错误事件输入。 */
 interface AgentErrorEventInput {
   type: 'agent.error';
   source: 'runtime' | 'model' | 'tool' | 'permission' | 'transport';
@@ -127,12 +139,14 @@ interface AgentErrorEventInput {
   detail?: unknown;
 }
 
+/** Agent 回合结束事件输入。 */
 interface AgentDoneEventInput {
   type: 'agent.done';
   status: ConversationStatus;
   stopReason?: StopReason;
 }
 
+/** Runtime 内部标准化后准备写入 Agent 事件流的输入事件。 */
 export type AcpRuntimeAgentEventInput =
   | AgentTurnStartedEventInput
   | AgentThinkingEventInput
@@ -152,16 +166,19 @@ type PendingRequest = {
   reject: (error: unknown) => void;
 };
 
+/** 发送给 ACP runtime 的用户文本、附件和可选恢复上下文。 */
 export type RuntimePromptInput = {
   text: string;
   attachments?: StoredAttachment[];
   restoreContext?: string | null;
 };
 
+/** 发送给 ACP prompt 的文本或图片块。 */
 type AcpPromptBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string };
 
+/** ACP session 启动或恢复后的会话状态摘要。 */
 type AcpSessionStartupResult = {
   sessionId: string;
   modeSource?: unknown;
@@ -396,6 +413,9 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     return true;
   }
 
+  /**
+   * 将用户文本和已存储附件转换为 ACP SDK 支持的 prompt block。
+   */
   private async buildPromptBlocks(input: RuntimePromptInput): Promise<AcpPromptBlock[]> {
     const blocks: AcpPromptBlock[] = [];
     if (input.text.trim()) {
@@ -1560,6 +1580,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
   }
 }
 
+/** 从事件输入中提取需要单独持久化和索引的字段。 */
 function extractAgentEventMemoryFields(event: AcpRuntimeAgentEventInput): Partial<AgentEvent> {
   switch (event.type) {
     case 'agent.reply.delta':
