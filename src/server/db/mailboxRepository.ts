@@ -53,8 +53,3 @@ export class MailboxRepository {
     return rows.map(rowToMailbox);
   }
 }
-
-export type MailboxRepositoryPort = Pick<
-  MailboxRepository,
-  'writeMailbox' | 'readUnreadAndMark' | 'listUnreadMailbox' | 'listMailbox'
->;

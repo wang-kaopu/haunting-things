@@ -19,8 +19,8 @@ import type {
   Workspace,
 } from '@shared/types';
 import { classifyAgentEvent } from '@server/agentEventPolicy';
-import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
-import type { ConversationRepositoryPort } from '@server/db/conversationRepository';
+import type { AttachmentRepositoryPort } from '@server/port/attachmentRepositoryPort';
+import type { ConversationRepositoryPort } from '@server/port/conversationRepositoryPort';
 import { toAttachmentRef } from '@server/db/mappers';
 import type { EventBus } from '@server/events';
 import { createId } from '@server/id';

@@ -59,18 +59,6 @@ export class TeamRepository {
   }
 }
 
-export type TeamRepositoryPort = Pick<
-  TeamRepository,
-  | 'createTeam'
-  | 'updateTeam'
-  | 'getTeam'
-  | 'listTeams'
-  | 'countTeamsByWorkspace'
-  | 'getTeamWithWorkspace'
-  | 'listTeamsWithWorkspace'
-  | 'deleteTeam'
->;
-
 /** 构造团队与工作区 join 查询，避免多个读取方法重复列清单。 */
 function teamWithWorkspaceSql(tail: string): string {
   return `

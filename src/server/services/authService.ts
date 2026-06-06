@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'node:crypto';
 import type { User } from '@shared/types';
-import type { UserRepositoryPort } from '@server/db/userRepository';
+import type { UserRepositoryPort } from '@server/port/userRepositoryPort';
 import { createId } from '@server/id';
 import { setRequestContext } from '@server/utils/requestContext';
 

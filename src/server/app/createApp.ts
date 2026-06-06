@@ -6,7 +6,7 @@ import type { AuthService } from '@server/services/authService';
 import type { Logger } from '@server/utils/logger';
 import { requestContextMiddleware } from '@server/utils/requestContext';
 import { requestLogger } from '@server/utils/requestLogger';
-import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import type { AttachmentRepositoryPort } from '@server/port/attachmentRepositoryPort';
 import { createAuthRoutes } from '@server/app/routes/authRoutes';
 
 /**

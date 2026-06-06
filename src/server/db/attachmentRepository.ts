@@ -295,20 +295,3 @@ export class AttachmentRepository {
     return attachments;
   }
 }
-
-export type AttachmentRepositoryPort = Pick<
-  AttachmentRepository,
-  | 'createAttachment'
-  | 'getAttachment'
-  | 'listAttachments'
-  | 'linkMessageAttachments'
-  | 'listMessageAttachments'
-  | 'listMessageAttachmentsForMessages'
-  | 'linkMailboxAttachments'
-  | 'listMailboxAttachments'
-  | 'listMailboxAttachmentsForMessages'
-  | 'deleteAttachment'
-  | 'deleteMessage'
-  | 'deleteMessageAttachment'
-  | 'deleteTeamAttachments'
->;

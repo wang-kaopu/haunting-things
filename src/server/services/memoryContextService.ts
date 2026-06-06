@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@shared/types';
-import type { ConversationRepositoryPort } from '@server/db/conversationRepository';
+import type { MemoryContextRepositoryPort } from '@server/port/memoryContextRepositoryPort';
 
 export type MemoryContextBuildInput = {
   conversationId: string;
@@ -12,7 +12,7 @@ export type MemoryContextBuildInput = {
  * 从本地消息历史构造 ACP session 恢复失败时的兜底上下文。
  */
 export class MemoryContextService {
-  constructor(private readonly repo: Pick<ConversationRepositoryPort, 'listMessages'>) {}
+  constructor(private readonly repo: MemoryContextRepositoryPort) {}
 
   /**
    * 读取当前会话最近的稳定文本消息，并拼成一段只在新 ACP session 中注入的上下文。

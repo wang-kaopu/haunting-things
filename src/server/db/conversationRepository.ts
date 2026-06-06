@@ -750,43 +750,6 @@ function parseJsonValue(value: string | null): unknown {
   }
 }
 
-export type ConversationRepositoryPort = Pick<
-  ConversationRepository,
-  | 'createConversation'
-  | 'updateConversationModel'
-  | 'updateConversationStatus'
-  | 'updateConversationAcpSession'
-  | 'updateConversationSessionRestoreState'
-  | 'updateConversationRuntimeState'
-  | 'updateConversationTurnResult'
-  | 'listConversations'
-  | 'listConversationsByWorkspace'
-  | 'countConversationsByWorkspace'
-  | 'deleteConversationsByWorkspace'
-  | 'listConversationsByStatus'
-  | 'getConversation'
-  | 'getConversationWithWorkspace'
-  | 'listConversationsWithWorkspace'
-  | 'listConversationSummaries'
-  | 'updateConversationWorkspace'
-  | 'finalizeInterruptedConversation'
-  | 'finalizeStreamingMessages'
-  | 'addMessage'
-  | 'updateMessage'
-  | 'listMessages'
-  | 'messageExists'
-  | 'addAgentEvent'
-  | 'listAgentEvents'
-  | 'replaceConversationMcpServers'
-  | 'listConversationMcpServers'
-  | 'replaceConversationCommands'
-  | 'getConversationCommands'
-  | 'replaceConversationModels'
-  | 'getConversationModels'
-  | 'replaceConversationMode'
-  | 'getConversationMode'
->;
-
 /** 构造会话与工作区 join 查询，避免多个读取方法重复列清单。 */
 function conversationWithWorkspaceSql(tail: string): string {
   return `

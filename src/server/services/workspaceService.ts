@@ -10,7 +10,7 @@ import type {
   WorkspaceRoot,
   WorkspaceTreeInput,
 } from '@shared/types';
-import type { WorkspaceRepositoryPort } from '@server/db/workspaceRepository';
+import type { WorkspaceRepositoryPort } from '@server/port/workspaceRepositoryPort';
 import { normalizeWorkspacePath } from '@server/db/workspaceRepository';
 import type { WorkspaceRootService } from '@server/services/workspaceRootService';
 

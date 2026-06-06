@@ -53,8 +53,3 @@ export class UserRepository {
     return this.db.prepare('DELETE FROM users').run().changes;
   }
 }
-
-export type UserRepositoryPort = Pick<
-  UserRepository,
-  'getUserByUsername' | 'getAnyUser' | 'createUser' | 'updateLastLogin' | 'updatePassword' | 'deleteAllUsers'
->;

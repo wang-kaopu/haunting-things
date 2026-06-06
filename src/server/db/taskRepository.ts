@@ -61,5 +61,3 @@ export class TaskRepository {
     return rows.map(rowToTask);
   }
 }
-
-export type TaskRepositoryPort = Pick<TaskRepository, 'createTask' | 'updateTask' | 'getTask' | 'listTasks'>;

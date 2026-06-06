@@ -8,10 +8,10 @@ import type {
   TeamMailboxEntry,
   TeamTask,
 } from '@shared/types';
-import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
-import type { MailboxRepositoryPort } from '@server/db/mailboxRepository';
-import type { TaskRepositoryPort } from '@server/db/taskRepository';
-import type { TeamRepositoryPort } from '@server/db/teamRepository';
+import type { AttachmentRepositoryPort } from '@server/port/attachmentRepositoryPort';
+import type { MailboxRepositoryPort } from '@server/port/mailboxRepositoryPort';
+import type { TaskRepositoryPort } from '@server/port/taskRepositoryPort';
+import type { TeamRepositoryPort } from '@server/port/teamRepositoryPort';
 import type { ConversationService } from '@server/services/conversationService';
 import type { AttachmentService } from '@server/services/attachmentService';
 import type { EventBus } from '@server/events';

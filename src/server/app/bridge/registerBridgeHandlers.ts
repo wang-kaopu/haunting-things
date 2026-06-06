@@ -1,5 +1,5 @@
 import type { AgentBackend, ServerInfo } from '@shared/types';
-import type { AttachmentRepositoryPort } from '@server/db/attachmentRepository';
+import type { AttachmentRepositoryPort } from '@server/port/attachmentRepositoryPort';
 import { toAttachmentRef } from '@server/db/mappers';
 import { healthAgent, listAgents } from '@server/runtime/agentRegistry';
 import type { AttachmentService } from '@server/services/attachmentService';

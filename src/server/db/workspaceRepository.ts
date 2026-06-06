@@ -139,16 +139,3 @@ export function normalizeWorkspacePath(input: string): string {
   if (!trimmed) throw new Error('workspace path is required');
   return path.resolve(trimmed);
 }
-
-export type WorkspaceRepositoryPort = Pick<
-  WorkspaceRepository,
-  | 'createWorkspace'
-  | 'getWorkspace'
-  | 'getWorkspaceByPath'
-  | 'listWorkspaces'
-  | 'touchWorkspace'
-  | 'updateWorkspace'
-  | 'deleteWorkspace'
-  | 'findOrCreateServerWorkspace'
-  | 'createTemporaryWorkspace'
->;
