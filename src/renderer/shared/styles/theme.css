@@ -1,4 +1,5 @@
 @theme inline {
+  --font-sans: var(--app-font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -24,6 +25,10 @@
 }
 
 :root {
+  --app-font-sans:
+    "PingFang SC", "PingFang TC", "PingFang HK", "PingFang",
+    -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans SC",
+    ui-sans-serif, system-ui, sans-serif;
   --background: #ffffff;
   --foreground: #0d0d0d;
   --card: #ffffff;

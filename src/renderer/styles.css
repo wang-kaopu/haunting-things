@@ -8,9 +8,7 @@
 
 :root {
   color-scheme: light;
-  font-family:
-    "Avenir Next", "PingFang SC", "Noto Sans SC", ui-sans-serif, system-ui,
-    sans-serif;
+  font-family: var(--app-font-sans);
   background: #ffffff;
   color: #0d0d0d;
 }
