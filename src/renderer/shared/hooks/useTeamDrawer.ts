@@ -12,7 +12,7 @@ export type UseTeamDrawerResult = {
  * 管理 Team 侧栏展开/折叠状态。
  */
 export function useTeamDrawer(): UseTeamDrawerResult {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(false);
 
   return {
     open,

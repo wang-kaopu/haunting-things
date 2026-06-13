@@ -1,8 +1,18 @@
 import type React from 'react';
+import { ArrowUpIcon, ChevronRightIcon } from 'lucide-react';
 import type { Workspace } from '@shared/types';
 import { useWorkspacePicker } from '@renderer/features/workspace/hooks/useWorkspacePicker';
 import { FileIcon } from '@renderer/shared/components/FileIcon';
-import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
+import { Button } from '@renderer/shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@renderer/shared/components/ui/dialog';
+import { ScrollArea } from '@renderer/shared/components/ui/scroll-area';
 
 /** 工作区选择弹窗的打开状态和选中目录回调。 */
 export type WorkspacePickerDialogProps = {
@@ -49,86 +59,94 @@ export function WorkspacePickerDialog({
   const directories = listing?.entries.filter((entry) => entry.isDir) ?? [];
 
   return (
-    <PanelDialogShell
+    <Dialog
       open={open}
-      className="workspace-picker-dialog"
-      titleId="workspace-picker-title"
-      title="选择工作区"
-      description="从当前项目目录中选择 Agent 的工作目录。"
-      closeLabel="关闭"
-      closeOnBackdrop
-      onClose={close}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) close();
+      }}
     >
-      <div className="panel-dialog-panel workspace-picker-content">
-        <section className="workspace-picker-current">
-          <span>当前目录</span>
-          <strong>{listing?.absolutePath ?? '加载中...'}</strong>
-        </section>
+      <DialogContent className="w-[min(680px,calc(100vw-32px))]">
+        <DialogHeader>
+          <DialogTitle>选择工作区</DialogTitle>
+          <DialogDescription>从当前项目目录中选择 Agent 的工作目录。</DialogDescription>
+        </DialogHeader>
 
-        <section className="workspace-picker-tree">
-          {listing?.parentRelativePath ? (
-            <button
-              type="button"
-              className="workspace-picker-row"
-              onClick={() => void goParent()}
-            >
-              <span className="workspace-picker-row-icon">↩</span>
-              <span className="workspace-picker-row-name">返回上一级</span>
-            </button>
-          ) : null}
+        <div className="grid min-h-0 gap-4 px-6 py-5">
+          <section className="grid gap-1 rounded-lg bg-muted p-3">
+            <span className="text-xs font-medium text-muted-foreground">当前目录</span>
+            <strong className="min-w-0 break-all text-sm font-medium text-foreground">{listing?.absolutePath ?? '加载中...'}</strong>
+          </section>
 
-          {loading ? (
-            <div className="workspace-picker-empty">正在加载...</div>
-          ) : null}
+          <section className="min-h-[300px] overflow-hidden rounded-lg bg-muted p-1">
+            <ScrollArea className="max-h-[380px] min-h-[300px]">
+              <div className="grid gap-0.5">
+                {listing?.parentRelativePath ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="grid h-10 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-md px-3 text-left text-sm font-normal"
+                    onClick={() => void goParent()}
+                  >
+                    <ArrowUpIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                    <span className="min-w-0 truncate">返回上一级</span>
+                  </Button>
+                ) : null}
 
-          {!loading
-            ? directories.map((entry) => (
-                <button
-                  key={entry.relativePath}
-                  type="button"
-                  className="workspace-picker-row"
-                  onClick={() => void browse(entry.relativePath)}
-                >
-                  <span className="workspace-picker-chevron">›</span>
-                  <FileIcon name={entry.name} isDirectory />
-                  <span className="workspace-picker-row-name">{entry.name}</span>
-                </button>
-              ))
-            : null}
+                {loading ? (
+                  <div className="px-3 py-10 text-center text-sm text-muted-foreground">正在加载...</div>
+                ) : null}
 
-          {!loading && directories.length === 0 ? (
-            <div className="workspace-picker-empty">
-              当前目录下没有可进入的子目录
-            </div>
-          ) : null}
-        </section>
+                {!loading
+                  ? directories.map((entry) => (
+                      <Button
+                        key={entry.relativePath}
+                        type="button"
+                        variant="ghost"
+                        className="grid h-10 w-full grid-cols-[18px_20px_minmax(0,1fr)] items-center gap-2 rounded-md px-3 text-left text-sm font-normal"
+                        onClick={() => void browse(entry.relativePath)}
+                      >
+                        <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                        <FileIcon name={entry.name} isDirectory />
+                        <span className="min-w-0 truncate">{entry.name}</span>
+                      </Button>
+                    ))
+                  : null}
 
-        <footer className="workspace-picker-footer">
-          <button
+                {!loading && directories.length === 0 ? (
+                  <div className="px-3 py-10 text-center text-sm text-muted-foreground">
+                    当前目录下没有可进入的子目录
+                  </div>
+                ) : null}
+              </div>
+            </ScrollArea>
+          </section>
+        </div>
+
+        <DialogFooter>
+          <Button
             type="button"
-            className="workspace-picker-button secondary"
+            variant="secondary"
             onClick={close}
           >
             取消
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            className="workspace-picker-button secondary"
+            variant="secondary"
             onClick={() => void refresh()}
           >
             刷新
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            className="workspace-picker-button primary"
             onClick={() => void handleSelectCurrentDirectory()}
           >
             选择当前目录
-          </button>
-        </footer>
-      </div>
-    </PanelDialogShell>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

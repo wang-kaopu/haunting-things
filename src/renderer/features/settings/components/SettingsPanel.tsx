@@ -18,10 +18,9 @@ export function SettingsPanel({
   onSetRemoteAccess,
 }: SettingsPanelProps): React.ReactElement {
   return (
-    <div className="panel-dialog-panel">
-      <section className="panel-dialog-section">
-        <h3>通用</h3>
-
+    <div className="min-h-0 overflow-y-auto px-6 py-5">
+      <section className="grid gap-3">
+        <h3 className="text-xs font-medium text-muted-foreground">通用</h3>
         <RemoteAccessSetting
           serverInfo={serverInfo}
           loading={loading}

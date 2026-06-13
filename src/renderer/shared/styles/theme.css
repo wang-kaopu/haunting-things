@@ -62,19 +62,4 @@
   --sidebar-active: #e7e7e7;
   --bubble-user: #f4f4f4;
   --composer-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
-
-  /* Panel dialog aliases are kept for current dialogs before Radix Dialog migration. */
-  --panel-dialog-bg: var(--popover);
-  --panel-dialog-text: var(--popover-foreground);
-  --panel-dialog-muted: #6b7280;
-  --panel-dialog-border: #ececec;
-  --panel-dialog-row-border: #f0f0f0;
-  --panel-dialog-hover-bg: #f4f4f4;
-  --panel-dialog-active-bg: #e9e9e9;
-  --panel-dialog-subtle-bg: #f7f7f8;
-  --panel-dialog-error-bg: #fff1f0;
-  --panel-dialog-error-text: var(--destructive);
-  --panel-dialog-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.06);
 }

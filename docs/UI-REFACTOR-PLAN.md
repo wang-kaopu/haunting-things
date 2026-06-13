@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-第五阶段已完成聊天体验迁移。后续 UI 迁移应优先复用 Tailwind token 和 shadcn/ui 组件，不再为通用控件新增大段全局 CSS。
+第七阶段已完成工作区切换和工作区选择器周边迁移。后续 UI 迁移应优先复用 Tailwind token 和 shadcn/ui 组件，不再为通用控件新增大段全局 CSS。
 
 ## 主题入口
 
@@ -79,15 +79,22 @@
 - `.image-attachment-*`
 - `.usage-chip`
 - `.phase-badge`
+- `.modal-*`
+- `.team-drawer*`
+- `.drawer-*`
+- `.member-card*`
+- `.agent-badge*`
+- `.panel-dialog-*`
+- `.sidebar-section-*`
+- `.sidebar-empty`
+- `.workspace-switcher*`
+- `.workspace-picker-*`
+- `.conversation-summary-*`
 
 仍待后续阶段废弃的旧样式组：
 
-- `.panel-dialog-*` 内容布局样式
-- `.modal-*`
-- `.sidebar-section-*` 和 `.sidebar-empty` 的工作区旧组件用法
-- `.team-drawer*` 和 `.drawer-*`
-- `.member-card*`
-- `.agent-badge*`
+- `.workspace-panel*`
+- `.workspace-tree*`
 
 ## 阶段记录
 
@@ -126,14 +133,32 @@
 
 这些组件已迁移到 Tailwind utility、共享 `Button`、Radix Select 链路和 lucide 图标。聊天主区、Header、消息流、用户/助手消息、附件预览、输入框和工具栏不再依赖旧 `.chat-*`、`.messages-*`、`.message-*`、`.composer-*` 全局样式。
 
-## 后续阶段建议
-
-第六阶段建议进入工作区和团队详情周边：
+第六阶段已完成：
 
 - `src/renderer/features/teams/TeamDrawer.tsx`
 - `src/renderer/features/teams/components/TeamMemberList.tsx`
 - `src/renderer/features/teams/components/TeamMemberCard.tsx`
 - `src/renderer/features/teams/dialogs/AddAgentDialog.tsx`
 - `src/renderer/features/teams/dialogs/CreateTeamDialog.tsx`
+- `src/renderer/features/settings/components/SettingsDialog.tsx`
 - `src/renderer/features/settings/components/SettingsPanel.tsx`
+- `src/renderer/features/settings/components/RemoteAccessSetting.tsx`
 - `src/renderer/features/settings/components/RemoteAccessPanel.tsx`
+
+这些组件已迁移到 Tailwind utility、共享 `Button`、Radix `Dialog`、Radix `Select` 和 `ScrollArea`。团队抽屉、成员卡片、添加 Agent、创建团队和设置远程访问不再依赖旧 `.team-drawer*`、`.drawer-*`、`.member-card*`、`.agent-badge*`、`.modal-*`、`.remote-*` 和 `.create-team-*` 全局样式。
+
+第七阶段已完成：
+
+- `src/renderer/features/workspace/WorkspaceSwitcher.tsx`
+- `src/renderer/features/workspace/ConversationSummaryList.tsx`
+- `src/renderer/features/workspace/WorkspacePickerDialog.tsx`
+- `src/renderer/shared/components/PanelDialogShell.tsx`
+
+这些组件已迁移到 Tailwind utility、共享 `Button`、Radix `Dialog`、Radix `Select` 和 `ScrollArea`。工作区切换、会话摘要列表和工作区选择器不再依赖旧 `.sidebar-section-*`、`.sidebar-empty`、`.workspace-switcher*`、`.conversation-summary-*`、`.workspace-picker-*`、`.panel-dialog-*` 全局样式；`PanelDialogShell` 兼容层已删除。
+
+## 后续阶段建议
+
+第八阶段建议进入工作区文件浏览面板：
+
+- `src/renderer/features/workspace/WorkspacePanel.tsx`
+- `src/renderer/features/workspace/WorkspaceTree.tsx`

@@ -6,6 +6,7 @@ import { ChatLayout } from '@renderer/features/chat/ChatLayout';
 import { NotificationCenter } from '@renderer/features/notifications/components/NotificationCenter';
 import { SettingsDialog } from '@renderer/features/settings/components/SettingsDialog';
 import { Sidebar } from '@renderer/features/teams/Sidebar';
+import { TeamDrawer } from '@renderer/features/teams/TeamDrawer';
 import { AddAgentDialog } from '@renderer/features/teams/dialogs/AddAgentDialog';
 import { CreateTeamDialog } from '@renderer/features/teams/dialogs/CreateTeamDialog';
 import { WorkspacePickerDialog } from '@renderer/features/workspace/WorkspacePickerDialog';
@@ -25,6 +26,7 @@ import { useConversationStream } from '@renderer/shared/hooks/useConversationStr
 import { useNotifications } from '@renderer/shared/hooks/useNotifications';
 import { useRuntimeSnapshots } from '@renderer/shared/hooks/useRuntimeSnapshots';
 import { useServerInfo } from '@renderer/shared/hooks/useServerInfo';
+import { useTeamDrawer } from '@renderer/shared/hooks/useTeamDrawer';
 import { useTeams } from '@renderer/shared/hooks/useTeams';
 import type { AddAgentInput, CreateTeamInput } from '@renderer/shared/types/ui';
 import { normalizePermissionRequest, normalizeWorkspace } from '@renderer/shared/utils/backendData';
@@ -48,6 +50,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     activeAgent: active.activeAgent,
   });
   const snapshots = useRuntimeSnapshots({ activeAgent: active.activeAgent });
+  const teamDrawer = useTeamDrawer();
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [createTeamWorkspaceId, setCreateTeamWorkspaceId] = useState<string | null>(null);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
@@ -276,6 +279,18 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onSetModel={setModel}
         onSetMode={setMode}
       />
+      {active.activeTeam ? (
+        <TeamDrawer
+          open={teamDrawer.open}
+          team={active.activeTeam}
+          activeSlotId={active.activeSlotId}
+          phases={conversation.phaseByConversation}
+          commandsByConversation={snapshots.commandsByConversation}
+          modeByConversation={snapshots.modeByConversation}
+          onToggle={teamDrawer.toggle}
+          onSelectAgent={active.selectAgent}
+        />
+      ) : null}
       <NotificationCenter items={notifications.items} onRemove={notifications.remove} />
       <CreateTeamDialog
         open={createTeamOpen}
