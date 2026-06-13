@@ -12,7 +12,10 @@ export function UsageChip({ usage }: UsageChipProps): React.ReactElement | null 
   if (!usage) return null;
 
   return (
-    <span className="usage-chip" title={`Updated at ${new Date(usage.updatedAt).toLocaleTimeString()}`}>
+    <span
+      className="inline-flex whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700"
+      title={`Updated at ${new Date(usage.updatedAt).toLocaleTimeString()}`}
+    >
       {formatUsageShort(usage)} · {formatUsagePercent(usage)}
     </span>
   );

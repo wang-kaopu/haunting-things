@@ -1,6 +1,9 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
+import { PlusIcon, XIcon } from 'lucide-react';
 import type { AttachmentRef } from '@shared/types';
+import { Button } from '@renderer/shared/components/ui/button';
+import { cn } from '@renderer/shared/lib/utils';
 
 /** 图片选择器的上传行为配置。 */
 export type ImageAttachmentPickerProps = {
@@ -31,7 +34,7 @@ export function ImageAttachmentPicker({
 
   return (
     <div
-      className={`image-picker ${dragging ? 'dragging' : ''}`}
+      className="relative inline-flex min-w-0 items-center"
       onDragEnter={(event) => {
         event.preventDefault();
         if (!disabled) setDragging(true);
@@ -59,16 +62,21 @@ export function ImageAttachmentPicker({
           event.currentTarget.value = '';
         }}
       />
-      <button
+      <Button
         type="button"
-        className="composer-icon-button image-picker-button"
+        variant="ghost"
+        size="icon"
+        className={cn(
+          'size-8 rounded-full text-muted-foreground hover:text-foreground',
+          dragging && 'bg-accent text-accent-foreground'
+        )}
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
         aria-label={uploading ? '图片上传中' : '添加图片'}
         title={uploading ? '图片上传中' : '添加图片'}
       >
-        {uploading ? '…' : '+'}
-      </button>
+        {uploading ? <span aria-hidden="true" className="text-base leading-none">…</span> : <PlusIcon aria-hidden="true" className="size-4" />}
+      </Button>
     </div>
   );
 }
@@ -87,41 +95,29 @@ export function ImageAttachmentPreview({
 }): React.ReactElement | null {
   if (attachments.length === 0) return null;
   return (
-    <div className="image-attachment-list">
+    <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto px-0.5 py-0.5 [scrollbar-color:#d9d9d9_transparent] [scrollbar-width:thin]">
       {attachments.map((attachment) => (
-        <figure className="image-attachment-preview" key={attachment.id}>
-          <img src={attachment.url} alt={attachment.name} />
-          <button
+        <figure
+          className="relative m-0 size-[72px] shrink-0 overflow-hidden rounded-xl border border-border bg-background shadow-sm"
+          key={attachment.id}
+        >
+          <img
+            className="block size-full rounded-[11px] bg-muted object-cover"
+            src={attachment.url}
+            alt={attachment.name}
+          />
+          <Button
             type="button"
+            size="icon"
+            className="absolute right-1 top-1 size-[18px] rounded-full bg-foreground text-background shadow-sm hover:bg-foreground/85 hover:text-background"
             aria-label={`移除 ${attachment.name}`}
             title={`移除 ${attachment.name}`}
             onClick={() => onRemove(attachment.id)}
           >
-            <RemoveImageIcon />
-          </button>
+            <XIcon aria-hidden="true" className="size-3" />
+          </Button>
         </figure>
       ))}
     </div>
-  );
-}
-
-/** 图片预览移除图标。 */
-function RemoveImageIcon(): React.ReactElement {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M6 6l12 12M18 6 6 18"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

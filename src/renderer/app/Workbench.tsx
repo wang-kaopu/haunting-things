@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PanelLeftIcon } from 'lucide-react';
 import type { PermissionRequest, PermissionResponse, TeamAgent, Workspace } from '@shared/types';
 import { ChatLayout } from '@renderer/features/chat/ChatLayout';
 import { NotificationCenter } from '@renderer/features/notifications/components/NotificationCenter';
@@ -9,6 +10,16 @@ import { AddAgentDialog } from '@renderer/features/teams/dialogs/AddAgentDialog'
 import { CreateTeamDialog } from '@renderer/features/teams/dialogs/CreateTeamDialog';
 import { WorkspacePickerDialog } from '@renderer/features/workspace/WorkspacePickerDialog';
 import { bridge } from '@renderer/shared/bridgeClient';
+import { Button } from '@renderer/shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@renderer/shared/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@renderer/shared/components/ui/radio-group';
 import { useActiveTeam } from '@renderer/shared/hooks/useActiveTeam';
 import { useConversationStream } from '@renderer/shared/hooks/useConversationStream';
 import { useNotifications } from '@renderer/shared/hooks/useNotifications';
@@ -202,11 +213,24 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   }
 
   return (
-    <main className={mobileSidebarOpen ? 'app-shell mobile-sidebar-open' : 'app-shell'}>
+    <main className="relative grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-background md:grid-cols-[300px_minmax(0,1fr)]">
+      {!mobileSidebarOpen && !active.activeTeam ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="fixed left-3 top-3 z-30 size-9 md:hidden"
+          aria-label="打开侧边栏"
+          title="打开侧边栏"
+          onClick={() => setMobileSidebarOpen(true)}
+        >
+          <PanelLeftIcon aria-hidden="true" className="size-5" />
+        </Button>
+      ) : null}
       {mobileSidebarOpen ? (
         <button
           type="button"
-          className="mobile-sidebar-backdrop"
+          className="fixed inset-0 z-40 bg-black/28 md:hidden"
           aria-label="关闭侧边栏"
           onClick={() => setMobileSidebarOpen(false)}
         />
@@ -235,6 +259,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onDeleteTeam={deleteTeam}
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={() => void logout()}
+        mobileOpen={mobileSidebarOpen}
       />
       <ChatLayout
         team={active.activeTeam}
@@ -325,30 +350,36 @@ function PermissionDialog({
   const [selected, setSelected] = useState(() => getDefaultPermissionOption(permission.options));
 
   return (
-    <div className="permission-overlay">
-      <section
-        className="permission-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="permission-dialog-title"
-      >
-        <header className="permission-header">
-          <div className="permission-icon" aria-hidden="true">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onDismiss();
+      }}
+    >
+      <DialogContent className="gap-0 p-0">
+        <DialogHeader className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 border-b-0 pb-3">
+          <div className="grid size-[34px] place-items-center rounded-[10px] bg-primary text-base text-primary-foreground" aria-hidden="true">
             ⌘
           </div>
-          <div className="permission-heading">
-            <p className="permission-eyebrow">需要授权</p>
-            <h3 id="permission-dialog-title">{meta.displayTitle}</h3>
+          <div className="min-w-0">
+            <DialogDescription className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              需要授权
+            </DialogDescription>
+            <DialogTitle className="text-xl leading-tight">
+              {meta.displayTitle}
+            </DialogTitle>
           </div>
-        </header>
+        </DialogHeader>
 
         {formattedInput ? (
-          <section className="permission-detail">
-            <div className="permission-detail-header">
+          <section className="mx-6 mb-4 overflow-hidden rounded-[18px] border border-border bg-muted">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
               <span>Tool arguments</span>
-              <button
+              <Button
                 type="button"
-                className="permission-copy"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
                 onClick={() => {
                   void navigator.clipboard.writeText(formattedInput).catch((err) => {
                     console.warn('[permission] failed to copy tool arguments', err);
@@ -356,55 +387,61 @@ function PermissionDialog({
                 }}
               >
                 Copy
-              </button>
+              </Button>
             </div>
-            <pre className="permission-body">{formattedInput}</pre>
+            <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-foreground">
+              {formattedInput}
+            </pre>
           </section>
         ) : null}
 
-        <div className="permission-options" role="radiogroup" aria-label="权限选项">
+        <RadioGroup
+          className="mx-6 mb-5 gap-1"
+          value={selected}
+          aria-label="权限选项"
+          onValueChange={setSelected}
+        >
           {permission.options.map((opt) => {
             const checked = selected === opt.id;
+            const optionId = `permission-option-${opt.id}`;
 
             return (
               <label
                 key={opt.id}
-                className={checked ? 'permission-option selected' : 'permission-option'}
+                htmlFor={optionId}
+                className={[
+                  'flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-foreground transition-colors',
+                  checked ? 'bg-muted' : 'hover:bg-muted/70',
+                ].join(' ')}
               >
-                <input
-                  className="permission-option-input"
-                  type="radio"
-                  name="permission"
+                <RadioGroupItem
+                  id={optionId}
                   value={opt.id}
-                  checked={checked}
-                  onChange={() => setSelected(opt.id)}
                 />
-                <span className="permission-option-indicator" aria-hidden="true" />
-                <span className="permission-option-label">{opt.label}</span>
+                <span className="min-w-0 truncate font-medium">{opt.label}</span>
               </label>
             );
           })}
-        </div>
+        </RadioGroup>
 
-        <footer className="permission-actions">
-          <button
+        <DialogFooter className="gap-2">
+          <Button
             type="button"
-            className="permission-button primary"
             onClick={() => onRespond(selected)}
             disabled={!selected}
           >
             确认
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="permission-button secondary"
+            variant="secondary"
             onClick={onDismiss}
           >
             关闭
-          </button>
-        </footer>
-      </section>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

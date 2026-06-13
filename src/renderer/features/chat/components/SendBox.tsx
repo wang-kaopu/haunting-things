@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
+import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import type {
   AgentTurnPhase,
   AttachmentRef,
@@ -12,6 +13,7 @@ import { bridge } from '@renderer/shared/bridgeClient';
 import { normalizeAttachmentRef } from '@renderer/shared/utils/backendData';
 import { ComposerTools } from '@renderer/features/chat/components/ComposerTools';
 import { ImageAttachmentPicker, ImageAttachmentPreview } from '@renderer/features/chat/components/ImageAttachmentPicker';
+import { Button } from '@renderer/shared/components/ui/button';
 
 const ALLOWED_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -155,13 +157,14 @@ export function SendBox({
   const sendButtonLabel = canCancel ? (cancelling ? '正在取消' : '停止生成') : (sending ? '发送中' : '发送消息');
 
   return (
-    <div className="composer">
-      <div className="composer-inner">
+    <div className="shrink-0 bg-[linear-gradient(to_top,#ffffff_76%,rgba(255,255,255,0))] px-6 pb-6 pt-4 max-[600px]:px-3 max-[600px]:pb-[calc(12px+env(safe-area-inset-bottom))] max-[600px]:pt-2.5">
+      <div className="mx-auto grid max-w-[760px] gap-2 rounded-3xl border border-input bg-background p-3 shadow-[var(--composer-shadow)]">
         <ImageAttachmentPreview
           attachments={attachments}
           onRemove={(id) => void removeAttachment(id)}
         />
         <textarea
+          className="min-h-12 max-h-[200px] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
           ref={textareaRef}
           value={content}
           disabled={disabled || sending}
@@ -176,7 +179,7 @@ export function SendBox({
           }}
           rows={1}
         />
-        <div className="composer-footer">
+        <div className="flex items-center justify-between gap-2">
           <ComposerTools
             activeAgent={activeAgent}
             commands={commands}
@@ -194,9 +197,10 @@ export function SendBox({
               />
             }
           />
-          <button
+          <Button
             type="button"
-            className={canCancel ? 'composer-send composer-send--stop' : 'composer-send'}
+            size="icon"
+            className="size-8 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background disabled:bg-muted disabled:text-muted-foreground"
             disabled={canCancel ? cancelling : !canSend}
             onClick={() => {
               if (canCancel) {
@@ -208,10 +212,16 @@ export function SendBox({
             aria-label={sendButtonLabel}
             title={sendButtonLabel}
           >
-            {canCancel ? <span className="composer-stop-icon" aria-hidden="true" /> : sending ? '…' : '↑'}
-          </button>
+            {canCancel ? (
+              <SquareIcon aria-hidden="true" className="size-3 fill-current" />
+            ) : sending ? (
+              <span aria-hidden="true" className="text-base leading-none">…</span>
+            ) : (
+              <ArrowUpIcon aria-hidden="true" className="size-4" />
+            )}
+          </Button>
         </div>
-        {error ? <p className="send-error">{error}</p> : null}
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </div>
     </div>
   );

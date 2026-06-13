@@ -1,7 +1,9 @@
 import type React from 'react';
+import { MenuIcon } from 'lucide-react';
 import type { AgentTurnPhase, ConversationUsage, Team, TeamAgent } from '@shared/types';
 import { formatPhase } from '@renderer/shared/utils/format';
 import { UsageChip } from '@renderer/features/chat/components/UsageChip';
+import { Button } from '@renderer/shared/components/ui/button';
 
 /** 聊天顶部栏展示的团队、Agent、阶段和移动端侧栏入口。 */
 export type ChatHeaderProps = {
@@ -21,50 +23,39 @@ export function ChatHeader({
   onOpenSidebar,
 }: ChatHeaderProps): React.ReactElement {
   return (
-    <header className="chat-header">
-      <div className="chat-header-main">
+    <header className="flex h-14 min-h-14 items-center gap-4 border-b border-border bg-background/90 px-6 backdrop-blur md:px-6 max-[600px]:px-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
         {onOpenSidebar ? (
-          <button
+          <Button
             type="button"
-            className="mobile-sidebar-trigger"
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0 rounded-full md:hidden"
             aria-label="打开侧边栏"
             title="打开侧边栏"
             onClick={onOpenSidebar}
           >
-            <MenuIcon />
-          </button>
+            <MenuIcon aria-hidden="true" className="size-[18px]" />
+          </Button>
         ) : null}
-        <div className="chat-header__title">
-          <strong>{team?.name ?? '未选择团队'}</strong>
-          {activeAgent ? <span>{activeAgent.name}</span> : <span>暂无 Agent</span>}
+        <div className="flex min-w-0 items-baseline gap-2">
+          <strong className="truncate text-[15px] font-semibold text-foreground">
+            {team?.name ?? '未选择团队'}
+          </strong>
+          <span className="truncate text-sm text-muted-foreground">
+            {activeAgent ? activeAgent.name : '暂无 Agent'}
+          </span>
         </div>
       </div>
 
-      <div className="chat-header__status">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <UsageChip usage={usage} />
-        {activePhase ? <span className={`phase-badge ${activePhase}`}>{formatPhase(activePhase)}</span> : null}
+        {activePhase ? (
+          <span className="inline-flex whitespace-nowrap rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+            {formatPhase(activePhase)}
+          </span>
+        ) : null}
       </div>
     </header>
-  );
-}
-
-/** 三横线菜单图标（hamburger menu）。 */
-function MenuIcon(): React.ReactElement {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M4 7h16M4 12h16M4 17h16"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

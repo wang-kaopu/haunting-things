@@ -40,7 +40,7 @@ export function ComposerTools({
   onSetMode,
 }: ComposerToolsProps): React.ReactElement {
   return (
-    <div className="composer-tools">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       {imagePicker}
       <ModelPicker agent={activeAgent} models={models} onSetModel={onSetModel} />
       <PermissionModePicker agent={activeAgent} mode={mode} onSetMode={onSetMode} />

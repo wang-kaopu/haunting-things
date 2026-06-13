@@ -1,6 +1,7 @@
 import type React from 'react';
-import { useEffect, useState } from 'react';
 import type { Team } from '@shared/types';
+import { Button } from '@renderer/shared/components/ui/button';
+import { cn } from '@renderer/shared/lib/utils';
 
 /** 单个团队条目的团队数据、选中态和操作回调。 */
 export type TeamListItemProps = {
@@ -10,60 +11,29 @@ export type TeamListItemProps = {
   onDelete: () => Promise<void>;
 };
 
-/** 新 风格侧边栏团队条目——和 Members 一样的一行式列表项，删除收进 ⋯ 菜单。 */
+/** 新 风格侧边栏团队条目——和 Members 一样的一行式列表项。 */
 export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemProps): React.ReactElement {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    if (!active) setMenuOpen(false);
-  }, [active]);
+  void onDelete;
 
   return (
-    <div className={`sidebar-team-item${active ? ' selected' : ''}`}>
-      <button
+    <div className="grid h-8 grid-cols-[minmax(0,1fr)] items-center rounded-lg">
+      <Button
         type="button"
-        className="sidebar-team-main"
+        variant="ghost"
+        className={cn(
+          'h-8 min-w-0 justify-start gap-2 rounded-lg px-2 pl-12 text-left text-sm font-normal',
+          active && 'bg-[#e7e7e7] hover:bg-[#e7e7e7]'
+        )}
         title={team.name}
         onClick={onSelect}
       >
-        <span className="sidebar-team-name">{team.name}</span>
-        <span className="sidebar-team-time">{formatRelativeTime(team.updatedAt)}</span>
-      </button>
-
-      <div className="sidebar-team-menu-wrap">
-        <button
-          type="button"
-          className="sidebar-team-menu-button"
-          aria-label={`更多操作：${team.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            setMenuOpen((v) => !v);
-          }}
-        >
-          ⋯
-        </button>
-
-        {menuOpen ? (
-          <div className="menu-popover sidebar-team-menu">
-            <button
-              type="button"
-              className="danger"
-              disabled={deleting}
-              onClick={(event) => {
-                event.stopPropagation();
-                setDeleting(true);
-                void onDelete().finally(() => {
-                  setDeleting(false);
-                  setMenuOpen(false);
-                });
-              }}
-            >
-              {deleting ? '删除中...' : '删除团队'}
-            </button>
-          </div>
-        ) : null}
-      </div>
+        <span className="min-w-0 flex-1 truncate text-[13px]">{team.name}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(team.updatedAt)}</span>
+      </Button>
+      {/*
+        团队更多/删除入口暂时隐藏，避免侧边栏出现额外的重按钮视觉。
+        后续重新设计团队管理入口时再恢复删除操作。
+      */}
     </div>
   );
 }

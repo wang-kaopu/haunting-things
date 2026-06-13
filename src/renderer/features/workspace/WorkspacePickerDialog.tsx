@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { Workspace } from '@shared/types';
 import { useWorkspacePicker } from '@renderer/features/workspace/hooks/useWorkspacePicker';
+import { FileIcon } from '@renderer/shared/components/FileIcon';
 import { PanelDialogShell } from '@renderer/shared/components/PanelDialogShell';
 
 /** 工作区选择弹窗的打开状态和选中目录回调。 */
@@ -89,7 +90,7 @@ export function WorkspacePickerDialog({
                   onClick={() => void browse(entry.relativePath)}
                 >
                   <span className="workspace-picker-chevron">›</span>
-                  <span className="workspace-picker-row-icon">📁</span>
+                  <FileIcon name={entry.name} isDirectory />
                   <span className="workspace-picker-row-name">{entry.name}</span>
                 </button>
               ))

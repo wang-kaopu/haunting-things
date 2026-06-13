@@ -1,7 +1,11 @@
 import type React from 'react';
 import { useMemo } from 'react';
+import { SquarePenIcon } from 'lucide-react';
 import type { Team, Workspace } from '@shared/types';
 import { TeamListItem } from '@renderer/features/teams/components/TeamListItem';
+import { FileIcon } from '@renderer/shared/components/FileIcon';
+import { Button } from '@renderer/shared/components/ui/button';
+import { ScrollArea } from '@renderer/shared/components/ui/scroll-area';
 
 /** 侧边栏团队列表的分组数据、选中态和团队操作回调。 */
 export type TeamListProps = {
@@ -13,7 +17,7 @@ export type TeamListProps = {
   onDeleteTeam: (teamId: string) => Promise<void>;
 };
 
-/** 侧边栏团队列表，空状态统一使用 sidebar-empty。 */
+/** 侧边栏团队列表，按工作区分组并在有限高度内滚动。 */
 export function TeamList({
   teams,
   workspaces,
@@ -25,32 +29,36 @@ export function TeamList({
   const groups = useMemo(() => groupTeamsByWorkspace(teams, workspaces), [teams, workspaces]);
 
   if (groups.length === 0) {
-    return <p className="sidebar-empty">暂无工作区或团队</p>;
+    return <p className="mx-2 mb-2 mt-1 text-xs text-muted-foreground">暂无工作区或团队</p>;
   }
 
   return (
-    <div className="sidebar-team-list">
-      {groups.map((group) => (
-        <section className={`sidebar-team-group ${group.kind}`} key={group.key}>
-          <TeamGroupHeader
-            group={group}
-            onCreateTeamInWorkspace={onCreateTeamInWorkspace}
-          />
-          <div className="sidebar-team-group__items">
-            {group.teams.map((team) => (
-              <TeamListItem
-                key={team.id}
-                team={team}
-                active={team.id === activeTeamId}
-                onSelect={() => onSelectTeam(team.id)}
-                onDelete={() => onDeleteTeam(team.id)}
-              />
-            ))}
-            {group.teams.length === 0 ? <p className="sidebar-team-group__empty">暂无 Team</p> : null}
-          </div>
-        </section>
-      ))}
-    </div>
+    <ScrollArea className="h-full min-h-0">
+      <div className="grid gap-4 pr-1">
+        {groups.map((group) => (
+          <section className="grid gap-1.5" key={group.key}>
+            <TeamGroupHeader
+              group={group}
+              onCreateTeamInWorkspace={onCreateTeamInWorkspace}
+            />
+            <div className="grid gap-0.5">
+              {group.teams.map((team) => (
+                <TeamListItem
+                  key={team.id}
+                  team={team}
+                  active={team.id === activeTeamId}
+                  onSelect={() => onSelectTeam(team.id)}
+                  onDelete={() => onDeleteTeam(team.id)}
+                />
+              ))}
+              {group.teams.length === 0 ? (
+                <p className="ml-12 h-7 text-xs leading-7 text-muted-foreground">暂无 Team</p>
+              ) : null}
+            </div>
+          </section>
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -117,45 +125,28 @@ function TeamGroupHeader({
   group: TeamGroup;
   onCreateTeamInWorkspace: (workspaceId?: string) => void;
 }): React.ReactElement {
+  const isWorkspace = group.kind === 'workspace';
+
   return (
-    <div className="sidebar-team-group__header">
-      <span className="sidebar-team-group__identity">
-        {group.kind === 'workspace' ? <FolderIcon /> : null}
-        <span className="sidebar-team-group__label" title={group.label}>
+    <div className="group/header grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 text-[13px] text-foreground">
+      <span className={isWorkspace ? 'grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center gap-2' : 'min-w-0 pl-7'}>
+        {isWorkspace ? <FileIcon name={group.label} isDirectory isRoot className="size-[18px]" /> : null}
+        <span className="truncate" title={group.label}>
           {group.label}
         </span>
       </span>
-      <span className="sidebar-team-group__actions">
-        <button
+      <span className="inline-flex opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100">
+        <Button
           type="button"
-          className="sidebar-group-icon-button"
+          variant="ghost"
+          size="icon"
+          className="size-6 text-muted-foreground hover:bg-[#dedede]"
           aria-label={`在 ${group.label} 中创建 Team`}
           onClick={() => onCreateTeamInWorkspace(group.createWorkspaceId)}
         >
-          <ComposeIcon />
-        </button>
+          <SquarePenIcon aria-hidden="true" className="size-4" />
+        </Button>
       </span>
     </div>
-  );
-}
-
-/** 工作区文件夹图标。 */
-function FolderIcon(): React.ReactElement {
-  return (
-    <svg className="sidebar-team-group__folder-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3.5 7.25A2.25 2.25 0 0 1 5.75 5h4.1l1.8 2.25h6.6A2.25 2.25 0 0 1 20.5 9.5v6.75a2.25 2.25 0 0 1-2.25 2.25H5.75a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
-      <path d="M3.5 9h17" />
-    </svg>
-  );
-}
-
-/** 新建 Team/Conversation 图标。 */
-function ComposeIcon(): React.ReactElement {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M11 5H6.75A2.75 2.75 0 0 0 4 7.75v9.5A2.75 2.75 0 0 0 6.75 20h9.5A2.75 2.75 0 0 0 19 17.25V13" />
-      <path d="m9.75 14.25.45-2.7 6.95-6.95a1.75 1.75 0 0 1 2.48 2.48l-6.95 6.95-2.93.22Z" />
-      <path d="m15.8 5.95 2.25 2.25" />
-    </svg>
   );
 }

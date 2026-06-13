@@ -2,6 +2,7 @@ import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { AgentTurnPhase, ChatMessage, TeamAgent } from '@shared/types';
 import { MessageBubble } from '@renderer/features/chat/components/MessageBubble';
+import { Button } from '@renderer/shared/components/ui/button';
 
 /** 聊天消息列表的消息、当前阶段和 Agent 归属上下文。 */
 export type MessageListProps = {
@@ -60,18 +61,20 @@ export function MessageList({ messages, activePhase, agents = [], activeAgent }:
   }, [pinnedToBottom]);
 
   return (
-    <div className="messages-wrap">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={listRef}
-        className="messages"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth px-6 pb-8 pt-6 max-[900px]:h-full max-[900px]:px-3 max-[900px]:pb-[140px] max-[900px]:pt-4"
         onScroll={(event) => {
           const nearBottom = isNearBottom(event.currentTarget);
           setPinnedToBottom(nearBottom);
           if (nearBottom) setNewMessageCount(0);
         }}
       >
-        <div className="messages__inner">
-          {messages.length === 0 ? <p className="empty-inline">暂无消息。</p> : null}
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-7">
+          {messages.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">暂无消息。</p>
+          ) : null}
           {messages.map((message) => {
             const assistantAgent =
               message.role === 'assistant'
@@ -94,9 +97,10 @@ export function MessageList({ messages, activePhase, agents = [], activeAgent }:
         </div>
       </div>
       {!pinnedToBottom && newMessageCount > 0 ? (
-        <button
+        <Button
           type="button"
-          className="jump-bottom"
+          variant="secondary"
+          className="absolute bottom-3.5 left-1/2 z-10 h-9 -translate-x-1/2 rounded-full px-4 text-xs shadow-[0_8px_24px_rgba(15,23,42,0.18)]"
           onClick={() => {
             const element = listRef.current;
             if (!element) return;
@@ -106,7 +110,7 @@ export function MessageList({ messages, activePhase, agents = [], activeAgent }:
           }}
         >
           有 {newMessageCount} 条新消息，回到底部
-        </button>
+        </Button>
       ) : null}
     </div>
   );

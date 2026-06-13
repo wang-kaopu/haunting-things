@@ -26,7 +26,7 @@ export function AgentCommandsMenu({
   }
 
   return (
-    <div className="commands-menu">
+    <div className="relative inline-flex min-w-0 items-center">
       <CustomSelect
         compact
         className="command-select"

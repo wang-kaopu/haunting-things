@@ -39,7 +39,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
   }
 
   return (
-    <div className="model-picker">
+    <div className="relative inline-flex min-w-0 items-center">
       <CustomSelect
         compact
         className="model-select"
@@ -63,7 +63,7 @@ export function ModelPicker({ agent, models, onSetModel }: ModelPickerProps): Re
           void submit(nextValue);
         }}
       />
-      {error ? <p className="error-text compact toolbar-select-error">{error}</p> : null}
+      {error ? <p className="max-w-[260px] text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

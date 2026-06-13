@@ -1,4 +1,5 @@
 import type React from 'react';
+import { LightbulbIcon } from 'lucide-react';
 import type {
   AgentTurnPhase,
   ChatMessage,
@@ -12,6 +13,7 @@ import type {
 import { ChatHeader } from '@renderer/features/chat/components/ChatHeader';
 import { MessageList } from '@renderer/features/chat/components/MessageList';
 import { SendBox, type SendBoxPayload } from '@renderer/features/chat/components/SendBox';
+import { Button } from '@renderer/shared/components/ui/button';
 
 /** 聊天主面板的运行时数据和操作回调。 */
 export type ChatLayoutProps = {
@@ -53,14 +55,16 @@ export function ChatLayout({
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
     return (
-      <section className="chat-layout empty">
-        <p>选择一个团队开始对话，或点击左侧 Members 区域添加成员。</p>
+      <section className="flex h-full min-h-0 flex-1 items-center justify-center overflow-hidden bg-background p-6">
+        <p className="max-w-md text-center text-sm text-muted-foreground">
+          选择一个团队开始对话，或点击左侧 Members 区域添加成员。
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="chat-layout">
+    <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
       <ChatHeader
         team={team}
         activeAgent={activeAgent}
@@ -68,7 +72,7 @@ export function ChatLayout({
         usage={usage}
         onOpenSidebar={onOpenSidebar}
       />
-      <div className="chat-workspace-shell">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {messages.length === 0 ? (
           <ChatEmpty />
         ) : (
@@ -99,13 +103,29 @@ export function ChatLayout({
 /** 新 风格空状态欢迎页。 */
 function ChatEmpty(): React.ReactElement {
   return (
-    <div className="chat-empty">
-      <h1>What can I help with?</h1>
-      <div className="chat-empty__suggestions">
-        <button type="button">Summarize this project</button>
-        <button type="button">Generate a task plan</button>
-        <button type="button">Debug current agent</button>
-        <button type="button">Explain this codebase</button>
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-8">
+      <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <LightbulbIcon aria-hidden="true" className="size-5" />
+      </div>
+      <h1 className="mb-6 text-[28px] font-medium leading-tight tracking-normal text-foreground">
+        What can I help with?
+      </h1>
+      <div className="grid w-full max-w-[560px] grid-cols-1 gap-3 sm:grid-cols-2">
+        {[
+          'Summarize this project',
+          'Generate a task plan',
+          'Debug current agent',
+          'Explain this codebase',
+        ].map((label) => (
+          <Button
+            key={label}
+            type="button"
+            variant="ghost"
+            className="h-auto justify-start rounded-lg px-4 py-3 text-left text-sm font-normal"
+          >
+            {label}
+          </Button>
+        ))}
       </div>
     </div>
   );

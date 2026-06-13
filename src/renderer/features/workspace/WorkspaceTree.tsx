@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { WorkspaceEntry } from '@shared/types';
+import { FileIcon } from '@renderer/shared/components/FileIcon';
 
 /** 工作区文件树的顶层条目集合。 */
 export type WorkspaceTreeProps = {
@@ -17,9 +18,7 @@ function WorkspaceTreeItem({ entry }: { entry: WorkspaceEntry }): React.ReactEle
   return (
     <li className="workspace-tree__item">
       <div className="workspace-tree__row" title={entry.relativePath}>
-        <span className="workspace-tree__icon" aria-hidden="true">
-          {entry.isDir ? '▸' : '·'}
-        </span>
+        <FileIcon name={entry.name} isDirectory={entry.isDir} />
         <span className="workspace-tree__name">{entry.name}</span>
       </div>
       {entry.children?.length ? <WorkspaceTree entries={entry.children} /> : null}
