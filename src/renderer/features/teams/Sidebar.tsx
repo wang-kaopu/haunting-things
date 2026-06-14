@@ -8,7 +8,6 @@ import { cn } from '@renderer/shared/lib/utils';
 
 /** 左侧导航栏输入——成员状态、团队列表和全局入口。 */
 export type SidebarProps = {
-  username?: string;
   teams: Team[];
   activeTeam: Team | null;
   activeTeamId: string | null;
@@ -33,7 +32,6 @@ export type SidebarProps = {
  * 成员状态置顶，打开页面第一眼就能看到"谁空闲、谁忙碌"。
  */
 export function Sidebar({
-  username,
   teams,
   activeTeam,
   activeTeamId,
@@ -59,7 +57,6 @@ export function Sidebar({
     >
       <div className="grid gap-1 px-2 pb-3 pt-1">
         <strong className="truncate text-[15px] font-semibold">Haunting Things</strong>
-        {username ? <span className="truncate text-xs text-muted-foreground">{username}</span> : null}
       </div>
 
       <section className="mb-4 grid max-h-[220px] flex-none gap-1.5 overflow-hidden">
@@ -88,7 +85,7 @@ export function Sidebar({
 
       <section className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-1.5">
         <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-          <span className="text-[13px] font-medium text-foreground">Teams</span>
+          <span className="font-medium">Teams</span>
           <Button
             type="button"
             variant="ghost"

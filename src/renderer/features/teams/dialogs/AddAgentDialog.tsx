@@ -24,41 +24,37 @@ export type AddAgentDialogProps = {
   open: boolean;
   disabled?: boolean;
   defaultBackend?: AgentBackend;
-  defaultModel?: string;
   onClose: () => void;
   onSubmit: (input: AddAgentInput) => Promise<void>;
 };
 
-/** 添加 Agent 表单当前填写的名称、后端和模型。 */
+/** 添加 Agent 表单当前填写的名称和后端。 */
 export type AddAgentFormState = {
   name: string;
   backend: AgentBackend;
-  model: string;
 };
 
-/** 添加团队成员弹窗，允许为新 Agent 覆盖默认后端和模型。 */
+/** 添加团队成员弹窗，允许为新 Agent 覆盖默认后端。 */
 export function AddAgentDialog({
   open,
   disabled,
   defaultBackend = 'claude',
-  defaultModel = '',
   onClose,
   onSubmit,
 }: AddAgentDialogProps): React.ReactElement | null {
   const [form, setForm] = useState<AddAgentFormState>({
     name: '',
     backend: defaultBackend,
-    model: defaultModel,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open) return;
-    setForm({ name: '', backend: defaultBackend, model: defaultModel });
+    setForm({ name: '', backend: defaultBackend });
     setError('');
     setSubmitting(false);
-  }, [defaultBackend, defaultModel, open]);
+  }, [defaultBackend, open]);
 
   if (!open) return null;
 
@@ -85,9 +81,8 @@ export function AddAgentDialog({
               await onSubmit({
                 name,
                 backend: form.backend,
-                model: form.model.trim() || undefined,
               });
-              setForm({ name: '', backend: defaultBackend, model: defaultModel });
+              setForm({ name: '', backend: defaultBackend });
             } catch (err) {
               setError(err instanceof Error ? err.message : String(err));
             } finally {
@@ -128,16 +123,6 @@ export function AddAgentDialog({
               </Select>
             </div>
 
-            <label className="grid gap-2 text-sm">
-              <span className="text-xs font-medium text-muted-foreground">模型 ID，可选</span>
-              <input
-                className="h-10 rounded-md bg-muted px-3 text-sm text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
-                value={form.model}
-                placeholder={defaultModel || '默认'}
-                disabled={disabled}
-                onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
-              />
-            </label>
             {error ? <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
           </div>
           <DialogFooter>
