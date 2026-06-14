@@ -20,7 +20,9 @@ Haunting Things 是一个多智能体会话管理的 Web 服务器应用。启�
 - 内置管理员账号认证，首次启动可直接登录并进入系统。
 - 可开启局域网与 Tailscale 远程访问。
 
-## 一条命令运行
+## 运行
+
+### npx 运行
 
 ```bash
 npx haunting-things
@@ -34,7 +36,7 @@ PORT=3000 npx haunting-things
 
 服务启动后，在浏览器中打开 `http://127.0.0.1:25808` 即可使用。
 
-## 使用本地 npm install 运行
+### npm install 运行
 
 ```bash
 mkdir test-haunting-things
