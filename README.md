@@ -20,23 +20,46 @@ Haunting Things 是一个多智能体会话管理的 Web 服务器应用。启�
 - 内置管理员账号认证，首次启动可直接登录并进入系统。
 - 可开启局域网与 Tailscale 远程访问。
 
-## 使用 npm install 安装
-
-```bash
-npm install -g haunting-things
-haunting-things
-```
-
-服务默认监听 `http://127.0.0.1:25808`。如需修改端口，可在启动时设置 `PORT`：
-
-```bash
-PORT=3000 haunting-things
-```
-
-## 使用 npx 运行
+## 一条命令运行
 
 ```bash
 npx haunting-things
 ```
 
+服务默认监听 `http://127.0.0.1:25808`。如需修改端口，可在启动时设置 `PORT`：
+
+```bash
+PORT=3000 npx haunting-things
+```
+
 服务启动后，在浏览器中打开 `http://127.0.0.1:25808` 即可使用。
+
+## 使用本地 npm install 运行
+
+```bash
+mkdir test-haunting-things
+cd test-haunting-things
+npm init -y
+npm install haunting-things
+npm exec haunting-things
+```
+
+本地安装会把命令放到当前项目的 `node_modules/.bin/haunting-things`。Shell 不会自动把这个目录加入全局 `PATH`，因此如果不使用 `npx`，也可以直接运行：
+
+```bash
+./node_modules/.bin/haunting-things
+```
+
+如果希望在当前终端直接输入 `haunting-things`，可以把本项目的本地命令目录加入 `PATH`：
+
+```bash
+export PATH="$PWD/node_modules/.bin:$PATH"
+haunting-things
+```
+
+如需在任意目录直接输入 `haunting-things`，请使用全局安装：
+
+```bash
+npm install -g haunting-things
+haunting-things
+```

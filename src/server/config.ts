@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadServerPreferences } from '@server/serverPreferences';
 
 /** Web 服务默认监听端口。 */
@@ -42,7 +43,7 @@ export function loadConfig(): AppConfig {
     host,
     port: Number.isFinite(port) ? port : DEFAULT_PORT,
     allowRemote,
-    rendererDist: path.resolve('dist/renderer'),
+    rendererDist: loadRendererDist(),
     projectRoot: loadProjectRoot(),
   };
 }
@@ -63,6 +64,20 @@ function parseBoolean(value: string | undefined): boolean | undefined {
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
   return undefined;
+}
+
+/**
+ * 读取前端静态资源目录；默认相对当前包定位，避免 npx 或全局启动时受运行目录影响。
+ */
+export function loadRendererDist(): string {
+  return path.resolve(process.env.HAUNTING_RENDERER_DIST?.trim() || path.join(loadPackageRoot(), 'dist/renderer'));
+}
+
+/**
+ * 解析当前源码或构建产物所在的包根目录。
+ */
+export function loadPackageRoot(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 }
 
 /** 读取启动项目根目录；默认使用服务端当前工作目录。 */
