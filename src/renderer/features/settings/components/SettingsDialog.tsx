@@ -19,7 +19,7 @@ export type SettingsDialogProps = {
   onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
-/** 设置弹窗，复用面板式弹窗骨架承载设置内容。 */
+/** 设置弹窗，复用统一 Dialog 骨架承载偏好设置内容。 */
 export function SettingsDialog({
   open,
   serverInfo,
@@ -37,7 +37,7 @@ export function SettingsDialog({
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent>
+      <DialogContent className="w-[min(560px,calc(100vw-32px))] rounded-xl">
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
           <DialogDescription>管理应用偏好、访问方式和运行环境。</DialogDescription>

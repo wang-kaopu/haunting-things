@@ -23,7 +23,7 @@ export function RemoteAccessSetting({
   const switching = loading || serverInfo?.restarting;
 
   return (
-    <div className="grid gap-3 border-t border-border py-4 first:border-t-0 first:pt-0">
+    <div className="grid gap-4">
       <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <div className="grid min-w-0 gap-1">
           <strong className="text-sm font-medium text-foreground">远程访问</strong>
@@ -32,18 +32,11 @@ export function RemoteAccessSetting({
           </span>
         </div>
 
-        <label className="relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full bg-muted transition-colors has-[:checked]:bg-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50" aria-label="远程访问">
-          <input
-            className="peer sr-only"
-            type="checkbox"
-            checked={allowRemote}
-            disabled={!serverInfo || switching}
-            onChange={(event) =>
-              void onSetRemoteAccess(event.currentTarget.checked)
-            }
-          />
-          <span aria-hidden="true" className="ml-1 size-4 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-4" />
-        </label>
+        <RemoteAccessSwitch
+          checked={allowRemote}
+          disabled={!serverInfo || switching}
+          onCheckedChange={(checked) => void onSetRemoteAccess(checked)}
+        />
       </div>
 
       {error ? <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
@@ -76,10 +69,44 @@ export function RemoteAccessSetting({
   );
 }
 
+/** 设置面板中的远程访问开关。 */
+function RemoteAccessSwitch({
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}): React.ReactElement {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-label="远程访问"
+      aria-checked={checked}
+      disabled={disabled}
+      className={cn(
+        'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'bg-foreground' : 'bg-muted'
+      )}
+      onClick={() => onCheckedChange(!checked)}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'ml-1 size-4 rounded-full bg-background shadow-sm transition-transform',
+          checked ? 'translate-x-4' : 'translate-x-0'
+        )}
+      />
+    </button>
+  );
+}
+
 /** 展示一个远程访问地址，并提供复制入口。 */
 function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg bg-muted p-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-muted px-3 py-2">
       <div className="min-w-0">
         <span className="text-xs text-muted-foreground">{formatRemoteUrlLabel(url)}</span>
         <code className="mt-1 block break-all text-xs text-foreground">{url}</code>
@@ -87,9 +114,9 @@ function RemoteUrlRow({ url }: { url: string }): React.ReactElement {
 
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="sm"
-        className={cn('h-8 px-3')}
+        className="h-7 px-2 text-xs"
         onClick={() => void navigator.clipboard.writeText(url)}
       >
         复制

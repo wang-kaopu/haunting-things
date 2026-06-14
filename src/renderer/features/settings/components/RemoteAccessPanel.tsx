@@ -22,7 +22,7 @@ export function RemoteAccessPanel({
   onSetRemoteAccess,
 }: RemoteAccessPanelProps): React.ReactElement {
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-4">
       <RemoteAccessSetting
         serverInfo={serverInfo}
         loading={loading}

@@ -9,19 +9,26 @@ export type WorkspaceTreeProps = {
 
 /** 递归展示工作区文件树。 */
 export function WorkspaceTree({ entries }: WorkspaceTreeProps): React.ReactElement {
-  if (entries.length === 0) return <p className="workspace-panel__empty">暂无文件</p>;
-  return <ul className="workspace-tree">{entries.map((entry) => <WorkspaceTreeItem key={entry.relativePath} entry={entry} />)}</ul>;
+  if (entries.length === 0) return <p className="py-2 text-xs text-muted-foreground">暂无文件</p>;
+  return <ul className="m-0 list-none p-0">{entries.map((entry) => <WorkspaceTreeItem key={entry.relativePath} entry={entry} />)}</ul>;
 }
 
 /** 展示单个文件树节点。 */
 function WorkspaceTreeItem({ entry }: { entry: WorkspaceEntry }): React.ReactElement {
   return (
-    <li className="workspace-tree__item">
-      <div className="workspace-tree__row" title={entry.relativePath}>
+    <li>
+      <div
+        className="flex h-6 min-w-0 items-center gap-1.5 rounded px-1 hover:bg-[#f1f1f1]"
+        title={entry.relativePath}
+      >
         <FileIcon name={entry.name} isDirectory={entry.isDir} />
-        <span className="workspace-tree__name">{entry.name}</span>
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{entry.name}</span>
       </div>
-      {entry.children?.length ? <WorkspaceTree entries={entry.children} /> : null}
+      {entry.children?.length ? (
+        <div className="pl-3.5">
+          <WorkspaceTree entries={entry.children} />
+        </div>
+      ) : null}
     </li>
   );
 }

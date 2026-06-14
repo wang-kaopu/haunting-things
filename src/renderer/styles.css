@@ -154,88 +154,6 @@ label,
 }
 
 /* ================================================================
-   Layout — 两栏：Sidebar + Chat Main
-   ================================================================ */
-
-.workspace-panel {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  border-left: 1px solid var(--border);
-  background: #fbfbfb;
-  padding: 12px;
-  color: #202124;
-  font-size: 13px;
-}
-
-.workspace-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.workspace-panel__header button {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #ffffff;
-  color: #5f6368;
-  padding: 3px 8px;
-  font-size: 12px;
-}
-
-.workspace-panel__meta {
-  color: var(--muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-  margin-bottom: 10px;
-}
-
-.workspace-panel__empty,
-.workspace-panel__error {
-  color: var(--muted);
-  font-size: 12px;
-  padding: 8px 0;
-}
-
-.workspace-panel__error {
-  color: var(--danger);
-}
-
-.workspace-tree,
-.workspace-tree ul {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.workspace-tree .workspace-tree {
-  padding-left: 14px;
-}
-
-.workspace-tree__row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 24px;
-  border-radius: 4px;
-  padding: 0 4px;
-}
-
-.workspace-tree__row:hover {
-  background: #f1f1f1;
-}
-
-.workspace-tree__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ================================================================
    Team List (Sidebar items 保持兼容)
    ================================================================ */
 
@@ -309,7 +227,4 @@ label,
     overflow: hidden;
   }
 
-  .workspace-panel {
-    display: none;
-  }
 }

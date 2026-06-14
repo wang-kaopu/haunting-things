@@ -1,6 +1,6 @@
 {
   "name": "haunting-things",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "type": "module",
   "description": "haunting things are haunting everywhere",
@@ -29,6 +29,7 @@
   },
   "scripts": {
     "check:node": "node scripts/check-node-version.mjs",
+    "check:renderer-css": "node scripts/check-renderer-css.mjs",
     "ensure:native": "node scripts/ensure-native-deps.mjs",
     "preinstall": "node scripts/check-node-version.mjs",
     "postinstall": "node scripts/ensure-native-deps.mjs",
@@ -38,7 +39,7 @@
     "dev:remote": "npm run build:renderer && ALLOW_REMOTE=true tsx src/server/index.ts",
     "predev:desktop": "npm run check:node && npm run ensure:native",
     "dev:desktop": "npm run build && electron dist-server/electron/main.js",
-    "prebuild:renderer": "npm run check:node",
+    "prebuild:renderer": "npm run check:node && npm run check:renderer-css",
     "build:renderer": "vite build --config vite.renderer.config.ts",
     "prebuild:server": "npm run check:node",
     "build:server": "node scripts/build-server.mjs",
@@ -73,7 +74,6 @@
     "cookie": "^1.0.2",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
-    "haunting-things": "file:haunting-things-0.1.0.tgz",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.18.0",
     "pino": "^10.3.1",

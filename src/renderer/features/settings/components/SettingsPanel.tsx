@@ -10,7 +10,7 @@ export type SettingsPanelProps = {
   onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
 };
 
-/** 设置面板内容——"通用"分组下挂载各设置项。 */
+/** 设置面板内容，按分组承载各设置项。 */
 export function SettingsPanel({
   serverInfo,
   loading,
@@ -19,7 +19,7 @@ export function SettingsPanel({
 }: SettingsPanelProps): React.ReactElement {
   return (
     <div className="min-h-0 overflow-y-auto px-6 py-5">
-      <section className="grid gap-3">
+      <section className="grid gap-4">
         <h3 className="text-xs font-medium text-muted-foreground">通用</h3>
         <RemoteAccessSetting
           serverInfo={serverInfo}
