@@ -230,7 +230,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
       {mobileSidebarOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/28 md:hidden"
+          className="fixed inset-0 z-40 cursor-pointer border-0 bg-black/28 p-0 md:hidden"
           aria-label="关闭侧边栏"
           onClick={() => setMobileSidebarOpen(false)}
         />
@@ -257,7 +257,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         }}
         onDeleteTeam={deleteTeam}
         onSettingsClick={() => setSettingsOpen(true)}
-        onLogout={() => void logout()}
         mobileOpen={mobileSidebarOpen}
       />
       <ChatLayout
@@ -322,13 +321,21 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         error={serverInfoError}
         onClose={() => setSettingsOpen(false)}
         onSetRemoteAccess={setRemoteAccess}
+        onLogout={() => void logout()}
       />
       {teamsState.error ? (
-        <div className="load-error" role="alert">
+        <div
+          className="fixed left-1/2 top-3 z-[70] -translate-x-1/2 rounded-full border border-border bg-background px-3 py-2 text-xs text-destructive shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+          role="alert"
+        >
           {teamsState.error}
         </div>
       ) : null}
-      {teamsState.loading ? <div className="loading-strip">加载团队...</div> : null}
+      {teamsState.loading ? (
+        <div className="fixed left-1/2 top-3 z-[70] -translate-x-1/2 rounded-full border border-border bg-background px-3 py-2 text-xs shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
+          加载团队...
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -23,7 +23,7 @@ type TokenPayload = {
   username: string;
 };
 
-/** 管理本地单管理员认证、会话 token 和 Express 鉴权中间件。 */
+/** 管理本地用户认证、会话 token 和 Express 鉴权中间件。 */
 export class AuthService {
   readonly state: AuthState = { initialPassword: null };
 
@@ -44,17 +44,32 @@ export class AuthService {
     this.state.initialPassword = password;
   }
 
-  /** 校验账号密码，并签发会话 token。 */
+  /** 校验账号密码；用户名不存在时创建本地账号并签发会话 token。 */
   async login(username: string, password: string): Promise<{ user: User; token: string } | null> {
-    const user = this.repo.getUserByUsername(username);
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername || !password) return null;
+
+    const user = this.repo.getUserByUsername(normalizedUsername);
     if (!user) {
-      await bcrypt.compare(password, '$2a$12$s5cKddFA1hp06nhAubmZa.eT3/xT9Bmve36cul7fZ6ch2mz9EITDu');
-      return null;
+      const passwordHash = await bcrypt.hash(password, 12);
+      const jwtSecret = randomBytes(48).toString('hex');
+      const created = this.repo.createUser({
+        id: createId(),
+        username: normalizedUsername,
+        passwordHash,
+        jwtSecret,
+      });
+      return this.issueSession({ ...created, jwtSecret });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return null;
 
+    return this.issueSession(user);
+  }
+
+  /** 更新登录元数据并为指定用户签发浏览器会话。 */
+  private issueSession(user: User & { jwtSecret: string }): { user: User; token: string } {
     this.repo.updateLastLogin(user.id);
     const token = jwt.sign({ userId: user.id, username: user.username } satisfies TokenPayload, user.jwtSecret, {
       expiresIn: '7d',
@@ -64,9 +79,9 @@ export class AuthService {
     return { user: { id: user.id, username: user.username }, token };
   }
 
-  /** 校验当前密码并轮换 JWT secret，让旧会话在改密后立即失效。 */
-  async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
-    const user = this.repo.getAnyUser();
+  /** 校验当前用户密码并轮换 JWT secret，让旧会话在改密后立即失效。 */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const user = this.repo.getUserById(userId);
     if (!user) return false;
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok || newPassword.length < 8) return false;

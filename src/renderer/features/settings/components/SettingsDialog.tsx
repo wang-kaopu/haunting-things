@@ -4,7 +4,6 @@ import { SettingsPanel } from '@renderer/features/settings/components/SettingsPa
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@renderer/shared/components/ui/dialog';
@@ -17,6 +16,7 @@ export type SettingsDialogProps = {
   error?: string;
   onClose: () => void;
   onSetRemoteAccess: (allowRemote: boolean) => Promise<void>;
+  onLogout: () => void;
 };
 
 /** 设置弹窗，复用统一 Dialog 骨架承载偏好设置内容。 */
@@ -27,6 +27,7 @@ export function SettingsDialog({
   error,
   onClose,
   onSetRemoteAccess,
+  onLogout,
 }: SettingsDialogProps): React.ReactElement | null {
   if (!open) return null;
 
@@ -40,13 +41,13 @@ export function SettingsDialog({
       <DialogContent className="w-[min(560px,calc(100vw-32px))] rounded-xl">
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
-          <DialogDescription>管理应用偏好、访问方式和运行环境。</DialogDescription>
         </DialogHeader>
         <SettingsPanel
           serverInfo={serverInfo}
           loading={loading}
           error={error}
           onSetRemoteAccess={onSetRemoteAccess}
+          onLogout={onLogout}
         />
       </DialogContent>
     </Dialog>

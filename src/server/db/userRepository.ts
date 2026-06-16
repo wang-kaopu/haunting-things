@@ -15,7 +15,17 @@ export class UserRepository {
       : null;
   }
 
-  /** 获取首个用户，用于单管理员初始化和密码流程。 */
+  /** 按用户 ID 读取认证所需的私有字段，用于当前用户改密。 */
+  getUserById(userId: string): (User & { passwordHash: string; jwtSecret: string }) | null {
+    const row = this.db
+      .prepare('SELECT id, username, password_hash, jwt_secret FROM users WHERE id = ?')
+      .get(userId) as { id: string; username: string; password_hash: string; jwt_secret: string } | undefined;
+    return row
+      ? { id: row.id, username: row.username, passwordHash: row.password_hash, jwtSecret: row.jwt_secret }
+      : null;
+  }
+
+  /** 获取首个用户，用于首次启动默认账号初始化判断。 */
   getAnyUser(): (User & { passwordHash: string; jwtSecret: string }) | null {
     const row = this.db
       .prepare('SELECT id, username, password_hash, jwt_secret FROM users ORDER BY created_at ASC LIMIT 1')

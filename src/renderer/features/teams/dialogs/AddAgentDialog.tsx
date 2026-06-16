@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@renderer/shared/components/ui/dialog';
+import { Input } from '@renderer/shared/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -97,8 +98,7 @@ export function AddAgentDialog({
           <div className="grid gap-4 px-6 py-5">
             <label className="grid gap-2 text-sm">
               <span className="text-xs font-medium text-muted-foreground">Agent 名称</span>
-              <input
-                className="h-10 rounded-md bg-muted px-3 text-sm text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
+              <Input
                 value={form.name}
                 autoFocus
                 disabled={disabled}

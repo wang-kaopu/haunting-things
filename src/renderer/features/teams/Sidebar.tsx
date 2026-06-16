@@ -1,8 +1,9 @@
 import type React from 'react';
-import { LogOutIcon, PlusIcon, SettingsIcon } from 'lucide-react';
+import { PlusIcon, SettingsIcon } from 'lucide-react';
 import type { AgentTurnPhase, Team, Workspace } from '@shared/types';
 import { SidebarAgentList } from '@renderer/features/teams/components/SidebarAgentList';
 import { TeamList } from '@renderer/features/teams/components/TeamList';
+import brandLogoUrl from '@renderer/assets/icons/logo/haunting-things-logo-cropped.png';
 import { Button } from '@renderer/shared/components/ui/button';
 import { cn } from '@renderer/shared/lib/utils';
 
@@ -21,14 +22,13 @@ export type SidebarProps = {
   onSelectAgent: (slotId: string) => void;
   onDeleteTeam: (teamId: string) => Promise<void>;
   onSettingsClick: () => void;
-  onLogout: () => void;
   mobileOpen?: boolean;
 };
 
 /**
  * 左侧导航栏。
  *
- * 从上到下：品牌 → 成员状态 → 团队列表 → 设置/退出。
+ * 从上到下：品牌 → 成员状态 → 团队列表 → 设置。
  * 成员状态置顶，打开页面第一眼就能看到"谁空闲、谁忙碌"。
  */
 export function Sidebar({
@@ -45,7 +45,6 @@ export function Sidebar({
   onSelectAgent,
   onDeleteTeam,
   onSettingsClick,
-  onLogout,
   mobileOpen,
 }: SidebarProps): React.ReactElement {
   return (
@@ -55,8 +54,13 @@ export function Sidebar({
         mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       )}
     >
-      <div className="grid gap-1 px-2 pb-3 pt-1">
-        <strong className="truncate text-[15px] font-semibold">Haunting Things</strong>
+      <div className="flex h-14 items-center overflow-hidden px-2 pb-3 pt-1">
+        <img
+          src={brandLogoUrl}
+          alt="Haunting Things"
+          className="h-full w-full select-none object-contain object-center mix-blend-multiply"
+          draggable={false}
+        />
       </div>
 
       <section className="mb-4 grid max-h-[220px] flex-none gap-1.5 overflow-hidden">
@@ -117,15 +121,6 @@ export function Sidebar({
         >
           <SettingsIcon aria-hidden="true" className="size-4" />
           设置
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-9 justify-start gap-2 px-2 text-sm font-normal"
-          onClick={onLogout}
-        >
-          <LogOutIcon aria-hidden="true" className="size-4" />
-          退出登录
         </Button>
       </div>
     </aside>
