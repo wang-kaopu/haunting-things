@@ -24,7 +24,6 @@ export type UseNotificationsResult = {
   clearChat: () => void;
 };
 
-const TOAST_TTL_MS = 10_000;
 const CHAT_NOTIFICATION_TTL_MS = 12_000;
 
 type PushChatNotificationInput = PushNotificationInput & {
@@ -34,9 +33,9 @@ type PushChatNotificationInput = PushNotificationInput & {
 };
 
 /**
- * 管理全局通知和 Chat 面板内的局部通知。
+ * 管理 Workbench 内的应用通知。
  *
- * 错误、权限等系统级事件进入全局 toast；后台 Agent 终态和 Team 消息进入 Chat 局部通知。
+ * 所有通知都进入内容区局部层，避免在整个页面右上角渲染全局 toast。
  */
 export function useNotifications({
   activeTeamId,
@@ -44,21 +43,7 @@ export function useNotifications({
   activeConversationId,
   agentsByConversation = {},
 }: UseNotificationsInput = {}): UseNotificationsResult {
-  const [items, setItems] = useState<AppNotification[]>([]);
   const [chatItems, setChatItems] = useState<ChatNotification[]>([]);
-
-  const push = useCallback((input: PushNotificationInput) => {
-    const now = Date.now();
-    const item: AppNotification = {
-      id: crypto.randomUUID(),
-      title: input.title,
-      message: input.message,
-      level: input.level ?? 'info',
-      createdAt: now,
-      expiresAt: now + TOAST_TTL_MS,
-    };
-    setItems((current) => [...current, item].slice(-6));
-  }, []);
 
   const pushChat = useCallback((input: PushChatNotificationInput) => {
     const now = Date.now();
@@ -76,8 +61,12 @@ export function useNotifications({
     setChatItems((current) => [...current, item].slice(-6));
   }, []);
 
+  const push = useCallback((input: PushNotificationInput) => {
+    pushChat(input);
+  }, [pushChat]);
+
   const remove = useCallback((id: string) => {
-    setItems((current) => current.filter((item) => item.id !== id));
+    setChatItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
   const removeChat = useCallback((id: string) => {
@@ -85,7 +74,7 @@ export function useNotifications({
   }, []);
 
   const clear = useCallback(() => {
-    setItems([]);
+    setChatItems([]);
   }, []);
 
   const clearChat = useCallback(() => {
@@ -95,7 +84,6 @@ export function useNotifications({
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
-      setItems((current) => current.filter((item) => item.expiresAt > now));
       setChatItems((current) => current.filter((item) => item.expiresAt > now));
     }, 1000);
     return () => window.clearInterval(timer);
@@ -110,16 +98,7 @@ export function useNotifications({
       const agent = context?.agent;
       const level = event.type === 'agent.error' ? 'error' : event.type === 'agent.permission.request' ? 'warning' : 'success';
 
-      if (event.type === 'agent.error' || event.type === 'agent.permission.request') {
-        push({
-          title: agent ? agent.name : 'Agent',
-          message: formatAgentEvent(event),
-          level,
-        });
-        return;
-      }
-
-      if (event.conversationId === activeConversationId) return;
+      if (event.conversationId === activeConversationId && event.type === 'agent.done') return;
       pushChat({
         title: agent ? agent.name : 'Agent',
         message: formatAgentEvent(event),
@@ -146,7 +125,7 @@ export function useNotifications({
       unsubAgentEvent();
       unsubTeamMessage();
     };
-  }, [activeConversationId, activeSlotId, activeTeamId, agentsByConversation, push, pushChat]);
+  }, [activeConversationId, activeSlotId, activeTeamId, agentsByConversation, pushChat]);
 
-  return { items, chatItems, push, pushChat, remove, removeChat, clear, clearChat };
+  return { items: chatItems, chatItems, push, pushChat, remove, removeChat, clear, clearChat };
 }

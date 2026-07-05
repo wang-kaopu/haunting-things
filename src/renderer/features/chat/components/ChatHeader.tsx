@@ -4,14 +4,7 @@ import type { AgentTurnPhase, ConversationMemoryState, ConversationUsage, Team, 
 import { formatPhase } from '@renderer/shared/utils/format';
 import { UsageChip } from '@renderer/features/chat/components/UsageChip';
 import { Button } from '@renderer/shared/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@renderer/shared/components/ui/dialog';
+import { ConfirmDialog } from '@renderer/shared/components/ui/confirm-dialog';
 
 /** 聊天顶部栏展示的团队、Agent、阶段和移动端侧栏入口。 */
 export type ChatHeaderProps = {
@@ -36,17 +29,13 @@ export function ChatHeader({
 }: ChatHeaderProps): ReactElement {
   const compressing = memory?.status === 'compressing';
   const [confirmCompressOpen, setConfirmCompressOpen] = useState(false);
-  const [confirmingCompress, setConfirmingCompress] = useState(false);
 
+  /**
+   * 手动确认后触发当前会话的上下文压缩。
+   */
   async function confirmCompressMemory(): Promise<void> {
-    if (!onCompressMemory || confirmingCompress) return;
-    setConfirmingCompress(true);
-    try {
-      await onCompressMemory();
-      setConfirmCompressOpen(false);
-    } finally {
-      setConfirmingCompress(false);
-    }
+    if (!onCompressMemory) return;
+    await onCompressMemory();
   }
 
   return (
@@ -102,46 +91,16 @@ export function ChatHeader({
           </span>
         ) : null}
       </div>
-      <Dialog
+      <ConfirmDialog
         open={confirmCompressOpen}
-        onOpenChange={(open) => {
-          if (!confirmingCompress) setConfirmCompressOpen(open);
-        }}
-      >
-        <DialogContent className="w-[min(420px,calc(100vw-32px))] rounded-xl">
-          <DialogHeader>
-            <DialogTitle>是否确认压缩上下文？</DialogTitle>
-            <DialogDescription>
-              压缩会把较早历史整理为摘要，并在下一轮发送时使用新的上下文记忆。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={confirmingCompress}
-              onClick={() => setConfirmCompressOpen(false)}
-            >
-              取消
-            </Button>
-            <Button
-              type="button"
-              variant="default"
-              disabled={confirmingCompress}
-              onClick={() => void confirmCompressMemory()}
-            >
-              {confirmingCompress ? (
-                <>
-                  <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
-                  压缩中
-                </>
-              ) : (
-                '确认压缩'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setConfirmCompressOpen}
+        title="是否确认压缩上下文？"
+        description="压缩会把较早历史整理为摘要，并在下一轮发送时使用新的上下文记忆。"
+        confirmLabel="确认压缩"
+        loadingLabel="压缩中"
+        disabled={compressing}
+        onConfirm={confirmCompressMemory}
+      />
     </header>
   );
 }

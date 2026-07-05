@@ -3,6 +3,7 @@ import type { AgentTurnPhase, ChatMessage, TeamAgent } from '@shared/types';
 import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
 import { getMessageFallbackText } from '@renderer/shared/utils/format';
 import { isWrappedTeamPrompt } from '@renderer/shared/utils/guards';
+import { CollapsibleMessageContent } from '@renderer/features/chat/components/CollapsibleMessageContent';
 import { MarkdownMessage } from '@renderer/features/chat/components/MarkdownMessage';
 import { cn } from '@renderer/shared/lib/utils';
 
@@ -44,7 +45,9 @@ export function MessageBubble({ message, activePhase, assistantAgent }: MessageB
                 </pre>
               </details>
             ) : (
-              content
+              <CollapsibleMessageContent contentClassName="whitespace-pre-wrap">
+                {content}
+              </CollapsibleMessageContent>
             )}
             {message.attachments?.length ? (
               <div className="mt-2.5 flex flex-wrap gap-2">

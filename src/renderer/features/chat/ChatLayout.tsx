@@ -68,7 +68,12 @@ export function ChatLayout({
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
     return (
-      <section className="flex h-full min-h-0 flex-1 items-center justify-center overflow-hidden bg-background p-6">
+      <section className="relative flex h-full min-h-0 flex-1 items-center justify-center overflow-hidden bg-background p-6">
+        <ChatNotificationLayer
+          items={chatNotifications}
+          onDismiss={onDismissChatNotification ?? (() => undefined)}
+          onOpenTarget={onOpenChatNotification}
+        />
         <p className="max-w-md text-center text-sm text-muted-foreground">
           选择一个团队开始对话，或点击左侧 Members 区域添加成员。
         </p>

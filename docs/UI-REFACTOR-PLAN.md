@@ -37,7 +37,7 @@
 - 移动端侧栏：后续使用 shadcn `Sheet`
 - 状态标签：后续使用 shadcn `Badge`
 - 表单控件：后续使用 shadcn `Input`、`Textarea`、`Label`、`Switch`
-- 通知：使用 `sonner`
+- 通知：使用 Chat 面板内的局部通知层，不使用全局页面 toast
 
 只有业务展示形态非常特殊、且 Radix/shadcn 组合会明显增加复杂度时，才允许保留自定义组件。
 
@@ -48,6 +48,7 @@
 - 交互按钮优先使用图标或图标加文字，图标优先来自 `lucide-react`。
 - 不新增大面积渐变、装饰色块或单一色系主题。
 - 桌面端优先保证侧栏、聊天区、输入框的稳定尺寸；移动端优先使用 `Sheet` 承载侧栏。
+- 右侧用户消息正文超过 12 行时在前端折叠显示，展开后展示完整正文；左侧 Agent/teammate 消息保持完整展示。该行为只影响聊天流阅读，不截断发送内容、历史内容或附件。
 
 ## 旧 CSS 废弃策略
 
@@ -100,10 +101,11 @@
 
 - `src/renderer/shared/components/CustomSelect.tsx`
 - `src/renderer/shared/components/PanelDialogShell.tsx`
-- `src/renderer/features/notifications/components/NotificationCenter.tsx`
 - `src/renderer/app/Workbench.tsx` 内联的 `PermissionDialog`
 
-这些组件已迁移到 Radix/shadcn/sonner 路径，覆盖焦点管理、键盘交互、Portal、可访问性和状态样式。
+这些组件已迁移到 Radix/shadcn 路径，覆盖焦点管理、键盘交互、Portal、可访问性和状态样式。
+
+通知系统后续不再使用全局 `NotificationCenter` / `sonner`。Workbench 内的应用通知统一进入 Chat 内容区局部通知层，避免遮挡页面右上角控件。
 
 第四阶段已完成：
 
@@ -130,6 +132,8 @@
 - `src/renderer/features/chat/components/UsageChip.tsx`
 
 这些组件已迁移到 Tailwind utility、共享 `Button`、Radix Select 链路和 lucide 图标。聊天主区、Header、消息流、用户/助手消息、附件预览、输入框和工具栏不再依赖旧 `.chat-*`、`.messages-*`、`.message-*`、`.composer-*` 全局样式。
+
+右侧用户气泡正文折叠使用 `CollapsibleMessageContent` 统一处理，阈值为 12 行。左侧 Agent/teammate Markdown 正文不折叠；附件、错误提示和历史包装 Prompt 的已有折叠逻辑不纳入正文折叠容器。
 
 第六阶段已完成：
 

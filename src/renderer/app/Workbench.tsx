@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PanelLeftIcon } from 'lucide-react';
 import type { PermissionRequest, PermissionResponse, TeamAgent, Workspace } from '@shared/types';
 import { ChatLayout } from '@renderer/features/chat/ChatLayout';
-import { NotificationCenter } from '@renderer/features/notifications/components/NotificationCenter';
 import { SettingsDialog } from '@renderer/features/settings/components/SettingsDialog';
 import { Sidebar } from '@renderer/features/teams/Sidebar';
 import { AddAgentDialog } from '@renderer/features/teams/dialogs/AddAgentDialog';
@@ -151,6 +150,22 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     notifications.removeChat(item.id);
   }
 
+  /**
+   * 把当前 Agent 相关的成功反馈显示在 Chat 面板内，避免占用页面全局右上角。
+   *
+   * @param input - 通知标题和内容
+   */
+  function pushActiveChatNotification(input: { title: string; message: string }): void {
+    notifications.pushChat({
+      title: input.title,
+      message: input.message,
+      level: 'success',
+      teamId: active.activeTeam?.id,
+      slotId: active.activeAgent?.slotId,
+      conversationId: active.activeAgent?.conversationId,
+    });
+  }
+
   /** 向当前团队添加 Agent，并立即选中新成员。 */
   async function addAgent(input: AddAgentInput): Promise<void> {
     if (!active.activeTeam) return;
@@ -173,7 +188,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     if (active.activeAgent.model === model.trim()) return;
     await snapshots.setModel(active.activeTeam.id, active.activeAgent.slotId, model);
     await teamsState.refreshTeams();
-    notifications.push({ title: '模型已切换', message: model.trim(), level: 'success' });
+    pushActiveChatNotification({ title: '模型已切换', message: model.trim() });
   }
 
   /** 切换当前 Agent 的权限模式。 */
@@ -185,7 +200,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
       conversationId: active.activeAgent.conversationId,
       mode: nextMode,
     });
-    notifications.push({ title: '权限模式已切换', message: nextMode, level: 'success' });
+    pushActiveChatNotification({ title: '权限模式已切换', message: nextMode });
   }
 
   /** 手动压缩当前 Agent 的上下文记忆。 */
@@ -194,10 +209,17 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     const state = await bridge.invoke('conversation.compressMemory', {
       conversationId: active.activeAgent.conversationId,
     });
+    if (state.status !== 'failed') {
+      pushActiveChatNotification({
+        title: '上下文已压缩',
+        message: state.reason ?? active.activeAgent.name,
+      });
+      return;
+    }
     notifications.push({
-      title: state.status === 'failed' ? '上下文压缩失败' : '上下文已压缩',
+      title: '上下文压缩失败',
       message: state.error ?? state.reason ?? active.activeAgent.name,
-      level: state.status === 'failed' ? 'error' : 'success',
+      level: 'error',
     });
   }
 
@@ -311,7 +333,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onDismissChatNotification={notifications.removeChat}
         onOpenChatNotification={openChatNotificationTarget}
       />
-      <NotificationCenter items={notifications.items} onRemove={notifications.remove} />
       <CreateTeamDialog
         open={createTeamOpen}
         defaultWorkspaceId={createTeamWorkspaceId}
