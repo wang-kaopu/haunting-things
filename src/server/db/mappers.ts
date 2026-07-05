@@ -3,6 +3,7 @@ import type {
   AttachmentRef,
   ChatMessage,
   Conversation,
+  ConversationMemory,
   ConversationSummary,
   ConversationWithWorkspace,
   MailboxMessage,
@@ -38,6 +39,22 @@ export function rowToConversation(row: any): Conversation {
     sessionRestoreMethod: row.session_restore_method ?? undefined,
     sessionRestoreError: row.session_restore_error ?? undefined,
     sessionRestoredAt: row.session_restored_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** 将 conversation_memories 表行映射为共享领域类型。 */
+export function rowToConversationMemory(row: any): ConversationMemory {
+  return {
+    conversationId: row.conversation_id,
+    summary: row.summary,
+    coveredUntilSequence: row.covered_until_sequence,
+    sourceMessageCount: row.source_message_count,
+    tokenEstimate: row.token_estimate,
+    status: row.compression_status,
+    compressionReason: row.compression_reason ?? undefined,
+    lastError: row.last_error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

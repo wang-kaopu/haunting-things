@@ -9,6 +9,7 @@ import type {
   ConversationCommands,
   ConversationListInput,
   ConversationListResult,
+  ConversationMemory,
   ConversationSummary,
   ConversationWithWorkspace,
   ConversationMcpServer,
@@ -20,6 +21,7 @@ import type { Db } from '@server/db/connection';
 import {
   rowToAgentEvent,
   rowToConversation,
+  rowToConversationMemory,
   rowToConversationSummary,
   rowToConversationWithWorkspace,
   rowToMessage,
@@ -88,6 +90,23 @@ export class ConversationRepository {
     this.db
       .prepare('UPDATE conversations SET acp_session_id = ?, updated_at = ? WHERE id = ?')
       .run(acpSessionId, Date.now(), id);
+    return this.getConversation(id);
+  }
+
+  /** 清除 ACP session id，强制下一次发送使用压缩后的本地上下文新建 session。 */
+  clearConversationAcpSession(id: string): Conversation | null {
+    this.db
+      .prepare(
+        `UPDATE conversations
+         SET acp_session_id = NULL,
+             session_restore_status = 'new',
+             session_restore_method = NULL,
+             session_restore_error = NULL,
+             session_restored_at = NULL,
+             updated_at = ?
+         WHERE id = ?`
+      )
+      .run(Date.now(), id);
     return this.getConversation(id);
   }
 
@@ -424,6 +443,56 @@ export class ConversationRepository {
       .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY sequence ASC, created_at ASC')
       .all(conversationId) as any[];
     return rows.map(rowToMessage);
+  }
+
+  /** 列出指定 sequence 之后的消息，用于压缩记忆后拼接 recent tail。 */
+  listMessagesAfter(conversationId: string, sequence: number): ChatMessage[] {
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM messages WHERE conversation_id = ? AND sequence > ? ORDER BY sequence ASC, created_at ASC'
+      )
+      .all(conversationId, sequence) as any[];
+    return rows.map(rowToMessage);
+  }
+
+  /** 读取 conversation 当前压缩记忆。 */
+  getConversationMemory(conversationId: string): ConversationMemory | null {
+    const row = this.db.prepare('SELECT * FROM conversation_memories WHERE conversation_id = ?').get(conversationId);
+    return row ? rowToConversationMemory(row) : null;
+  }
+
+  /** 写入或替换 conversation 当前压缩记忆。 */
+  upsertConversationMemory(memory: ConversationMemory): ConversationMemory {
+    this.db
+      .prepare(
+        `INSERT INTO conversation_memories (
+          conversation_id, summary, covered_until_sequence, source_message_count,
+          token_estimate, compression_status, compression_reason, last_error,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(conversation_id) DO UPDATE SET
+          summary = excluded.summary,
+          covered_until_sequence = excluded.covered_until_sequence,
+          source_message_count = excluded.source_message_count,
+          token_estimate = excluded.token_estimate,
+          compression_status = excluded.compression_status,
+          compression_reason = excluded.compression_reason,
+          last_error = excluded.last_error,
+          updated_at = excluded.updated_at`
+      )
+      .run(
+        memory.conversationId,
+        memory.summary,
+        memory.coveredUntilSequence,
+        memory.sourceMessageCount,
+        memory.tokenEstimate,
+        memory.status,
+        memory.compressionReason ?? null,
+        memory.lastError ?? null,
+        memory.createdAt,
+        memory.updatedAt
+      );
+    return this.getConversationMemory(memory.conversationId) ?? memory;
   }
 
   /** 判断消息是否已经入库，避免流式更新反复扫描完整历史。 */

@@ -4,6 +4,7 @@ import type { MailboxMessage } from '@shared/types';
 export interface MailboxRepositoryPort {
   writeMailbox(message: MailboxMessage): MailboxMessage;
   readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[];
+  markMailboxRead(messageIds: string[]): void;
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[];
   listMailbox(teamId: string): MailboxMessage[];
 }

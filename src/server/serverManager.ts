@@ -127,7 +127,7 @@ export class ServerManager {
   private async startInstance(allowRemote: boolean): Promise<void> {
     const host = resolveListenHost(allowRemote);
     const server = http.createServer(this.input.app);
-    const wss = new WebSocketServer({ server });
+    const wss = new WebSocketServer({ server, maxPayload: 32 * 1024 * 1024 });
     const bridge = new WebBridge(wss, this.input.auth);
 
     this.input.configureBridge(bridge);

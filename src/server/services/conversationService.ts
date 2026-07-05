@@ -10,6 +10,8 @@ import type {
   ConversationSummary,
   ConversationWithWorkspace,
   ConversationMcpServer,
+  ConversationMemory,
+  ConversationMemoryState,
   ConversationModels,
   ConversationMode,
   ConversationUsage,
@@ -28,6 +30,19 @@ import { createLogger } from '@server/utils/logger';
 import type { AttachmentService } from '@server/services/attachmentService';
 import { AcpRuntime } from '@server/runtime/acpRuntime';
 import { MemoryContextService } from '@server/services/memoryContextService';
+import {
+  BASE_CONTEXT_TOKENS,
+  COMPRESSION_TRIGGER_TOKENS,
+  HARD_REJECT_TOKENS,
+  InputBudgetError,
+  InputBudgetService,
+  RECENT_MEMORY_MESSAGE_WINDOW,
+} from '@server/services/inputBudgetService';
+import { MemoryCompressionService } from '@server/services/memoryCompressionService';
+import {
+  AcpMemorySummaryModelService,
+  type MemorySummaryModelPort,
+} from '@server/services/memorySummaryModelService';
 import type { WorkspaceService } from '@server/services/workspaceService';
 
 const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
@@ -47,6 +62,8 @@ const ALLOWED_PERMISSION_MODES: Record<AgentBackend, readonly string[]> = {
 export class ConversationService {
   private readonly logger = createLogger('conversation');
   private readonly memoryContext: MemoryContextService;
+  private readonly inputBudget = new InputBudgetService();
+  private readonly memoryCompression: MemoryCompressionService;
   private readonly fallbackWorkspaces = new Map<string, Workspace>();
   /** 以 `conversationId` 映射运行时实例（懒加载）。 */
   private readonly runtimes = new Map<string, AcpRuntime>();
@@ -64,6 +81,14 @@ export class ConversationService {
   >();
   /** 本地 agent event 监听器，用于 Team 回流等服务内逻辑。 */
   private readonly agentEventHandlers = new Set<(event: AgentEvent) => void | Promise<void>>();
+  /** usage 触发但需要等待当前 turn 结束后执行的自动压缩任务。 */
+  private readonly pendingAutoCompression = new Set<string>();
+  /** 防止同一 conversation 并发压缩。 */
+  private readonly activeCompression = new Set<string>();
+  /** 防止同一 conversation 并发后台模型摘要。 */
+  private readonly activeMemoryRefinement = new Set<string>();
+  /** 后台模型摘要服务，失败不影响规则压缩兜底结果。 */
+  private readonly memorySummaryModel: MemorySummaryModelPort;
 
   constructor(
     private readonly repo: ConversationRepositoryPort,
@@ -71,9 +96,12 @@ export class ConversationService {
     private readonly dataDir: string,
     private readonly workspaceService?: WorkspaceService,
     private readonly attachmentsRepo?: AttachmentRepositoryPort,
-    private readonly attachmentService?: AttachmentService
+    private readonly attachmentService?: AttachmentService,
+    memorySummaryModel?: MemorySummaryModelPort
   ) {
     this.memoryContext = new MemoryContextService(repo);
+    this.memoryCompression = new MemoryCompressionService(repo, this.inputBudget);
+    this.memorySummaryModel = memorySummaryModel ?? new AcpMemorySummaryModelService(this.inputBudget);
   }
 
   /**
@@ -251,6 +279,23 @@ export class ConversationService {
     };
   }
 
+  /** 返回指定 Conversation 的压缩记忆快照。 */
+  memory(conversationId: string): ConversationMemory | null {
+    return this.repo.getConversationMemory(conversationId);
+  }
+
+  /**
+   * 手动压缩指定 Conversation 的记忆，并让下一次发送走新 ACP session。
+   *
+   * @param input - 需要压缩的 conversation 和可选原因
+   * @returns 压缩状态，供 UI 展示
+   */
+  async compressMemory(input: { conversationId: string; reason?: string }): Promise<ConversationMemoryState> {
+    const conversation = this.repo.getConversation(input.conversationId);
+    if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+    return this.compressConversationMemory(conversation, input.reason ?? '用户手动压缩上下文');
+  }
+
   /**
    * 订阅 conversation.finish 本地回调。
    *
@@ -291,6 +336,12 @@ export class ConversationService {
       filesCount: input.files?.length ?? 0,
     });
     const attachments = this.resolveAttachments(input.files ?? []);
+    const prepared = await this.preparePromptForSend({
+      conversation,
+      text: input.content,
+      attachments,
+      reason: '发送前输入预算预检',
+    });
 
     const userMessage = this.repo.addMessage({
       id: createId(),
@@ -312,17 +363,12 @@ export class ConversationService {
     });
 
     try {
-      const runtime = this.getRuntime(conversation);
-      const restoreContext = this.memoryContext.buildRestoreContext({
-        conversationId: conversation.id,
-        beforeSequence: userMessage.sequence,
-        maxMessages: 20,
-        maxChars: 12000,
-      });
+      const runtimeConversation = this.repo.getConversation(conversation.id) ?? conversation;
+      const runtime = this.getRuntime(runtimeConversation);
       await runtime.send({
         text: input.content,
         attachments,
-        restoreContext,
+        restoreContext: prepared.restoreContext,
       });
       this.logger.info('conversation_send_done', {
         conversationId: conversation.id,
@@ -348,6 +394,7 @@ export class ConversationService {
     prompt: string;
     displayMessage?: string;
     files?: string[];
+    beforeRuntimeSend?: () => void;
   }): Promise<void> {
     const startedAt = Date.now();
     const conversation = this.repo.getConversation(input.conversationId);
@@ -364,7 +411,12 @@ export class ConversationService {
 
     const visibleMessage = input.displayMessage?.trim();
     const attachments = this.resolveAttachments(input.files ?? []);
-    let beforeSequence: number | undefined;
+    const prepared = await this.preparePromptForSend({
+      conversation,
+      text: input.prompt,
+      attachments,
+      reason: '运行时 prompt 输入预算预检',
+    });
     if (visibleMessage || attachments.length > 0) {
       const userMessage = this.repo.addMessage({
         id: createId(),
@@ -384,21 +436,16 @@ export class ConversationService {
         conversationId: conversation.id,
         message: { ...userMessage, attachments: attachments.map(toAttachmentRef) },
       });
-      beforeSequence = userMessage.sequence;
     }
 
     try {
-      const runtime = this.getRuntime(conversation);
-      const restoreContext = this.memoryContext.buildRestoreContext({
-        conversationId: conversation.id,
-        beforeSequence,
-        maxMessages: 20,
-        maxChars: 12000,
-      });
+      const runtimeConversation = this.repo.getConversation(conversation.id) ?? conversation;
+      const runtime = this.getRuntime(runtimeConversation);
+      input.beforeRuntimeSend?.();
       await runtime.send({
         text: input.prompt,
         attachments,
-        restoreContext,
+        restoreContext: prepared.restoreContext,
       });
       this.logger.info('runtime_prompt_send_done', {
         conversationId: conversation.id,
@@ -668,6 +715,241 @@ export class ConversationService {
   }
 
   /**
+   * 在写入用户消息前执行预算预检，必要时先压缩并重建 ACP session。
+   *
+   * @param input - 待发送 prompt 的会话、文本和附件
+   * @returns 本轮发送应携带的恢复上下文
+   */
+  private async preparePromptForSend(input: {
+    conversation: Conversation;
+    text: string;
+    attachments: StoredAttachment[];
+    reason: string;
+  }): Promise<{ restoreContext: string | null }> {
+    const restoreContext = this.buildBudgetRestoreContext(input.conversation.id);
+    const plan = this.inputBudget.plan({
+      conversation: input.conversation,
+      text: input.text,
+      attachments: input.attachments,
+      restoreContext,
+      usage: this.getUsageForBudget(input.conversation),
+    });
+
+    if (plan.action === 'reject') {
+      throw new InputBudgetError(plan);
+    }
+
+    if (plan.action === 'allow') {
+      return { restoreContext };
+    }
+
+    let compressed: ConversationMemoryState;
+    try {
+      compressed = await this.compressConversationMemory(input.conversation, plan.reason);
+    } catch (error) {
+      if (plan.projectedTokens >= HARD_REJECT_TOKENS) {
+        throw error;
+      }
+      this.logger.warn('memory_compression_warning_continue_send', {
+        conversationId: input.conversation.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { restoreContext };
+    }
+
+    const refreshed = this.repo.getConversation(input.conversation.id) ?? input.conversation;
+    const compressedRestoreContext = this.buildBudgetRestoreContext(input.conversation.id);
+    const compressedPlan = this.inputBudget.plan({
+      conversation: refreshed,
+      text: input.text,
+      attachments: input.attachments,
+      restoreContext: compressedRestoreContext,
+      usage: { conversationId: refreshed.id, size: BASE_CONTEXT_TOKENS, used: 0, ratio: 0, updatedAt: Date.now() },
+      assumeFreshSession: true,
+    });
+
+    if (compressedPlan.action === 'reject') {
+      throw new InputBudgetError(compressedPlan);
+    }
+
+    this.logger.info('memory_compression_ready_for_send', {
+      conversationId: input.conversation.id,
+      status: compressed.status,
+      projectedTokens: compressedPlan.projectedTokens,
+      summaryTokens: compressed.summaryTokens,
+    });
+    return { restoreContext: compressedRestoreContext };
+  }
+
+  /**
+   * 构造预算预检和新 session 恢复共用的压缩上下文。
+   *
+   * @param conversationId - 会话 ID
+   * @returns summary + recent tail 文本；无历史时为 null
+   */
+  private buildBudgetRestoreContext(conversationId: string): string | null {
+    return this.memoryContext.buildRestoreContext({
+      conversationId,
+      maxMessages: RECENT_MEMORY_MESSAGE_WINDOW,
+      maxChars: 64_000,
+    });
+  }
+
+  /**
+   * 执行规则压缩、清理旧 ACP session，并广播压缩状态。
+   *
+   * @param conversation - 需要压缩的会话
+   * @param reason - 压缩原因
+   * @returns 压缩状态
+   */
+  private async compressConversationMemory(
+    conversation: Conversation,
+    reason: string
+  ): Promise<ConversationMemoryState> {
+    if (this.activeCompression.has(conversation.id)) {
+      return {
+        conversationId: conversation.id,
+        status: 'compressing',
+        reason,
+        updatedAt: Date.now(),
+      };
+    }
+
+    if (conversation.status === 'running') {
+      this.pendingAutoCompression.add(conversation.id);
+      const state: ConversationMemoryState = {
+        conversationId: conversation.id,
+        status: 'warning',
+        reason,
+        error: '当前回合仍在运行，已安排在回合结束后压缩。',
+        updatedAt: Date.now(),
+      };
+      this.events.emit('conversation.memory', state);
+      return state;
+    }
+
+    this.activeCompression.add(conversation.id);
+    this.events.emit('conversation.memory', {
+      conversationId: conversation.id,
+      status: 'compressing',
+      reason,
+      updatedAt: Date.now(),
+    });
+
+    try {
+      const { state } = this.memoryCompression.compress({ conversationId: conversation.id, reason });
+      this.resetRuntimeForCompressedMemory(conversation.id);
+      const updated = this.repo.clearConversationAcpSession(conversation.id);
+      this.events.emit('conversation.memory', state);
+      if (updated) this.events.emit('conversation.updated', updated);
+      this.queueMemoryModelRefinement(updated ?? conversation, reason, state);
+      return state;
+    } catch (error) {
+      const failed = this.memoryCompression.markFailed({ conversationId: conversation.id, reason, error });
+      this.events.emit('conversation.memory', failed);
+      throw error;
+    } finally {
+      this.activeCompression.delete(conversation.id);
+    }
+  }
+
+  /**
+   * 压缩后清理内存 runtime，保留 UI 状态为 idle，下一次发送会新建 session。
+   *
+   * @param conversationId - 会话 ID
+   */
+  private resetRuntimeForCompressedMemory(conversationId: string): void {
+    const runtime = this.runtimes.get(conversationId);
+    runtime?.stop('idle');
+    this.runtimes.delete(conversationId);
+  }
+
+  /**
+   * 在规则压缩完成后后台生成模型摘要；失败只更新 memory 状态，不阻断发送路径。
+   *
+   * @param conversation - 已压缩的会话快照
+   * @param reason - 压缩原因
+   * @param state - 规则压缩结果状态
+   */
+  private queueMemoryModelRefinement(
+    conversation: Conversation,
+    reason: string,
+    state: ConversationMemoryState
+  ): void {
+    if (state.status !== 'compressed' || this.activeMemoryRefinement.has(conversation.id)) return;
+
+    this.activeMemoryRefinement.add(conversation.id);
+    const workspace = this.resolveConversationWorkspace(conversation);
+    this.events.emit('conversation.memory', {
+      conversationId: conversation.id,
+      status: 'compressing',
+      summaryTokens: state.summaryTokens,
+      coveredUntilSequence: state.coveredUntilSequence,
+      sourceMessageCount: state.sourceMessageCount,
+      reason: '规则压缩已完成，正在后台生成模型摘要。',
+      updatedAt: Date.now(),
+    });
+
+    Promise.resolve(
+      this.memoryCompression.refineWithModel({
+        conversationId: conversation.id,
+        reason,
+        summarize: (source) =>
+          this.memorySummaryModel.summarize({
+            conversation,
+            workspacePath: workspace.path,
+            reason: source.reason,
+            ruleSummary: source.ruleSummary,
+            coveredUntilSequence: source.coveredUntilSequence,
+            sourceMessageCount: source.sourceMessageCount,
+            messages: source.messages,
+          }),
+      })
+    )
+      .then(({ state: refined, skipped }) => {
+        if (!skipped) {
+          this.events.emit('conversation.memory', refined);
+        }
+      })
+      .catch((error) => {
+        const failed = this.memoryCompression.markRefinementFailed({
+          conversationId: conversation.id,
+          reason: `后台模型摘要失败，继续使用规则摘要：${reason}`,
+          error,
+        });
+        this.events.emit('conversation.memory', failed);
+        this.logger.warn('memory_model_refinement_failed', {
+          conversationId: conversation.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        this.activeMemoryRefinement.delete(conversation.id);
+      });
+  }
+
+  /**
+   * 获取预算预检使用的 usage；如果没有可恢复 ACP session，则按新 session 从 0 估算。
+   *
+   * @param conversation - 会话快照
+   * @returns 用于预算估算的 usage 快照
+   */
+  private getUsageForBudget(conversation: Conversation): ConversationUsage {
+    const runtimeUsage = this.runtimes.get(conversation.id)?.getUsageSnapshot();
+    if (runtimeUsage) return runtimeUsage;
+    if (!conversation.acpSessionId) {
+      return { conversationId: conversation.id, size: BASE_CONTEXT_TOKENS, used: 0, ratio: 0, updatedAt: Date.now() };
+    }
+    return {
+      conversationId: conversation.id,
+      size: conversation.usageSize ?? BASE_CONTEXT_TOKENS,
+      used: conversation.usageUsed ?? 0,
+      ratio: conversation.usageRatio ?? 0,
+      updatedAt: conversation.usageUpdatedAt ?? Date.now(),
+    };
+  }
+
+  /**
    * 获取或创建指定 Conversation 的 `AcpRuntime`。
    *
    * 首次创建时注册四类事件转发：
@@ -771,6 +1053,16 @@ export class ConversationService {
         usageUpdatedAt: usage.updatedAt,
       });
       this.events.emit('conversation.usage', usage);
+      if (usage.used >= COMPRESSION_TRIGGER_TOKENS) {
+        this.pendingAutoCompression.add(conversation.id);
+        this.events.emit('conversation.memory', {
+          conversationId: conversation.id,
+          status: 'warning',
+          reason: 'ACP usage 达到 200k 的 75%，将在当前回合结束后自动压缩上下文。',
+          summaryTokens: this.repo.getConversationMemory(conversation.id)?.tokenEstimate,
+          updatedAt: Date.now(),
+        });
+      }
     });
     runtime.on('commands', (snapshot: ConversationCommands) => {
       this.commandSnapshots.set(conversation.id, snapshot);
@@ -809,6 +1101,19 @@ export class ConversationService {
             error: error instanceof Error ? error.message : String(error),
           });
         });
+      }
+      if (status === 'idle' && this.pendingAutoCompression.delete(conversation.id)) {
+        const latest = this.repo.getConversation(conversation.id);
+        if (latest) {
+          Promise.resolve(this.compressConversationMemory(latest, 'ACP usage 达到 200k 的 75%，自动压缩上下文')).catch(
+            (error) => {
+              this.logger.warn('auto_memory_compression_failed', {
+                conversationId: conversation.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          );
+        }
       }
     });
     this.runtimes.set(conversation.id, runtime);

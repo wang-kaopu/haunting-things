@@ -37,6 +37,13 @@ export class MailboxRepository {
     return tx();
   }
 
+  /** 将指定 mailbox 消息标记为已读，用于预算预检通过后确认消费。 */
+  markMailboxRead(messageIds: string[]): void {
+    if (messageIds.length === 0) return;
+    const placeholders = messageIds.map(() => '?').join(',');
+    this.db.prepare(`UPDATE mailbox SET read = 1 WHERE id IN (${placeholders})`).run(...messageIds);
+  }
+
   /** 查看目标成员未读消息，不改变已读状态，供前端徽标和预览使用。 */
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[] {
     const rows = this.db

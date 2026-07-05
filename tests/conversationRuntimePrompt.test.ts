@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventBus } from '@server/events';
 import { ConversationService } from '@server/services/conversationService';
-import type { AgentBackend, AgentEvent, ChatMessage, Conversation } from '@shared/types';
+import type { AgentBackend, AgentEvent, ChatMessage, Conversation, ConversationMemory } from '@shared/types';
 
 const runtimeInstances: Array<{
   send: ReturnType<typeof vi.fn>;
   cancelCurrentTurn: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  getUsageSnapshot: ReturnType<typeof vi.fn>;
   input: unknown;
 }> = [];
 
@@ -17,10 +18,17 @@ vi.mock('@server/runtime/acpRuntime', () => {
     readonly send = vi.fn(async () => undefined);
     readonly cancelCurrentTurn = vi.fn(async () => true);
     readonly stop = vi.fn();
+    readonly getUsageSnapshot = vi.fn(() => null);
 
     constructor(input: unknown) {
       super();
-      runtimeInstances.push({ send: this.send, cancelCurrentTurn: this.cancelCurrentTurn, stop: this.stop, input });
+      runtimeInstances.push({
+        send: this.send,
+        cancelCurrentTurn: this.cancelCurrentTurn,
+        stop: this.stop,
+        getUsageSnapshot: this.getUsageSnapshot,
+        input,
+      });
     }
   }
 
@@ -31,6 +39,7 @@ function createFakeRepository() {
   const conversations = new Map<string, Conversation>();
   const messages = new Map<string, ChatMessage[]>();
   const agentEvents = new Map<string, AgentEvent[]>();
+  const memories = new Map<string, ConversationMemory>();
 
   return {
     createConversation(conversation: Conversation): Conversation {
@@ -63,6 +72,13 @@ function createFakeRepository() {
       const conversation = conversations.get(id);
       if (!conversation) return null;
       const updated = { ...conversation, acpSessionId, updatedAt: Date.now() };
+      conversations.set(id, updated);
+      return structuredClone(updated);
+    },
+    clearConversationAcpSession(id: string): Conversation | null {
+      const conversation = conversations.get(id);
+      if (!conversation) return null;
+      const updated = { ...conversation, acpSessionId: undefined, updatedAt: Date.now() };
       conversations.set(id, updated);
       return structuredClone(updated);
     },
@@ -128,6 +144,17 @@ function createFakeRepository() {
     },
     listMessages(conversationId: string): ChatMessage[] {
       return structuredClone(messages.get(conversationId) ?? []);
+    },
+    listMessagesAfter(conversationId: string, sequence: number): ChatMessage[] {
+      return structuredClone((messages.get(conversationId) ?? []).filter((message) => message.sequence > sequence));
+    },
+    getConversationMemory(conversationId: string): ConversationMemory | null {
+      const memory = memories.get(conversationId);
+      return memory ? structuredClone(memory) : null;
+    },
+    upsertConversationMemory(memory: ConversationMemory): ConversationMemory {
+      memories.set(memory.conversationId, structuredClone(memory));
+      return memory;
     },
     messageExists(messageId: string): boolean {
       return [...messages.values()].some((list) => list.some((message) => message.id === messageId));
@@ -309,5 +336,54 @@ describe('ConversationService runtime prompt separation', () => {
     expect(result).toEqual({ accepted: false, error: 'cancel transport failed' });
     expect(runtime?.stop).toHaveBeenCalledWith('idle');
     expect((conversations as any).runtimes.has(conversation.id)).toBe(false);
+  });
+
+  it('refines compressed memory asynchronously after the rule compression succeeds', async () => {
+    const repo = createFakeRepository();
+    const events = new EventBus();
+    const emitSpy = vi.spyOn(events, 'emit');
+    let resolveSummary: ((summary: string) => void) | undefined;
+    const summaryPromise = new Promise<string>((resolve) => {
+      resolveSummary = resolve;
+    });
+    const conversations = new ConversationService(
+      repo as any,
+      events,
+      '/tmp/Haunting-things-test',
+      undefined,
+      undefined,
+      undefined,
+      {
+        summarize: vi.fn(async () => summaryPromise),
+      }
+    );
+    const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
+    for (let index = 1; index <= 23; index += 1) {
+      repo.addMessage({
+        id: `m-${index}`,
+        conversationId: conversation.id,
+        role: index % 2 === 0 ? 'assistant' : 'user',
+        type: 'text',
+        content: `history ${index}`,
+        createdAt: index,
+        status: 'done',
+        sequence: 0,
+      });
+    }
+
+    const ruleState = await conversations.compressMemory({ conversationId: conversation.id, reason: 'manual test' });
+
+    expect(ruleState.status).toBe('compressed');
+    expect(repo.getConversationMemory(conversation.id)?.summary).toContain('history 1');
+    resolveSummary?.('模型摘要：保留预算阈值和最近 20 条原文策略。');
+    await vi.waitFor(() => {
+      expect(repo.getConversationMemory(conversation.id)?.summary).toContain('模型摘要');
+    });
+    expect(emitSpy.mock.calls).toEqual(
+      expect.arrayContaining([
+        ['conversation.memory', expect.objectContaining({ conversationId: conversation.id, status: 'compressing' })],
+        ['conversation.memory', expect.objectContaining({ conversationId: conversation.id, status: 'compressed' })],
+      ])
+    );
   });
 });

@@ -26,7 +26,7 @@ import { useNotifications } from '@renderer/shared/hooks/useNotifications';
 import { useRuntimeSnapshots } from '@renderer/shared/hooks/useRuntimeSnapshots';
 import { useServerInfo } from '@renderer/shared/hooks/useServerInfo';
 import { useTeams } from '@renderer/shared/hooks/useTeams';
-import type { AddAgentInput, CreateTeamInput } from '@renderer/shared/types/ui';
+import type { AddAgentInput, ChatNotification, CreateTeamInput } from '@renderer/shared/types/ui';
 import { normalizePermissionRequest, normalizeWorkspace } from '@renderer/shared/utils/backendData';
 
 /** 主工作台接收的登录用户与退出回调。 */
@@ -66,16 +66,21 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     setRemoteAccess,
   } = useServerInfo();
 
-  const activeAgentsByConversation = useMemo(() => {
-    const map: Record<string, TeamAgent | undefined> = {};
+  const agentsByConversation = useMemo(() => {
+    const map: Record<string, { teamId: string; slotId: string; agent: TeamAgent } | undefined> = {};
     for (const team of teamsState.teams) {
       for (const agent of team.agents ?? []) {
-        map[agent.conversationId] = agent;
+        map[agent.conversationId] = { teamId: team.id, slotId: agent.slotId, agent };
       }
     }
     return map;
   }, [teamsState.teams]);
-  const notifications = useNotifications({ activeAgentsByConversation });
+  const notifications = useNotifications({
+    activeTeamId: active.activeTeamId,
+    activeSlotId: active.activeSlotId,
+    activeConversationId: active.activeAgent?.conversationId,
+    agentsByConversation,
+  });
 
   useEffect(() => {
     console.info('[diag] workbench mounted', {
@@ -132,6 +137,20 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     setCreateTeamOpen(true);
   }
 
+  /** 打开局部 Chat 通知指向的团队成员，并关闭该通知。 */
+  function openChatNotificationTarget(item: ChatNotification): void {
+    const context = item.conversationId ? agentsByConversation[item.conversationId] : undefined;
+    const teamId = item.teamId ?? context?.teamId;
+    const slotId = item.slotId ?? context?.slotId;
+    if (teamId) {
+      const team = teamsState.teams.find((entry) => entry.id === teamId);
+      if (team) setActiveWorkspaceId(team.workspaceId);
+      active.selectTeam(teamId);
+    }
+    if (slotId) active.selectAgent(slotId);
+    notifications.removeChat(item.id);
+  }
+
   /** 向当前团队添加 Agent，并立即选中新成员。 */
   async function addAgent(input: AddAgentInput): Promise<void> {
     if (!active.activeTeam) return;
@@ -167,6 +186,19 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
       mode: nextMode,
     });
     notifications.push({ title: '权限模式已切换', message: nextMode, level: 'success' });
+  }
+
+  /** 手动压缩当前 Agent 的上下文记忆。 */
+  async function compressMemory(): Promise<void> {
+    if (!active.activeAgent?.conversationId) return;
+    const state = await bridge.invoke('conversation.compressMemory', {
+      conversationId: active.activeAgent.conversationId,
+    });
+    notifications.push({
+      title: state.status === 'failed' ? '上下文压缩失败' : '上下文已压缩',
+      message: state.error ?? state.reason ?? active.activeAgent.name,
+      level: state.status === 'failed' ? 'error' : 'success',
+    });
   }
 
   /** 将权限请求加入队列；同一会话和 callId 的请求会被更新。 */
@@ -265,6 +297,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         messages={conversation.messages}
         activePhase={conversation.activePhase}
         usage={snapshots.usage}
+        memory={snapshots.memory}
         commands={snapshots.commands}
         models={snapshots.models}
         mode={snapshots.mode}
@@ -273,6 +306,10 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onCancelTurn={conversation.cancelCurrentTurn}
         onSetModel={setModel}
         onSetMode={setMode}
+        onCompressMemory={compressMemory}
+        chatNotifications={notifications.chatItems}
+        onDismissChatNotification={notifications.removeChat}
+        onOpenChatNotification={openChatNotificationTarget}
       />
       <NotificationCenter items={notifications.items} onRemove={notifications.remove} />
       <CreateTeamDialog

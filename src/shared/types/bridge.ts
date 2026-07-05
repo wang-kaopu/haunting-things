@@ -16,6 +16,8 @@ import type {
   ConversationMode,
   ConversationModels,
   ConversationMcpServer,
+  ConversationMemory,
+  ConversationMemoryState,
   ConversationSummary,
   ConversationStatus,
   ConversationUsage,
@@ -121,6 +123,8 @@ export type InvokeMap = {
   'conversation.commands': { params: { conversationId: string }; result: ConversationCommands | null };
   'conversation.models': { params: { conversationId: string }; result: ConversationModels | null };
   'conversation.mode': { params: { conversationId: string }; result: ConversationMode | null };
+  'conversation.memory': { params: { conversationId: string }; result: ConversationMemory | null };
+  'conversation.compressMemory': { params: { conversationId: string }; result: ConversationMemoryState };
   'conversation.sendMessage': {
     params: { conversationId: string; content: string; files?: string[] };
     result: { accepted: true };
@@ -189,6 +193,7 @@ export type EventMap = {
   'conversation.commands': ConversationCommands;
   'conversation.models': ConversationModels;
   'conversation.mode': ConversationMode;
+  'conversation.memory': ConversationMemoryState;
   'conversation.permission': PermissionRequest;
   'conversation.finish': { conversationId: string; status: ConversationStatus };
   'conversation.status': { conversationId: string; status: ConversationStatus; error?: string };

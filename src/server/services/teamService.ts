@@ -665,13 +665,7 @@ export class TeamService {
     this.explicitRepliedTurns.set(agent.conversationId, false);
 
     this.events.emit('team.agent.status', { teamId, slotId, status: 'active' });
-    const messages = this.withMailboxAttachments(this.mailboxRepo.readUnreadAndMark(teamId, slotId));
-    for (const message of messages) {
-      this.events.emit('team.agent.message', {
-        teamId,
-        entry: this.buildMailboxEntry(team, { ...message, read: true }),
-      });
-    }
+    const messages = this.withMailboxAttachments(this.mailboxRepo.listUnreadMailbox(teamId, slotId));
     const prompt = formatMailbox(messages, team, agent, (conversationId) => this.conversations.commands(conversationId));
     const displayMessage = formatMailboxDisplay(messages, team);
     const attachmentIds = [...new Set(messages.flatMap((message) => message.attachments?.map((item) => item.id) ?? []))];
@@ -696,6 +690,15 @@ export class TeamService {
         prompt,
         displayMessage,
         ...(attachmentIds.length > 0 ? { files: attachmentIds } : {}),
+        beforeRuntimeSend: () => {
+          this.mailboxRepo.markMailboxRead(messages.map((message) => message.id));
+          for (const message of messages) {
+            this.events.emit('team.agent.message', {
+              teamId,
+              entry: this.buildMailboxEntry(team, { ...message, read: true }),
+            });
+          }
+        },
       });
       this.events.emit('team.turn.finished', { teamId, slotId });
       this.events.emit('team.agent.status', { teamId, slotId, status: 'idle' });

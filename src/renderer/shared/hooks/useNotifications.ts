@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { TeamAgent } from '@shared/types';
 import { bridge } from '@renderer/shared/bridgeClient';
-import type { AppNotification, PushNotificationInput, RuntimeNotificationContext } from '@renderer/shared/types/ui';
+import type {
+  AppNotification,
+  ChatNotification,
+  PushNotificationInput,
+  RuntimeNotificationContext,
+} from '@renderer/shared/types/ui';
 import { normalizeAgentEvent, normalizeTeamMessageEvent } from '@renderer/shared/utils/backendData';
 import { formatAgentEvent, shouldShowAgentEventInToast } from '@renderer/shared/utils/format';
 
@@ -11,22 +15,37 @@ export type UseNotificationsInput = RuntimeNotificationContext;
 /** 前端通知列表和操作方法。 */
 export type UseNotificationsResult = {
   items: AppNotification[];
+  chatItems: ChatNotification[];
   push: (input: PushNotificationInput) => void;
+  pushChat: (input: PushChatNotificationInput) => void;
   remove: (id: string) => void;
+  removeChat: (id: string) => void;
   clear: () => void;
+  clearChat: () => void;
 };
 
 const TOAST_TTL_MS = 10_000;
+const CHAT_NOTIFICATION_TTL_MS = 12_000;
+
+type PushChatNotificationInput = PushNotificationInput & {
+  teamId?: string;
+  slotId?: string;
+  conversationId?: string;
+};
 
 /**
- * 管理右上角 toast 通知。
+ * 管理全局通知和 Chat 面板内的局部通知。
  *
- * 只把需要用户关注的 Agent 终态事件和未处理 Team 消息推到通知流，避免流式事件刷屏。
+ * 错误、权限等系统级事件进入全局 toast；后台 Agent 终态和 Team 消息进入 Chat 局部通知。
  */
 export function useNotifications({
-  activeAgentsByConversation = {},
+  activeTeamId,
+  activeSlotId,
+  activeConversationId,
+  agentsByConversation = {},
 }: UseNotificationsInput = {}): UseNotificationsResult {
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [chatItems, setChatItems] = useState<ChatNotification[]>([]);
 
   const push = useCallback((input: PushNotificationInput) => {
     const now = Date.now();
@@ -41,18 +60,43 @@ export function useNotifications({
     setItems((current) => [...current, item].slice(-6));
   }, []);
 
+  const pushChat = useCallback((input: PushChatNotificationInput) => {
+    const now = Date.now();
+    const item: ChatNotification = {
+      id: crypto.randomUUID(),
+      title: input.title,
+      message: input.message,
+      level: input.level ?? 'info',
+      teamId: input.teamId,
+      slotId: input.slotId,
+      conversationId: input.conversationId,
+      createdAt: now,
+      expiresAt: now + CHAT_NOTIFICATION_TTL_MS,
+    };
+    setChatItems((current) => [...current, item].slice(-6));
+  }, []);
+
   const remove = useCallback((id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
+  }, []);
+
+  const removeChat = useCallback((id: string) => {
+    setChatItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
   const clear = useCallback(() => {
     setItems([]);
   }, []);
 
+  const clearChat = useCallback(() => {
+    setChatItems([]);
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
       setItems((current) => current.filter((item) => item.expiresAt > now));
+      setChatItems((current) => current.filter((item) => item.expiresAt > now));
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -62,21 +106,39 @@ export function useNotifications({
       const event = normalizeAgentEvent(payload);
       if (!event) return;
       if (!shouldShowAgentEventInToast(event)) return;
-      const agent = activeAgentsByConversation[event.conversationId] as TeamAgent | undefined;
+      const context = agentsByConversation[event.conversationId];
+      const agent = context?.agent;
       const level = event.type === 'agent.error' ? 'error' : event.type === 'agent.permission.request' ? 'warning' : 'success';
-      push({
+
+      if (event.type === 'agent.error' || event.type === 'agent.permission.request') {
+        push({
+          title: agent ? agent.name : 'Agent',
+          message: formatAgentEvent(event),
+          level,
+        });
+        return;
+      }
+
+      if (event.conversationId === activeConversationId) return;
+      pushChat({
         title: agent ? agent.name : 'Agent',
         message: formatAgentEvent(event),
         level,
+        teamId: context?.teamId,
+        slotId: context?.slotId,
+        conversationId: event.conversationId,
       });
     });
     const unsubTeamMessage = bridge.on('team.agent.message', (payload) => {
       const event = normalizeTeamMessageEvent(payload);
       if (!event || event.entry.processed) return;
-      push({
+      if (event.teamId === activeTeamId && event.entry.message.toAgentId === activeSlotId) return;
+      pushChat({
         title: `${event.entry.fromAgentName} → ${event.entry.toAgentName}`,
         message: event.entry.message.summary || event.entry.message.content,
         level: 'info',
+        teamId: event.teamId,
+        slotId: event.entry.message.toAgentId,
       });
     });
 
@@ -84,7 +146,7 @@ export function useNotifications({
       unsubAgentEvent();
       unsubTeamMessage();
     };
-  }, [activeAgentsByConversation, push]);
+  }, [activeConversationId, activeSlotId, activeTeamId, agentsByConversation, push, pushChat]);
 
-  return { items, push, remove, clear };
+  return { items, chatItems, push, pushChat, remove, removeChat, clear, clearChat };
 }

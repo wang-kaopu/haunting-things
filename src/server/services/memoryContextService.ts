@@ -23,13 +23,16 @@ export class MemoryContextService {
    */
   buildRestoreContext(input: MemoryContextBuildInput): string | null {
     const maxSequence = input.beforeSequence ?? Number.MAX_SAFE_INTEGER;
+    const memory = this.repo.getConversationMemory(input.conversationId);
+    const minSequence = memory?.coveredUntilSequence ?? -1;
     const messages = this.repo
       .listMessages(input.conversationId)
       .filter((message) => message.sequence < maxSequence)
+      .filter((message) => message.sequence > minSequence)
       .filter(isStableTextMessage)
       .slice(-(input.maxMessages ?? 20));
 
-    if (messages.length === 0) return null;
+    if (!memory?.summary.trim() && messages.length === 0) return null;
 
     const lines = messages.map((message) => {
       const role = message.role === 'user' ? '用户' : message.role === 'assistant' ? '助手' : message.role;
@@ -37,13 +40,21 @@ export class MemoryContextService {
       return `${role}${suffix}: ${message.content.trim()}`;
     });
 
-    const body = lines.join('\n\n');
+    const sections = [
+      memory?.summary.trim()
+        ? ['[压缩记忆]', memory.summary.trim()].join('\n')
+        : '',
+      lines.length > 0
+        ? ['[最近原文]', ...lines].join('\n\n')
+        : '',
+    ].filter(Boolean);
+    const body = sections.join('\n\n');
     const maxChars = input.maxChars ?? 12000;
     const clippedBody = body.length > maxChars ? body.slice(-maxChars) : body;
 
     return [
       '以下是当前会话在本地数据库中恢复出的历史上下文。',
-      '这些内容用于在 ACP 后端 session 无法恢复时帮助你接续对话。',
+      '这些内容由压缩记忆和最近原文组成，用于在 ACP 后端 session 无法恢复或被压缩重建时帮助你接续对话。',
       '不要逐字复述历史，除非用户要求。',
       '',
       clippedBody,

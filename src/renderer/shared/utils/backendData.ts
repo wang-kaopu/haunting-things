@@ -10,6 +10,9 @@ import type {
   Conversation,
   ConversationCommands,
   ConversationListResult,
+  ConversationMemory,
+  ConversationMemoryState,
+  ConversationMemoryStatus,
   ConversationMode,
   ConversationModels,
   ConversationSummary,
@@ -43,6 +46,13 @@ const attachmentKinds = new Set<AttachmentKind>(['image']);
 const chatMessageTypes = new Set<ChatMessageType>(['text', 'thinking', 'tool_call', 'tool_result', 'plan', 'permission', 'system']);
 const chatRoles = new Set<ChatRole>(['user', 'assistant', 'system', 'tool']);
 const conversationStatuses = new Set<ConversationStatus>(['idle', 'running', 'failed', 'stopped']);
+const conversationMemoryStatuses = new Set<ConversationMemoryStatus>([
+  'idle',
+  'compressing',
+  'compressed',
+  'warning',
+  'failed',
+]);
 const stopReasons = new Set<StopReason>(['done', 'cancelled', 'failed', 'stopped']);
 const workspaceKinds = new Set<WorkspaceKind>(['server', 'temporary', 'managed']);
 
@@ -500,6 +510,46 @@ export function normalizeConversationUsage(value: unknown): ConversationUsage | 
     size: asNumber(input.size, 0),
     used: asNumber(input.used, 0),
     ratio: asNumber(input.ratio, 0),
+    updatedAt: asNumber(input.updatedAt, Date.now()),
+  };
+}
+
+/** 归一化压缩记忆快照。 */
+export function normalizeConversationMemory(value: unknown): ConversationMemory | null {
+  const input = asRecord(value);
+  const conversationId = asString(input?.conversationId);
+  const status = enumValue(input?.status, conversationMemoryStatuses, undefined);
+  const createdAt = asRequiredNumber(input?.createdAt);
+  const updatedAt = asRequiredNumber(input?.updatedAt);
+  if (!input || !conversationId || !status || createdAt === null || updatedAt === null) return null;
+  return {
+    conversationId,
+    summary: asString(input.summary),
+    coveredUntilSequence: asNumber(input.coveredUntilSequence, -1),
+    sourceMessageCount: asNumber(input.sourceMessageCount, 0),
+    tokenEstimate: asNumber(input.tokenEstimate, 0),
+    status,
+    compressionReason: optionalString(input.compressionReason),
+    lastError: optionalString(input.lastError),
+    createdAt,
+    updatedAt,
+  };
+}
+
+/** 归一化压缩记忆状态事件。 */
+export function normalizeConversationMemoryState(value: unknown): ConversationMemoryState | null {
+  const input = asRecord(value);
+  const conversationId = asString(input?.conversationId);
+  const status = enumValue(input?.status, conversationMemoryStatuses, undefined);
+  if (!input || !conversationId || !status) return null;
+  return {
+    conversationId,
+    status,
+    summaryTokens: optionalNumber(input.summaryTokens),
+    coveredUntilSequence: optionalNumber(input.coveredUntilSequence),
+    sourceMessageCount: optionalNumber(input.sourceMessageCount),
+    reason: optionalString(input.reason),
+    error: optionalString(input.error),
     updatedAt: asNumber(input.updatedAt, Date.now()),
   };
 }

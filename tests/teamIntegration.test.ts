@@ -208,7 +208,13 @@ class FakeConversationService {
     this.sentMessages.push(input);
   }
 
-  async sendRuntimePrompt(input: { conversationId: string; prompt: string; displayMessage?: string }): Promise<void> {
+  async sendRuntimePrompt(input: {
+    conversationId: string;
+    prompt: string;
+    displayMessage?: string;
+    beforeRuntimeSend?: () => void;
+  }): Promise<void> {
+    input.beforeRuntimeSend?.();
     this.runtimePrompts.push(input);
     if (input.displayMessage?.trim()) {
       this.sentMessages.push({

@@ -56,6 +56,47 @@ describe('mailbox repository', () => {
     db.close();
   });
 
+  test('markMailboxRead consumes only selected unread messages', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
+    const db = openDatabase(path.join(dir, 'test.sqlite'));
+    const teamsRepo = new TeamRepository(db);
+    const mailboxRepo = new MailboxRepository(db);
+    db.prepare(
+      `INSERT INTO workspaces (id, name, path, kind, is_temporary, exists_on_disk, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('workspace-1', 'Test Team', dir, 'server', 0, 1, 1, 1);
+    teamsRepo.createTeam({
+      id: 'team-1',
+      name: 'Test Team',
+      workspaceId: 'workspace-1',
+      leaderSlotId: 'agent-1',
+      agents: [],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    for (const id of ['m1', 'm2']) {
+      mailboxRepo.writeMailbox({
+        id,
+        teamId: 'team-1',
+        toAgentId: 'agent-1',
+        fromAgentId: 'user',
+        content: id,
+        read: false,
+        createdAt: 1,
+      });
+    }
+
+    expect(mailboxRepo.listUnreadMailbox('team-1', 'agent-1')).toHaveLength(2);
+    mailboxRepo.markMailboxRead(['m1']);
+    const unread = mailboxRepo.listUnreadMailbox('team-1', 'agent-1');
+
+    expect(unread).toHaveLength(1);
+    expect(unread[0].id).toBe('m2');
+
+    db.close();
+  });
+
   test('openDatabase migrates legacy mailbox tables before creating unread index', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'Haunting-things-test-'));
     const dbPath = path.join(dir, 'legacy.sqlite');

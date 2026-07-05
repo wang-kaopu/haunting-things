@@ -141,6 +141,35 @@ export type ConversationUsage = {
   updatedAt: number;
 };
 
+/** Conversation 压缩记忆的持久化快照。 */
+export type ConversationMemory = {
+  conversationId: string;
+  summary: string;
+  coveredUntilSequence: number;
+  sourceMessageCount: number;
+  tokenEstimate: number;
+  status: ConversationMemoryStatus;
+  compressionReason?: string;
+  lastError?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** Conversation 记忆压缩当前状态。 */
+export type ConversationMemoryStatus = 'idle' | 'compressing' | 'compressed' | 'warning' | 'failed';
+
+/** Conversation 记忆压缩状态事件，供 UI 展示自动压缩上下文状态。 */
+export type ConversationMemoryState = {
+  conversationId: string;
+  status: ConversationMemoryStatus;
+  summaryTokens?: number;
+  coveredUntilSequence?: number;
+  sourceMessageCount?: number;
+  reason?: string;
+  error?: string;
+  updatedAt: number;
+};
+
 /** Conversation 的实时可用命令快照。 */
 export type ConversationCommands = {
   conversationId: string;

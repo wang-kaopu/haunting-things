@@ -74,6 +74,7 @@ class BrowserBridge {
         reason: event.reason,
         at: new Date().toISOString(),
       });
+      this.rejectPending(new Error('Bridge connection closed before the request completed.'));
       this.scheduleReconnect();
     });
   }
@@ -137,6 +138,18 @@ class BrowserBridge {
       this.reconnectTimer = null;
       this.connect();
     }, 1000);
+  }
+
+  /**
+   * 连接断开时拒绝所有未完成 RPC，避免调用方永久等待。
+   *
+   * @param error - 传递给调用方的失败原因
+   */
+  private rejectPending(error: Error): void {
+    if (this.pending.size === 0) return;
+    const pending = Array.from(this.pending.values());
+    this.pending.clear();
+    for (const item of pending) item.reject(error);
   }
 }
 

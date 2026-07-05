@@ -48,6 +48,13 @@ export type AppNotification = {
   expiresAt: number;
 };
 
+/** Chat 面板内展示的局部通知记录。 */
+export type ChatNotification = AppNotification & {
+  teamId?: string;
+  slotId?: string;
+  conversationId?: string;
+};
+
 /** 团队详情抽屉的打开状态。 */
 export type TeamDrawerState = {
   open: boolean;
@@ -87,8 +94,18 @@ export type PushNotificationInput = {
 };
 
 /** 根据会话 ID 解析活动 Agent 的通知上下文。 */
+export type RuntimeNotificationAgentContext = {
+  teamId: string;
+  slotId: string;
+  agent: TeamAgent;
+};
+
+/** 根据当前选择和会话映射决定通知进入全局层还是 Chat 局部层。 */
 export type RuntimeNotificationContext = {
-  activeAgentsByConversation?: Record<string, TeamAgent | undefined>;
+  activeTeamId?: string | null;
+  activeSlotId?: string | null;
+  activeConversationId?: string | null;
+  agentsByConversation?: Record<string, RuntimeNotificationAgentContext | undefined>;
 };
 
 /** UI 活动流使用的 Agent 事件别名。 */

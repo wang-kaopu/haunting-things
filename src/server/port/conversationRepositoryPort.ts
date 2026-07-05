@@ -8,6 +8,7 @@ import type {
   ConversationCommands,
   ConversationListInput,
   ConversationListResult,
+  ConversationMemory,
   ConversationMcpServer,
   ConversationMode,
   ConversationModels,
@@ -21,6 +22,7 @@ export interface ConversationRepositoryPort {
   updateConversationModel(id: string, model: string | undefined): void;
   updateConversationStatus(id: string, status: Conversation['status']): void;
   updateConversationAcpSession(id: string, acpSessionId: string): Conversation | null;
+  clearConversationAcpSession(id: string): Conversation | null;
   updateConversationSessionRestoreState(
     id: string,
     patch: {
@@ -70,7 +72,10 @@ export interface ConversationRepositoryPort {
   addMessage(message: ChatMessage): ChatMessage;
   updateMessage(message: ChatMessage): void;
   listMessages(conversationId: string): ChatMessage[];
+  listMessagesAfter(conversationId: string, sequence: number): ChatMessage[];
   messageExists(messageId: string): boolean;
+  getConversationMemory(conversationId: string): ConversationMemory | null;
+  upsertConversationMemory(memory: ConversationMemory): ConversationMemory;
   addAgentEvent(event: AgentEvent): AgentEvent;
   listAgentEvents(conversationId: string, limit?: number): AgentEvent[];
   replaceConversationMcpServers(conversationId: string, servers: ConversationMcpServer[]): void;

@@ -75,6 +75,20 @@ export function initializeSchema(db: Db): void {
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS conversation_memories (
+      conversation_id TEXT PRIMARY KEY,
+      summary TEXT NOT NULL,
+      covered_until_sequence INTEGER NOT NULL,
+      source_message_count INTEGER NOT NULL,
+      token_estimate INTEGER NOT NULL,
+      compression_status TEXT NOT NULL,
+      compression_reason TEXT,
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS agent_events (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
@@ -237,6 +251,7 @@ export function initializeSchema(db: Db): void {
     CREATE INDEX IF NOT EXISTS idx_conversations_session_restore ON conversations(session_restore_status, session_restored_at);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation_sequence ON messages(conversation_id, sequence);
+    CREATE INDEX IF NOT EXISTS idx_conversation_memories_status ON conversation_memories(compression_status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_messages_turn_id ON messages(turn_id);
     CREATE INDEX IF NOT EXISTS idx_messages_source_event_id ON messages(source_event_id);
     CREATE INDEX IF NOT EXISTS idx_messages_tool_call_id ON messages(tool_call_id);

@@ -67,6 +67,8 @@ export function registerBridgeHandlers(input: {
   bridge.register('conversation.commands', ({ conversationId }) => conversations.commands(conversationId));
   bridge.register('conversation.models', ({ conversationId }) => conversations.models(conversationId));
   bridge.register('conversation.mode', ({ conversationId }) => conversations.mode(conversationId));
+  bridge.register('conversation.memory', ({ conversationId }) => conversations.memory(conversationId));
+  bridge.register('conversation.compressMemory', (params) => conversations.compressMemory(params));
   bridge.register('conversation.sendMessage', async (params) => {
     await conversations.sendMessage(params);
     return { accepted: true };

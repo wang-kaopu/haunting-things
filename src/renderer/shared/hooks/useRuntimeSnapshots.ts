@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   Conversation,
   ConversationCommands,
+  ConversationMemoryState,
   ConversationMode,
   ConversationModels,
   ConversationUsage,
@@ -13,6 +14,8 @@ import { readCachedModels, writeCachedModels } from '@renderer/shared/modelCache
 import {
   normalizeConversationCommands,
   normalizeConversation,
+  normalizeConversationMemory,
+  normalizeConversationMemoryState,
   normalizeConversationMode,
   normalizeConversationModels,
   normalizeConversationUsage,
@@ -26,11 +29,13 @@ export type UseRuntimeSnapshotsInput = {
 /** 按 conversation 归档的运行时快照状态。 */
 export type UseRuntimeSnapshotsResult = {
   usage?: ConversationUsage | null;
+  memory?: ConversationMemoryState | null;
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
   setModel: (teamId: string, slotId: string, model: string) => Promise<void>;
   usageByConversation: Record<string, ConversationUsage>;
+  memoryByConversation: Record<string, ConversationMemoryState>;
   commandsByConversation: Record<string, ConversationCommands>;
   modelsByConversation: Record<string, ConversationModels>;
   modeByConversation: Record<string, ConversationMode>;
@@ -44,6 +49,7 @@ export type UseRuntimeSnapshotsResult = {
  */
 export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): UseRuntimeSnapshotsResult {
   const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
+  const [memoryByConversation, setMemoryByConversation] = useState<Record<string, ConversationMemoryState>>({});
   const [commandsByConversation, setCommandsByConversation] = useState<Record<string, ConversationCommands>>({});
   const [modelsByConversation, setModelsByConversation] = useState<Record<string, ConversationModels>>({});
   const [modeByConversation, setModeByConversation] = useState<Record<string, ConversationMode>>({});
@@ -53,6 +59,11 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
       const usage = normalizeConversationUsage(payload);
       if (!usage) return;
       setUsageByConversation((prev) => ({ ...prev, [usage.conversationId]: usage }));
+    });
+    const unsubMemory = bridge.on('conversation.memory', (payload) => {
+      const memory = normalizeConversationMemoryState(payload);
+      if (!memory) return;
+      setMemoryByConversation((prev) => ({ ...prev, [memory.conversationId]: memory }));
     });
     const unsubCommands = bridge.on('conversation.commands', (payload) => {
       const snapshot = normalizeConversationCommands(payload);
@@ -91,6 +102,7 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
 
     return () => {
       unsubUsage();
+      unsubMemory();
       unsubCommands();
       unsubModels();
       unsubMode();
@@ -153,10 +165,31 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
         if (snapshot) setModeByConversation((prev) => ({ ...prev, [conversationId]: snapshot }));
       })
       .catch(() => {});
+    bridge
+      .invoke('conversation.memory', { conversationId })
+      .then((value) => {
+        const memory = normalizeConversationMemory(value);
+        if (!memory) return;
+        setMemoryByConversation((prev) => ({
+          ...prev,
+          [conversationId]: {
+            conversationId: memory.conversationId,
+            status: memory.status,
+            summaryTokens: memory.tokenEstimate,
+            coveredUntilSequence: memory.coveredUntilSequence,
+            sourceMessageCount: memory.sourceMessageCount,
+            reason: memory.compressionReason,
+            error: memory.lastError,
+            updatedAt: memory.updatedAt,
+          },
+        }));
+      })
+      .catch(() => {});
   }, [activeAgent?.backend, activeAgent?.conversationId]);
 
   const clearSnapshots = useCallback((conversationId: string) => {
     setUsageByConversation((prev) => omitKey(prev, conversationId));
+    setMemoryByConversation((prev) => omitKey(prev, conversationId));
     setCommandsByConversation((prev) => omitKey(prev, conversationId));
     setModelsByConversation((prev) => omitKey(prev, conversationId));
     setModeByConversation((prev) => omitKey(prev, conversationId));
@@ -175,11 +208,13 @@ export function useRuntimeSnapshots({ activeAgent }: UseRuntimeSnapshotsInput): 
   const conversationId = activeAgent?.conversationId;
   return {
     usage: conversationId ? usageByConversation[conversationId] : undefined,
+    memory: conversationId ? memoryByConversation[conversationId] : undefined,
     commands: conversationId ? commandsByConversation[conversationId] : undefined,
     models: conversationId ? modelsByConversation[conversationId] : undefined,
     mode: conversationId ? modeByConversation[conversationId] : undefined,
     setModel,
     usageByConversation,
+    memoryByConversation,
     commandsByConversation,
     modelsByConversation,
     modeByConversation,

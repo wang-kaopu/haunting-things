@@ -53,6 +53,7 @@ type FakeRepository = {
   deleteTeam(id: string): void;
   writeMailbox(message: MailboxMessage): MailboxMessage;
   readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[];
+  markMailboxRead(messageIds: string[]): void;
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[];
   listMailbox(teamId: string): MailboxMessage[];
   createTask(task: TeamTask): TeamTask;
@@ -98,6 +99,13 @@ function createFakeRepository(): FakeRepository {
         }
       }
       return unread;
+    },
+    markMailboxRead(messageIds) {
+      for (const message of mailbox) {
+        if (messageIds.includes(message.id)) {
+          message.read = true;
+        }
+      }
     },
     listUnreadMailbox(teamId, toAgentId) {
       return mailbox
@@ -181,7 +189,10 @@ describe('TeamService', () => {
       restart: vi.fn(),
       stop: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue(undefined),
-      sendRuntimePrompt: vi.fn().mockResolvedValue(undefined),
+      sendRuntimePrompt: vi.fn((input: { beforeRuntimeSend?: () => void }) => {
+        input.beforeRuntimeSend?.();
+        return Promise.resolve();
+      }),
       messages: vi.fn((conversationId: string) => structuredClone(conversationMessages.get(conversationId) ?? [])),
       commands: vi.fn(() => null),
       onFinish: vi.fn((handler: (event: { conversationId: string; status: Conversation['status'] }) => void | Promise<void>) => {
@@ -299,26 +310,26 @@ describe('TeamService', () => {
         read: true,
       },
     });
-    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-1',
       prompt: expect.stringContaining('You are Leader, a member of team Alpha.'),
       displayMessage: 'user: Hello leader',
-    });
-    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
+    }));
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-1',
       prompt: expect.stringContaining('Current teammates:'),
       displayMessage: 'user: Hello leader',
-    });
-    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
+    }));
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-1',
       prompt: expect.stringContaining('Available team RPC tools:'),
       displayMessage: 'user: Hello leader',
-    });
-    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
+    }));
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-1',
       prompt: expect.stringContaining('team_delegate_task: create a task and assign it in one step'),
       displayMessage: 'user: Hello leader',
-    });
+    }));
   });
 
   it('queues wakeups without blocking and serializes repeated prompts for the same agent', async () => {
@@ -327,10 +338,12 @@ describe('TeamService', () => {
 
     let resolveFirstWake: (() => void) | null = null;
     conversations.sendRuntimePrompt.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
+      (input: { beforeRuntimeSend?: () => void }) => {
+        input.beforeRuntimeSend?.();
+        return new Promise<void>((resolve) => {
           resolveFirstWake = resolve;
-        })
+        });
+      }
     );
 
     await service.sendMessage({ teamId: team.id, content: 'First message' });
@@ -437,11 +450,11 @@ describe('TeamService', () => {
         content: expect.stringContaining('Reply from Dev:'),
       },
     });
-    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith({
+    expect(conversations.sendRuntimePrompt).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-1',
       prompt: expect.stringContaining('Reply from Dev:'),
       displayMessage: 'Dev: Reply from Dev:\nI fixed the bug and added coverage.',
-    });
+    }));
   });
 });
 

@@ -4,6 +4,7 @@ import type {
   AgentTurnPhase,
   ChatMessage,
   ConversationCommands,
+  ConversationMemoryState,
   ConversationMode,
   ConversationModels,
   ConversationUsage,
@@ -11,9 +12,11 @@ import type {
   TeamAgent,
 } from '@shared/types';
 import { ChatHeader } from '@renderer/features/chat/components/ChatHeader';
+import { ChatNotificationLayer } from '@renderer/features/chat/components/ChatNotificationLayer';
 import { MessageList } from '@renderer/features/chat/components/MessageList';
 import { SendBox, type SendBoxPayload } from '@renderer/features/chat/components/SendBox';
 import { Button } from '@renderer/shared/components/ui/button';
+import type { ChatNotification } from '@renderer/shared/types/ui';
 
 /** 聊天主面板的运行时数据和操作回调。 */
 export type ChatLayoutProps = {
@@ -22,14 +25,19 @@ export type ChatLayoutProps = {
   messages: ChatMessage[];
   activePhase?: AgentTurnPhase;
   usage?: ConversationUsage | null;
+  memory?: ConversationMemoryState | null;
   commands?: ConversationCommands | null;
   models?: ConversationModels | null;
   mode?: ConversationMode | null;
+  chatNotifications?: ChatNotification[];
   onOpenSidebar?: () => void;
+  onDismissChatNotification?: (id: string) => void;
+  onOpenChatNotification?: (item: ChatNotification) => void;
   onSendMessage: (payload: SendBoxPayload) => Promise<void>;
   onCancelTurn: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
+  onCompressMemory: () => Promise<void>;
 };
 
 /**
@@ -44,14 +52,19 @@ export function ChatLayout({
   messages,
   activePhase,
   usage,
+  memory,
   commands,
   models,
   mode,
+  chatNotifications = [],
   onOpenSidebar,
+  onDismissChatNotification,
+  onOpenChatNotification,
   onSendMessage,
   onCancelTurn,
   onSetModel,
   onSetMode,
+  onCompressMemory,
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
     return (
@@ -64,13 +77,20 @@ export function ChatLayout({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
+    <section className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
       <ChatHeader
         team={team}
         activeAgent={activeAgent}
         activePhase={activePhase}
         usage={usage}
+        memory={memory}
         onOpenSidebar={onOpenSidebar}
+        onCompressMemory={onCompressMemory}
+      />
+      <ChatNotificationLayer
+        items={chatNotifications}
+        onDismiss={onDismissChatNotification ?? (() => undefined)}
+        onOpenTarget={onOpenChatNotification}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {messages.length === 0 ? (
