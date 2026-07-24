@@ -1,5 +1,6 @@
 import type { MailboxMessage } from '@shared/types';
 import type { Db } from '@server/db/connection';
+import type { DatabaseRow } from '@server/db/mappers';
 import { rowToMailbox } from '@server/db/mappers';
 
 /** 负责团队内部 Agent 邮箱消息的写入、读取和已读状态推进。 */
@@ -30,7 +31,7 @@ export class MailboxRepository {
     const tx = this.db.transaction(() => {
       const rows = this.db
         .prepare('SELECT * FROM mailbox WHERE team_id = ? AND to_agent_id = ? AND read = 0 ORDER BY created_at ASC')
-        .all(teamId, toAgentId) as any[];
+        .all(teamId, toAgentId) as DatabaseRow[];
       this.db.prepare('UPDATE mailbox SET read = 1 WHERE team_id = ? AND to_agent_id = ? AND read = 0').run(teamId, toAgentId);
       return rows.map(rowToMailbox);
     });
@@ -48,7 +49,7 @@ export class MailboxRepository {
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM mailbox WHERE team_id = ? AND to_agent_id = ? AND read = 0 ORDER BY created_at ASC')
-      .all(teamId, toAgentId) as any[];
+      .all(teamId, toAgentId) as DatabaseRow[];
     return rows.map(rowToMailbox);
   }
 
@@ -56,7 +57,7 @@ export class MailboxRepository {
   listMailbox(teamId: string): MailboxMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM mailbox WHERE team_id = ? ORDER BY created_at ASC')
-      .all(teamId) as any[];
+      .all(teamId) as DatabaseRow[];
     return rows.map(rowToMailbox);
   }
 }

@@ -12,16 +12,16 @@ describe('workspace automatic deletion', () => {
     ]);
 
     registerBridgeHandlers({
-      bridge: bridge as any,
-      attachments: {} as any,
-      attachmentService: {} as any,
+      bridge: bridge as unknown,
+      attachments: {} as unknown,
+      attachmentService: {} as unknown,
       conversations: {
         countByWorkspace: (workspaceId: string) => (workspaceId === 'conversation-workspace' ? 1 : 0),
-      } as any,
+      } as unknown,
       teams: {
         countByWorkspace: (workspaceId: string) => (workspaceId === 'team-workspace' ? 1 : 0),
-      } as any,
-      workspaces: workspaces as any,
+      } as unknown,
+      workspaces: workspaces as unknown,
       serverInfo: vi.fn(),
       setRemoteAccess: vi.fn(),
     });
@@ -45,16 +45,16 @@ describe('workspace automatic deletion', () => {
     const teamDelete = vi.fn(async () => ({ deleted: true }));
 
     registerBridgeHandlers({
-      bridge: bridge as any,
-      attachments: {} as any,
-      attachmentService: {} as any,
-      conversations: { countByWorkspace: vi.fn(() => 0) } as any,
+      bridge: bridge as unknown,
+      attachments: {} as unknown,
+      attachmentService: {} as unknown,
+      conversations: { countByWorkspace: vi.fn(() => 0) } as unknown,
       teams: {
         get: vi.fn(() => ({ id: 'team-a', workspaceId: 'workspace-a' })),
         delete: teamDelete,
         countByWorkspace: vi.fn(() => 0),
-      } as any,
-      workspaces: workspaces as any,
+      } as unknown,
+      workspaces: workspaces as unknown,
       serverInfo: vi.fn(),
       setRemoteAccess: vi.fn(),
     });
@@ -73,12 +73,12 @@ describe('workspace automatic deletion', () => {
     const bridge = createBridgeHarness();
 
     registerBridgeHandlers({
-      bridge: bridge as any,
-      attachments: {} as any,
-      attachmentService: {} as any,
-      conversations: {} as any,
-      teams: {} as any,
-      workspaces: {} as any,
+      bridge: bridge as unknown,
+      attachments: {} as unknown,
+      attachmentService: {} as unknown,
+      conversations: {} as unknown,
+      teams: {} as unknown,
+      workspaces: {} as unknown,
       serverInfo: vi.fn(),
       setRemoteAccess: vi.fn(),
     });

@@ -78,13 +78,13 @@ describe('ConversationService agent event policy', () => {
   it('does not persist streaming deltas but persists final and completed tool events', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
-    (runtime as any).activeTurnId = 'turn-1';
+    const runtime = (conversations as unknown).getRuntime(conversations.get(conversation.id));
+    (runtime as unknown).activeTurnId = 'turn-1';
 
     const emitted: AgentEvent[] = [];
-    vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+    vi.spyOn(events, 'emit').mockImplementation((name: unknown, data: unknown) => {
       if (name === 'conversation.agentEvent') emitted.push(data);
     });
 
@@ -118,7 +118,7 @@ describe('ConversationService agent event policy', () => {
         status: 'completed',
         output: 'done',
       },
-    } as any);
+    } as unknown);
 
     runtime['handleSessionUpdate']({
       update: {
@@ -128,7 +128,7 @@ describe('ConversationService agent event policy', () => {
         status: 'failed',
         error: { message: 'boom' },
       },
-    } as any);
+    } as unknown);
 
     runtime.emit('agentEvent', {
       id: '4',

@@ -13,7 +13,7 @@ type AuthUser = {
 };
 
 /** 应用入口组件预留属性。 */
-export type AppProps = {};
+export type AppProps = Record<never, never>;
 
 /**
  * 应用入口组件。

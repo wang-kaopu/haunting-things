@@ -7,6 +7,11 @@ const port = Number.parseInt(process.env.TEAM_MCP_PORT || '0', 10);
 const authToken = process.env.TEAM_MCP_TOKEN || '';
 const fromSlotId = process.env.TEAM_AGENT_SLOT_ID || '';
 
+type TeamToolResponse = {
+  error?: unknown;
+  result?: unknown;
+};
+
 if (!port || !authToken) {
   process.stderr.write('TEAM_MCP_PORT and TEAM_MCP_TOKEN are required\n');
   process.exit(1);
@@ -98,7 +103,7 @@ function textResult(text: string) {
 }
 
 /** 向本地 Team MCP TCP bridge 发送一条带长度前缀的 JSON 请求。 */
-function sendTcpRequest(payload: unknown): Promise<any> {
+function sendTcpRequest(payload: unknown): Promise<TeamToolResponse> {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(port, '127.0.0.1');
     let buffer = Buffer.alloc(0);

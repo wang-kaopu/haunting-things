@@ -1,5 +1,6 @@
 import type { Team, TeamWithWorkspace } from '@shared/types';
 import type { Db } from '@server/db/connection';
+import type { DatabaseRow } from '@server/db/mappers';
 import { rowToTeam, rowToTeamWithWorkspace } from '@server/db/mappers';
 
 /** 负责团队配置的持久化读写，团队成员列表以 JSON 快照保存。 */
@@ -25,31 +26,31 @@ export class TeamRepository {
 
   /** 按团队标识读取团队配置，找不到时返回空值便于服务层做权限判断。 */
   getTeam(id: string): Team | null {
-    const row = this.db.prepare('SELECT * FROM teams WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT * FROM teams WHERE id = ?').get(id) as DatabaseRow | undefined;
     return row ? rowToTeam(row) : null;
   }
 
   /** 按最近更新时间列出团队，匹配侧边栏的默认排序。 */
   listTeams(): Team[] {
-    const rows = this.db.prepare('SELECT * FROM teams ORDER BY updated_at DESC').all() as any[];
+    const rows = this.db.prepare('SELECT * FROM teams ORDER BY updated_at DESC').all() as DatabaseRow[];
     return rows.map(rowToTeam);
   }
 
   /** 统计某个工作区下的团队数量，用于判断工作区是否可自动清理。 */
   countTeamsByWorkspace(workspaceId: string): number {
-    const row = this.db.prepare('SELECT COUNT(*) AS count FROM teams WHERE workspace_id = ?').get(workspaceId) as any;
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM teams WHERE workspace_id = ?').get(workspaceId) as { count: number } | undefined;
     return Number(row?.count ?? 0);
   }
 
   /** 按 ID 读取带工作区详情的团队视图。 */
   getTeamWithWorkspace(id: string): TeamWithWorkspace | null {
-    const row = this.db.prepare(teamWithWorkspaceSql('WHERE t.id = ?')).get(id) as any;
+    const row = this.db.prepare(teamWithWorkspaceSql('WHERE t.id = ?')).get(id) as DatabaseRow | undefined;
     return row ? rowToTeamWithWorkspace(row) : null;
   }
 
   /** 列出带工作区详情的团队视图。 */
   listTeamsWithWorkspace(): TeamWithWorkspace[] {
-    const rows = this.db.prepare(teamWithWorkspaceSql('ORDER BY t.updated_at DESC')).all() as any[];
+    const rows = this.db.prepare(teamWithWorkspaceSql('ORDER BY t.updated_at DESC')).all() as DatabaseRow[];
     return rows.map(rowToTeamWithWorkspace);
   }
 

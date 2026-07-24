@@ -2,7 +2,6 @@ import type {
   ChatMessage,
   ConversationMemory,
   ConversationMemoryState,
-  ConversationMemoryStatus,
 } from '@shared/types';
 import type { ConversationRepositoryPort } from '@server/port/conversationRepositoryPort';
 import { InputBudgetService, RECENT_MEMORY_MESSAGE_WINDOW } from '@server/services/inputBudgetService';

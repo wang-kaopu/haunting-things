@@ -63,3 +63,13 @@ haunting-things
 npm install -g haunting-things
 haunting-things
 ```
+
+## 开发检查
+
+提交代码前运行以下检查：
+
+```bash
+npm run check
+```
+
+`check` 会依次运行 ESLint、TypeScript 类型检查和测试。ESLint 覆盖项目中的 JavaScript、TypeScript 和 TSX 文件，并禁止使用显式 `any` 类型；只需单独检查代码规范时可运行 `npm run lint`。

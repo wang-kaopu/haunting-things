@@ -1,7 +1,6 @@
 import type {
   AgentBackend,
   AgentEvent,
-  AgentTurnPhase,
   AttachmentKind,
   AttachmentRef,
   ChatMessage,

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Workspace } from '@shared/types';
 import type { Db } from '@server/db/connection';
+import type { DatabaseRow } from '@server/db/mappers';
 import { rowToWorkspace } from '@server/db/mappers';
 import { createId } from '@server/id';
 
@@ -34,13 +35,13 @@ export class WorkspaceRepository {
 
   /** 按 ID 读取工作区。 */
   getWorkspace(id: string): Workspace | null {
-    const row = this.db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as DatabaseRow | undefined;
     return row ? rowToWorkspace(row) : null;
   }
 
   /** 按标准化路径读取工作区。 */
   getWorkspaceByPath(workspacePath: string): Workspace | null {
-    const row = this.db.prepare('SELECT * FROM workspaces WHERE path = ?').get(normalizeWorkspacePath(workspacePath)) as any;
+    const row = this.db.prepare('SELECT * FROM workspaces WHERE path = ?').get(normalizeWorkspacePath(workspacePath)) as DatabaseRow | undefined;
     return row ? rowToWorkspace(row) : null;
   }
 
@@ -48,7 +49,7 @@ export class WorkspaceRepository {
   listWorkspaces(): Workspace[] {
     const rows = this.db
       .prepare('SELECT * FROM workspaces ORDER BY COALESCE(last_opened_at, updated_at) DESC, updated_at DESC')
-      .all() as any[];
+      .all() as DatabaseRow[];
     return rows.map(rowToWorkspace);
   }
 

@@ -52,6 +52,9 @@
     "start:remote": "ALLOW_REMOTE=true node dist-server/server/index.js",
     "prereset-password": "npm run check:node && npm run ensure:native",
     "reset-password": "node scripts/reset-password.mjs",
+    "prelint": "npm run check:node",
+    "lint": "eslint .",
+    "check": "npm run lint && npm run typecheck && npm test",
     "pretypecheck": "npm run check:node",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run check:node && npm run ensure:native",
@@ -90,6 +93,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cookie": "^1.0.0",
@@ -103,8 +107,11 @@
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "^37.10.3",
     "esbuild": "^0.25.11",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "tsx": "^4.19.1",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.65.0",
     "vite": "^6.4.1",
     "vitest": "^4.0.18"
   }

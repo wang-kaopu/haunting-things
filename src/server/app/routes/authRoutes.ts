@@ -1,7 +1,11 @@
 import { Router } from 'express';
+import type { Request } from 'express';
 import type { AuthService } from '@server/services/authService';
 import type { Logger } from '@server/utils/logger';
 import { setRequestContext } from '@server/utils/requestContext';
+import type { User } from '@shared/types';
+
+type AuthenticatedRequest = Request & { user: User };
 
 /** 创建认证相关 HTTP 路由，并把登录/改密等安全事件写入审计日志。 */
 export function createAuthRoutes(auth: AuthService, logger: Logger): Router {
@@ -34,7 +38,7 @@ export function createAuthRoutes(auth: AuthService, logger: Logger): Router {
   });
 
   router.post('/logout', auth.authenticateRequest, (req, res) => {
-    const user = (req as any).user as { id?: string; username?: string } | undefined;
+    const user = (req as AuthenticatedRequest).user;
     logger.info('auth_logout', {
       userId: user?.id,
       username: user?.username,
@@ -44,12 +48,12 @@ export function createAuthRoutes(auth: AuthService, logger: Logger): Router {
   });
 
   router.get('/api/auth/user', auth.authenticateRequest, (req, res) => {
-    res.json({ success: true, user: (req as any).user });
+    res.json({ success: true, user: (req as AuthenticatedRequest).user });
   });
 
   router.post('/api/auth/change-password', auth.authenticateRequest, async (req, res) => {
     const { currentPassword, newPassword } = req.body ?? {};
-    const user = (req as any).user as { id?: string; username?: string } | undefined;
+    const user = (req as AuthenticatedRequest).user;
     if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
       logger.warn('auth_change_password_invalid_request', {
         userId: user?.id,

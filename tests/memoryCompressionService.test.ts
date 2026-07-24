@@ -120,7 +120,7 @@ describe('MemoryCompressionService', () => {
   it('compresses stable messages before the recent window', () => {
     const messages = Array.from({ length: RECENT_MEMORY_MESSAGE_WINDOW + 5 }, (_, index) => createMessage(index + 1));
     const repo = createRepo(messages);
-    const service = new MemoryCompressionService(repo as any, new InputBudgetService());
+    const service = new MemoryCompressionService(repo as unknown, new InputBudgetService());
 
     const result = service.compress({ conversationId: 'conv-memory', reason: 'test compression' });
 
@@ -135,7 +135,7 @@ describe('MemoryCompressionService', () => {
   it('replaces the rule summary with a model-refined summary', async () => {
     const messages = Array.from({ length: RECENT_MEMORY_MESSAGE_WINDOW + 3 }, (_, index) => createMessage(index + 1));
     const repo = createRepo(messages);
-    const service = new MemoryCompressionService(repo as any, new InputBudgetService());
+    const service = new MemoryCompressionService(repo as unknown, new InputBudgetService());
 
     service.compress({ conversationId: 'conv-memory', reason: 'rule compression' });
     const result = await service.refineWithModel({
@@ -157,7 +157,7 @@ describe('MemoryCompressionService', () => {
   it('skips stale model summaries when a newer compression changed the covered range', async () => {
     const messages = Array.from({ length: RECENT_MEMORY_MESSAGE_WINDOW + 3 }, (_, index) => createMessage(index + 1));
     const repo = createRepo(messages);
-    const service = new MemoryCompressionService(repo as any, new InputBudgetService());
+    const service = new MemoryCompressionService(repo as unknown, new InputBudgetService());
 
     service.compress({ conversationId: 'conv-memory', reason: 'first compression' });
     const result = await service.refineWithModel({

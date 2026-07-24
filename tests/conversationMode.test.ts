@@ -72,12 +72,12 @@ describe('ConversationService mode snapshots', () => {
   it('forwards current_mode_update as conversation.mode without persisting an agent event', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
+    const runtime = (conversations as unknown).getRuntime(conversations.get(conversation.id));
 
     const emitted: unknown[] = [];
-    vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+    vi.spyOn(events, 'emit').mockImplementation((name: unknown, data: unknown) => {
       if (name === 'conversation.mode') emitted.push(data);
     });
 
@@ -86,7 +86,7 @@ describe('ConversationService mode snapshots', () => {
         sessionUpdate: 'current_mode_update',
         currentModeId: 'review',
       },
-    } as any);
+    } as unknown);
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toMatchObject({
@@ -99,9 +99,9 @@ describe('ConversationService mode snapshots', () => {
   it('switches conversation mode through the runtime and emits a snapshot', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
+    const runtime = (conversations as unknown).getRuntime(conversations.get(conversation.id));
     const snapshot = {
       conversationId: conversation.id,
       mode: 'plan',
@@ -110,7 +110,7 @@ describe('ConversationService mode snapshots', () => {
     runtime.setSessionMode = vi.fn(async () => snapshot);
 
     const emitted: unknown[] = [];
-    vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+    vi.spyOn(events, 'emit').mockImplementation((name: unknown, data: unknown) => {
       if (name === 'conversation.mode') emitted.push(data);
     });
 
@@ -125,7 +125,7 @@ describe('ConversationService mode snapshots', () => {
   it('rejects permission modes that do not belong to the conversation backend', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const claude = conversations.create({ backend: 'claude', name: 'Claude' });
     const codex = conversations.create({ backend: 'codex', name: 'Codex' });
 
@@ -143,9 +143,9 @@ describe('ConversationService mode snapshots', () => {
   it('allows Codex-specific permission modes', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'codex', name: 'Codex' });
-    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
+    const runtime = (conversations as unknown).getRuntime(conversations.get(conversation.id));
     const snapshot = {
       conversationId: conversation.id,
       mode: 'full-access',
@@ -163,7 +163,7 @@ describe('ConversationService mode snapshots', () => {
   it('restores a persisted mode snapshot when runtime memory is empty', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
 
     repo.updateConversationRuntimeState(conversation.id, {

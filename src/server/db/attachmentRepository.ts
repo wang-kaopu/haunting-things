@@ -1,5 +1,6 @@
 import type { AttachmentRef, StoredAttachment } from '@shared/types';
 import type { Db } from '@server/db/connection';
+import type { DatabaseRow } from '@server/db/mappers';
 import { rowToStoredAttachment, toAttachmentRef } from '@server/db/mappers';
 
 /**
@@ -37,7 +38,7 @@ export class AttachmentRepository {
    * 查询单个附件的服务端完整记录。
    */
   getAttachment(id: string): StoredAttachment | null {
-    const row = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as DatabaseRow | undefined;
     return row ? rowToStoredAttachment(row) : null;
   }
 
@@ -52,7 +53,7 @@ export class AttachmentRepository {
 
     const rows = this.db
       .prepare(`SELECT * FROM attachments WHERE id IN (${uniqueIds.map(() => '?').join(',')})`)
-      .all(...uniqueIds) as any[];
+      .all(...uniqueIds) as Array<DatabaseRow & { id: string }>;
     const byId = new Map(rows.map((row) => [row.id, rowToStoredAttachment(row)]));
     return uniqueIds.map((id) => byId.get(id)).filter((item): item is StoredAttachment => Boolean(item));
   }
@@ -211,7 +212,7 @@ export class AttachmentRepository {
         WHERE rel.${ownerColumn} IN (${uniqueOwnerIds.map(() => '?').join(',')})
         ORDER BY rel.sort_order ASC`
       )
-      .all(...uniqueOwnerIds) as Array<any & { owner_id: string }>;
+      .all(...uniqueOwnerIds) as Array<DatabaseRow & { owner_id: string }>;
 
     const result: Record<string, AttachmentRef[]> = {};
     for (const row of rows) {
@@ -286,7 +287,7 @@ export class AttachmentRepository {
           AND NOT EXISTS (SELECT 1 FROM message_attachments ma WHERE ma.attachment_id = a.id)
           AND NOT EXISTS (SELECT 1 FROM mailbox_attachments ba WHERE ba.attachment_id = a.id)`
       )
-      .all(...ids) as any[];
+      .all(...ids) as DatabaseRow[];
     const attachments = rows.map(rowToStoredAttachment);
     if (attachments.length === 0) return [];
     this.db

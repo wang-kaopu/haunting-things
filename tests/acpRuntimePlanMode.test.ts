@@ -10,7 +10,7 @@ function createRuntime(): AcpRuntime {
     workspacePath: process.cwd(),
   });
 
-  (runtime as any).activeTurnId = 'turn-1';
+  (runtime as unknown).activeTurnId = 'turn-1';
   return runtime;
 }
 
@@ -195,9 +195,9 @@ describe('AcpRuntime plan and mode mappings', () => {
   it('sends session cancel notification and cancels pending permission requests', async () => {
     const runtime = createRuntime();
     const cancel = vi.fn(async () => undefined);
-    (runtime as any).connection = { cancel };
-    (runtime as any).sessionId = 'session-1';
-    (runtime as any).activePrompt = true;
+    (runtime as unknown).connection = { cancel };
+    (runtime as unknown).sessionId = 'session-1';
+    (runtime as unknown).activePrompt = true;
 
     const responsePromise = runtime['handlePermissionRequest']({
       options: [
@@ -222,9 +222,9 @@ describe('AcpRuntime plan and mode mappings', () => {
   it('finalizes prompt as idle when the agent returns cancelled stopReason', async () => {
     const runtime = createRuntime();
     const prompt = vi.fn(async () => ({ stopReason: 'cancelled' }));
-    (runtime as any).ensureStarted = vi.fn(async () => undefined);
-    (runtime as any).connection = { prompt };
-    (runtime as any).sessionId = 'session-1';
+    (runtime as unknown).ensureStarted = vi.fn(async () => undefined);
+    (runtime as unknown).connection = { prompt };
+    (runtime as unknown).sessionId = 'session-1';
 
     const statuses: string[] = [];
     const finishes: string[] = [];

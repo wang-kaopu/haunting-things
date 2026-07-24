@@ -1,5 +1,6 @@
 import type { TeamTask } from '@shared/types';
 import type { Db } from '@server/db/connection';
+import type { DatabaseRow } from '@server/db/mappers';
 import { rowToTask } from '@server/db/mappers';
 
 /** 负责团队任务的持久化，供 Agent 间协作和任务状态展示使用。 */
@@ -51,13 +52,13 @@ export class TaskRepository {
 
   /** 按任务标识读取单条任务，用于更新前校验和状态回显。 */
   getTask(id: string): TeamTask | null {
-    const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as DatabaseRow | undefined;
     return row ? rowToTask(row) : null;
   }
 
   /** 列出团队内任务，按最近更新优先显示。 */
   listTasks(teamId: string): TeamTask[] {
-    const rows = this.db.prepare('SELECT * FROM tasks WHERE team_id = ? ORDER BY updated_at DESC').all(teamId) as any[];
+    const rows = this.db.prepare('SELECT * FROM tasks WHERE team_id = ? ORDER BY updated_at DESC').all(teamId) as DatabaseRow[];
     return rows.map(rowToTask);
   }
 }

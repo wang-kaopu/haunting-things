@@ -12,7 +12,7 @@ import { createRequestId, runWithRequestContext } from '@server/utils/requestCon
  * 并返回统一的成功或错误结果信封。
  */
 export class WebBridge {
-  private readonly handlers = new Map<string, BridgeHandler<any>>();
+  private readonly handlers = new Map<BridgeInvokeName, (params: never) => unknown | Promise<unknown>>();
   private readonly logger = createLogger('bridge');
 
   constructor(

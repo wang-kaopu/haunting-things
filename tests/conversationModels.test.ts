@@ -72,15 +72,15 @@ describe('ConversationService model snapshots', () => {
   it('updates the conversation model and clears cached runtime snapshots', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha', model: 'old-model' });
 
-    (conversations as any).commandSnapshots.set(conversation.id, {
+    (conversations as unknown).commandSnapshots.set(conversation.id, {
       conversationId: conversation.id,
       commands: [{ name: 'review' }],
       updatedAt: Date.now(),
     });
-    (conversations as any).modelSnapshots.set(conversation.id, {
+    (conversations as unknown).modelSnapshots.set(conversation.id, {
       conversationId: conversation.id,
       currentModelId: 'old-model',
       models: [{ id: 'old-model', name: 'Old Model' }],
@@ -89,7 +89,7 @@ describe('ConversationService model snapshots', () => {
 
     const emittedCommands: unknown[] = [];
     const emittedModels: unknown[] = [];
-    const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+    const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: unknown, data: unknown) => {
       if (name === 'conversation.commands') emittedCommands.push(data);
       if (name === 'conversation.models') emittedModels.push(data);
     });

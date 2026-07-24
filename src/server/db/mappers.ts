@@ -14,10 +14,13 @@ import type {
   Workspace,
 } from '@shared/types';
 
+/** SQLite 驱动返回的动态列集合。 */
+export type DatabaseRow = Record<string, unknown>;
+
 /**
  * 将 conversation 表行映射为共享领域类型。
  */
-export function rowToConversation(row: any): Conversation {
+export function rowToConversation(row: DatabaseRow): Conversation {
   return {
     id: row.id,
     backend: row.backend,
@@ -41,11 +44,11 @@ export function rowToConversation(row: any): Conversation {
     sessionRestoredAt: row.session_restored_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  } as Conversation;
 }
 
 /** 将 conversation_memories 表行映射为共享领域类型。 */
-export function rowToConversationMemory(row: any): ConversationMemory {
+export function rowToConversationMemory(row: DatabaseRow): ConversationMemory {
   return {
     conversationId: row.conversation_id,
     summary: row.summary,
@@ -57,11 +60,11 @@ export function rowToConversationMemory(row: any): ConversationMemory {
     lastError: row.last_error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  } as ConversationMemory;
 }
 
 /** 将 workspaces 表行映射为共享领域类型。 */
-export function rowToWorkspace(row: any): Workspace {
+export function rowToWorkspace(row: DatabaseRow): Workspace {
   return {
     id: row.id,
     name: row.name,
@@ -72,11 +75,11 @@ export function rowToWorkspace(row: any): Workspace {
     lastOpenedAt: row.last_opened_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  } as Workspace;
 }
 
 /** 将 conversation + workspace join 行映射为带工作区详情的会话视图。 */
-export function rowToConversationWithWorkspace(row: any): ConversationWithWorkspace {
+export function rowToConversationWithWorkspace(row: DatabaseRow): ConversationWithWorkspace {
   return {
     ...rowToConversation(row),
     workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
@@ -84,7 +87,7 @@ export function rowToConversationWithWorkspace(row: any): ConversationWithWorksp
 }
 
 /** 将 conversation + workspace join 行映射为会话列表摘要。 */
-export function rowToConversationSummary(row: any): ConversationSummary {
+export function rowToConversationSummary(row: DatabaseRow): ConversationSummary {
   const conversation = rowToConversation(row);
   return {
     id: conversation.id,
@@ -98,13 +101,13 @@ export function rowToConversationSummary(row: any): ConversationSummary {
     lastError: conversation.lastError,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
-  };
+  } as ConversationSummary;
 }
 
 /**
  * 将 messages 表行映射为共享领域类型。
  */
-export function rowToMessage(row: any): ChatMessage {
+export function rowToMessage(row: DatabaseRow): ChatMessage {
   return {
     id: row.id,
     conversationId: row.conversation_id,
@@ -120,14 +123,14 @@ export function rowToMessage(row: any): ChatMessage {
     permissionCallId: row.permission_call_id ?? undefined,
     parentMessageId: row.parent_message_id ?? undefined,
     sequence: row.sequence,
-  };
+  } as ChatMessage;
 }
 
 /**
  * 还原持久化的 AgentEvent payload。
  */
-export function rowToAgentEvent(row: any): AgentEvent {
-  const payload = JSON.parse(row.payload) as AgentEvent;
+export function rowToAgentEvent(row: DatabaseRow): AgentEvent {
+  const payload = JSON.parse(String(row.payload)) as AgentEvent;
   return {
     ...payload,
     id: row.id,
@@ -146,7 +149,7 @@ export function rowToAgentEvent(row: any): AgentEvent {
 /**
  * 将附件表行映射为服务端完整附件记录。
  */
-export function rowToStoredAttachment(row: any): StoredAttachment {
+export function rowToStoredAttachment(row: DatabaseRow): StoredAttachment {
   return {
     id: row.id,
     kind: row.kind,
@@ -157,7 +160,7 @@ export function rowToStoredAttachment(row: any): StoredAttachment {
     url: row.url,
     sha256: row.sha256 ?? undefined,
     createdAt: row.created_at,
-  };
+  } as StoredAttachment;
 }
 
 /**
@@ -178,7 +181,7 @@ export function toAttachmentRef(attachment: StoredAttachment): AttachmentRef {
 /**
  * 将 team 表行映射为共享领域类型。
  */
-export function rowToTeam(row: any): Team {
+export function rowToTeam(row: DatabaseRow): Team {
   return {
     id: row.id,
     name: row.name,
@@ -187,11 +190,11 @@ export function rowToTeam(row: any): Team {
     agents: parseTeamAgents(row.agents),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  } as Team;
 }
 
 /** 将 team + workspace join 行映射为带工作区详情的团队视图。 */
-export function rowToTeamWithWorkspace(row: any): TeamWithWorkspace {
+export function rowToTeamWithWorkspace(row: DatabaseRow): TeamWithWorkspace {
   return {
     ...rowToTeam(row),
     workspace: rowToWorkspace(readWorkspaceJoinRow(row)),
@@ -201,7 +204,7 @@ export function rowToTeamWithWorkspace(row: any): TeamWithWorkspace {
 /**
  * 将 mailbox 表行映射为共享领域类型。
  */
-export function rowToMailbox(row: any): MailboxMessage {
+export function rowToMailbox(row: DatabaseRow): MailboxMessage {
   return {
     id: row.id,
     teamId: row.team_id,
@@ -211,13 +214,13 @@ export function rowToMailbox(row: any): MailboxMessage {
     summary: row.summary ?? undefined,
     read: row.read === 1,
     createdAt: row.created_at,
-  };
+  } as MailboxMessage;
 }
 
 /**
  * 将 task 表行映射为共享领域类型。
  */
-export function rowToTask(row: any): TeamTask {
+export function rowToTask(row: DatabaseRow): TeamTask {
   return {
     id: row.id,
     teamId: row.team_id,
@@ -231,7 +234,7 @@ export function rowToTask(row: any): TeamTask {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at ?? undefined,
-  };
+  } as TeamTask;
 }
 
 /**
@@ -250,7 +253,7 @@ function parseTeamAgents(value: unknown): Team['agents'] {
 }
 
 /** 从 conversation join 查询结果中还原 workspace 子对象字段。 */
-function readWorkspaceJoinRow(row: any): any {
+function readWorkspaceJoinRow(row: DatabaseRow): DatabaseRow {
   return {
     id: row.workspace__id,
     name: row.workspace__name,

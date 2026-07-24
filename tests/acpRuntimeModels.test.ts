@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationMode, ConversationModels } from '@shared/types';
 
-const { spawnMock, connectionMock, childMock } = vi.hoisted(() => {
+const { spawnMock, connectionMock } = vi.hoisted(() => {
   const childMock = {
     stderr: { on: vi.fn() },
     once: vi.fn(),
@@ -101,7 +101,7 @@ describe('AcpRuntime models', () => {
       modes.push(snapshot);
     });
 
-    await (runtime as any).ensureStarted();
+    await (runtime as unknown).ensureStarted();
 
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(connectionMock.initialize).toHaveBeenCalledTimes(1);
@@ -192,7 +192,7 @@ describe('AcpRuntime models', () => {
     const sessions: string[] = [];
     runtime.on('session', (event) => sessions.push(event.sessionId));
 
-    await (runtime as any).ensureStarted();
+    await (runtime as unknown).ensureStarted();
 
     expect(connectionMock.loadSession).toHaveBeenCalledWith({
       cwd: process.cwd(),
@@ -227,7 +227,7 @@ describe('AcpRuntime models', () => {
     const sessions: string[] = [];
     runtime.on('session', (event) => sessions.push(event.sessionId));
 
-    await (runtime as any).ensureStarted();
+    await (runtime as unknown).ensureStarted();
 
     expect(connectionMock.loadSession).toHaveBeenCalledWith({
       cwd: process.cwd(),
@@ -260,7 +260,7 @@ describe('AcpRuntime models', () => {
       resumeSessionId: 'session-old',
     });
 
-    await (runtime as any).ensureStarted();
+    await (runtime as unknown).ensureStarted();
 
     expect(connectionMock.unstable_resumeSession).toHaveBeenCalledWith({
       cwd: process.cwd(),

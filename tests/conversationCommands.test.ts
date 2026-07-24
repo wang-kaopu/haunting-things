@@ -46,13 +46,13 @@ describe('ConversationService commands snapshots', () => {
   it('forwards commands snapshot without persisting as agent event', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
 
     const conversation = conversations.create({ backend: 'claude', name: 'Alpha' });
-    const runtime = (conversations as any).getRuntime(conversations.get(conversation.id));
+    const runtime = (conversations as unknown).getRuntime(conversations.get(conversation.id));
 
     const emitted: ConversationCommands[] = [];
-    const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: any, data: any) => {
+    const emitSpy = vi.spyOn(events, 'emit').mockImplementation((name: unknown, data: unknown) => {
       if (name === 'conversation.commands') emitted.push(data);
     });
 

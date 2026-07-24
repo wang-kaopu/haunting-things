@@ -10,7 +10,6 @@ import type {
   ConversationListInput,
   ConversationListResult,
   ConversationMemory,
-  ConversationSummary,
   ConversationWithWorkspace,
   ConversationMcpServer,
   ConversationMode,
@@ -26,6 +25,7 @@ import {
   rowToConversationWithWorkspace,
   rowToMessage,
 } from '@server/db/mappers';
+import type { DatabaseRow } from '@server/db/mappers';
 
 const DEFAULT_CONVERSATION_LIST_LIMIT = 25;
 const MAX_CONVERSATION_LIST_LIMIT = 100;
@@ -219,7 +219,7 @@ export class ConversationRepository {
 
   /** 列出所有会话快照，按最近更新时间优先。 */
   listConversations(): Conversation[] {
-    const rows = this.db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all() as any[];
+    const rows = this.db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all() as DatabaseRow[];
     return rows.map(rowToConversation);
   }
 
@@ -227,13 +227,13 @@ export class ConversationRepository {
   listConversationsByWorkspace(workspaceId: string): Conversation[] {
     const rows = this.db
       .prepare('SELECT * FROM conversations WHERE workspace_id = ? ORDER BY updated_at DESC')
-      .all(workspaceId) as any[];
+      .all(workspaceId) as DatabaseRow[];
     return rows.map(rowToConversation);
   }
 
   /** 统计某个工作区下的会话数量，用于判断工作区是否可自动清理。 */
   countConversationsByWorkspace(workspaceId: string): number {
-    const row = this.db.prepare('SELECT COUNT(*) AS count FROM conversations WHERE workspace_id = ?').get(workspaceId) as any;
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM conversations WHERE workspace_id = ?').get(workspaceId) as { count: number } | undefined;
     return Number(row?.count ?? 0);
   }
 
@@ -247,25 +247,25 @@ export class ConversationRepository {
   listConversationsByStatus(status: Conversation['status']): Conversation[] {
     const rows = this.db
       .prepare('SELECT * FROM conversations WHERE status = ? ORDER BY updated_at DESC')
-      .all(status) as any[];
+      .all(status) as DatabaseRow[];
     return rows.map(rowToConversation);
   }
 
   /** 读取单个会话，用于发送前确认会话仍存在。 */
   getConversation(id: string): Conversation | null {
-    const row = this.db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as DatabaseRow | undefined;
     return row ? rowToConversation(row) : null;
   }
 
   /** 读取带工作区详情的单个会话。 */
   getConversationWithWorkspace(id: string): ConversationWithWorkspace | null {
-    const row = this.db.prepare(conversationWithWorkspaceSql('WHERE c.id = ?')).get(id) as any;
+    const row = this.db.prepare(conversationWithWorkspaceSql('WHERE c.id = ?')).get(id) as DatabaseRow | undefined;
     return row ? rowToConversationWithWorkspace(row) : null;
   }
 
   /** 列出带工作区详情的会话，按最近更新时间优先。 */
   listConversationsWithWorkspace(): ConversationWithWorkspace[] {
-    const rows = this.db.prepare(conversationWithWorkspaceSql('ORDER BY c.updated_at DESC')).all() as any[];
+    const rows = this.db.prepare(conversationWithWorkspaceSql('ORDER BY c.updated_at DESC')).all() as DatabaseRow[];
     return rows.map(rowToConversationWithWorkspace);
   }
 
@@ -304,7 +304,7 @@ export class ConversationRepository {
           `${whereSql} ORDER BY ${sortColumn} ${sortDirection}, c.id ${sortDirection} LIMIT ? OFFSET ?`
         )
       )
-      .all(...params, limit + 1, offset) as any[];
+      .all(...params, limit + 1, offset) as DatabaseRow[];
     const pageRows = rows.slice(0, limit);
     const nextOffset = offset + pageRows.length;
 
@@ -441,7 +441,7 @@ export class ConversationRepository {
   listMessages(conversationId: string): ChatMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY sequence ASC, created_at ASC')
-      .all(conversationId) as any[];
+      .all(conversationId) as DatabaseRow[];
     return rows.map(rowToMessage);
   }
 
@@ -451,13 +451,13 @@ export class ConversationRepository {
       .prepare(
         'SELECT * FROM messages WHERE conversation_id = ? AND sequence > ? ORDER BY sequence ASC, created_at ASC'
       )
-      .all(conversationId, sequence) as any[];
+      .all(conversationId, sequence) as DatabaseRow[];
     return rows.map(rowToMessage);
   }
 
   /** 读取 conversation 当前压缩记忆。 */
   getConversationMemory(conversationId: string): ConversationMemory | null {
-    const row = this.db.prepare('SELECT * FROM conversation_memories WHERE conversation_id = ?').get(conversationId);
+    const row = this.db.prepare('SELECT * FROM conversation_memories WHERE conversation_id = ?').get(conversationId) as DatabaseRow | undefined;
     return row ? rowToConversationMemory(row) : null;
   }
 
@@ -542,7 +542,7 @@ export class ConversationRepository {
         ORDER BY sequence DESC, created_at DESC
         LIMIT ?`
       )
-      .all(conversationId, safeLimit) as any[];
+      .all(conversationId, safeLimit) as DatabaseRow[];
 
     return rows.reverse().map(rowToAgentEvent);
   }

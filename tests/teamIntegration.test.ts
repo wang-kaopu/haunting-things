@@ -19,10 +19,6 @@ import type {
   Conversation,
   ConversationSummary,
   ConversationStatus,
-  EventMap,
-  TeamAgent,
-  TeamAgentStatus,
-  TeamMailboxEntry,
 } from '@shared/types';
 
 // ---------------------------------------------------------------------------
@@ -31,11 +27,11 @@ import type {
 
 const mockMcpInstances: Array<{
   teamId: string;
-  callbacks: any;
+  callbacks: unknown;
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
   getStdioConfig: ReturnType<typeof vi.fn>;
-  callTool: (tool: string, args: Record<string, any>, fromSlotId?: string) => Promise<any>;
+  callTool: (tool: string, args: Record<string, unknown>, fromSlotId?: string) => Promise<unknown>;
 }> = [];
 
 vi.mock('@server/mcp/teamMcpServer', () => {
@@ -56,7 +52,7 @@ vi.mock('@server/mcp/teamMcpServer', () => {
       },
     }));
 
-    constructor(teamId: string, getTeam: () => any, callbacks: unknown) {
+    constructor(teamId: string, getTeam: () => unknown, callbacks: unknown) {
       this.teamId = teamId;
       this.getTeam = getTeam;
       this.callbacks = callbacks;
@@ -70,8 +66,8 @@ vi.mock('@server/mcp/teamMcpServer', () => {
       });
     }
 
-    async callTool(tool: string, args: Record<string, any>, fromSlotId?: string): Promise<any> {
-      const parseAgentBackend = (val: any) => {
+    async callTool(tool: string, args: Record<string, unknown>, fromSlotId?: string): Promise<unknown> {
+      const parseAgentBackend = (val: unknown) => {
         if (val === 'claude' || val === 'codex') return val;
         throw new Error('backend must be exactly "claude" or "codex"');
       };
@@ -79,7 +75,7 @@ vi.mock('@server/mcp/teamMcpServer', () => {
       if (tool === 'team_add_agent') {
         const name = args.name;
         const backend = parseAgentBackend(args.backend);
-        return (this.callbacks as any).addAgent({ teamId: this.teamId, name, backend });
+        return (this.callbacks as unknown).addAgent({ teamId: this.teamId, name, backend });
       }
       if (tool === 'team_delegate_task') {
         const backend = parseAgentBackend(args.backend);
@@ -89,10 +85,10 @@ vi.mock('@server/mcp/teamMcpServer', () => {
         if (!taskBody) throw new Error('task is required');
 
         const team = this.getTeam();
-        let target = team.agents.find((agent: any) => agent.role === 'teammate' && agent.backend === backend);
+        let target = team.agents.find((agent: unknown) => agent.role === 'teammate' && agent.backend === backend);
         let createdAgent = false;
         if (!target) {
-          target = await (this.callbacks as any).addAgent({
+          target = await (this.callbacks as unknown).addAgent({
             teamId: team.id,
             name: name || (backend === 'claude' ? 'Claude Code' : 'Codex Agent'),
             backend,
@@ -100,7 +96,7 @@ vi.mock('@server/mcp/teamMcpServer', () => {
           createdAgent = true;
         }
 
-        const task = await (this.callbacks as any).taskCreate({
+        const task = await (this.callbacks as unknown).taskCreate({
           teamId: team.id,
           title: summary || taskBody,
           description: taskBody,
@@ -109,8 +105,8 @@ vi.mock('@server/mcp/teamMcpServer', () => {
         });
 
         const sender = fromSlotId
-          ? team.agents.find((agent: any) => agent.slotId === fromSlotId)
-          : team.agents.find((agent: any) => agent.role === 'leader') ?? team.agents[0];
+          ? team.agents.find((agent: unknown) => agent.slotId === fromSlotId)
+          : team.agents.find((agent: unknown) => agent.role === 'leader') ?? team.agents[0];
 
         const message = {
           id: crypto.randomUUID(),
@@ -123,7 +119,7 @@ vi.mock('@server/mcp/teamMcpServer', () => {
           createdAt: Date.now(),
         };
 
-        await (this.callbacks as any).sendMailboxMessage(message);
+        await (this.callbacks as unknown).sendMailboxMessage(message);
 
         return createdAgent
           ? `Delegated task to ${target.name} (${target.slotId}). The teammate has been started if it did not already exist.`
@@ -144,7 +140,7 @@ import { TeamService } from '@server/services/teamService';
 
 class FakeConversationService {
   conversations = new Map<string, Conversation>();
-  mcpServers = new Map<string, any[]>();
+  mcpServers = new Map<string, unknown[]>();
   sentMessages: Array<{ conversationId: string; content: string }> = [];
   runtimePrompts: Array<{ conversationId: string; prompt: string; displayMessage?: string }> = [];
   restarted: string[] = [];
@@ -192,7 +188,7 @@ class FakeConversationService {
     };
   }
 
-  setMcpServers(conversationId: string, servers: any[]): void {
+  setMcpServers(conversationId: string, servers: unknown[]): void {
     this.mcpServers.set(conversationId, servers);
   }
 
@@ -337,7 +333,7 @@ describe('team integration flow', () => {
     events = new EventBus();
     emitSpy = vi.spyOn(events, 'emit');
 
-    teamService = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations as any, events);
+    teamService = new TeamService(teamsRepo, mailboxRepo, tasksRepo, conversations as unknown, events);
   });
 
   afterEach(() => {
@@ -784,7 +780,7 @@ describe('team integration flow', () => {
     // 收集所有 emit 调用
     const emittedEvents = emitSpy.mock.calls.map(([name, data]) => ({
       name: name as string,
-      data: data as any,
+      data: data as unknown,
     }));
 
     // 验证关键事件存在
@@ -1169,10 +1165,3 @@ describe('team integration flow', () => {
     expect(repliesSecond).toHaveLength(1);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Helper：从 mockMcpInstances 取 callbacks（兜底）
-// ---------------------------------------------------------------------------
-function getMcpCallbacks(): any {
-  return (mockMcpInstances[0] as any)?.callbacks;
-}

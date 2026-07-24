@@ -11,8 +11,8 @@ const runtimeInstances: Array<{
   input: unknown;
 }> = [];
 
-vi.mock('@server/runtime/acpRuntime', () => {
-  const { EventEmitter } = require('node:events') as typeof import('node:events');
+vi.mock('@server/runtime/acpRuntime', async () => {
+  const { EventEmitter } = await import('node:events');
 
   class MockAcpRuntime extends EventEmitter {
     readonly send = vi.fn(async () => undefined);
@@ -179,7 +179,7 @@ describe('ConversationService runtime prompt separation', () => {
   it('stores displayMessage and sends the wrapped prompt to runtime', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
     await conversations.sendRuntimePrompt({
@@ -208,7 +208,7 @@ describe('ConversationService runtime prompt separation', () => {
   it('builds restore context from prior stable text messages before sending the current prompt', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
     await conversations.sendMessage({
@@ -234,10 +234,10 @@ describe('ConversationService runtime prompt separation', () => {
   it('forwards current turn cancellation to the active runtime', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
-    (conversations as any).getRuntime(conversations.get(conversation.id));
+    (conversations as unknown).getRuntime(conversations.get(conversation.id));
     const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
 
     const runtime = runtimeInstances.at(-1);
@@ -249,7 +249,7 @@ describe('ConversationService runtime prompt separation', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
     const emitSpy = vi.spyOn(events, 'emit');
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
     const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
@@ -268,7 +268,7 @@ describe('ConversationService runtime prompt separation', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
     const emitSpy = vi.spyOn(events, 'emit');
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
     repo.updateConversationStatus(conversation.id, 'running');
 
@@ -290,7 +290,7 @@ describe('ConversationService runtime prompt separation', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
     const emitSpy = vi.spyOn(events, 'emit');
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
     repo.updateConversationStatus(conversation.id, 'running');
     repo.addMessage({
@@ -324,10 +324,10 @@ describe('ConversationService runtime prompt separation', () => {
   it('force stops as idle and releases the runtime when current turn cancellation throws', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();
-    const conversations = new ConversationService(repo as any, events, '/tmp/Haunting-things-test');
+    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
     const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
 
-    (conversations as any).getRuntime(conversations.get(conversation.id));
+    (conversations as unknown).getRuntime(conversations.get(conversation.id));
     const runtime = runtimeInstances.at(-1);
     runtime?.cancelCurrentTurn.mockRejectedValueOnce(new Error('cancel transport failed'));
 
@@ -335,7 +335,7 @@ describe('ConversationService runtime prompt separation', () => {
 
     expect(result).toEqual({ accepted: false, error: 'cancel transport failed' });
     expect(runtime?.stop).toHaveBeenCalledWith('idle');
-    expect((conversations as any).runtimes.has(conversation.id)).toBe(false);
+    expect((conversations as unknown).runtimes.has(conversation.id)).toBe(false);
   });
 
   it('refines compressed memory asynchronously after the rule compression succeeds', async () => {
@@ -347,7 +347,7 @@ describe('ConversationService runtime prompt separation', () => {
       resolveSummary = resolve;
     });
     const conversations = new ConversationService(
-      repo as any,
+      repo as unknown,
       events,
       '/tmp/Haunting-things-test',
       undefined,

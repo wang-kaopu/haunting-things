@@ -1,4 +1,4 @@
-import type { AgentBackend, ChatMessage, Conversation } from '@shared/types';
+import type { ChatMessage, Conversation } from '@shared/types';
 import { createId } from '@server/id';
 import { AcpRuntime } from '@server/runtime/acpRuntime';
 import { InputBudgetService } from '@server/services/inputBudgetService';

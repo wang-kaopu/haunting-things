@@ -620,7 +620,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
 
     const stream = ndjsonFromChildProcess(child);
     const connection = new ClientSideConnection(
-      (_agent) => ({
+      () => ({
         /** 代理推送流式更新（文本块、工具调用等）。 */
         sessionUpdate: async (params: SessionNotification) => {
           this.handleSessionUpdate(params);
@@ -1344,7 +1344,7 @@ export class AcpRuntime extends EventEmitter<AcpRuntimeEvents> {
     const modelsState = raw?.models;
     if (modelsState == null) return;
 
-    let rawModels: unknown[] = [];
+    let rawModels: unknown[];
     let currentModelId: string | undefined;
 
     if (Array.isArray(modelsState)) {

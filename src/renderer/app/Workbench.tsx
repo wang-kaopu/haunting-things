@@ -55,7 +55,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [permissionQueue, setPermissionQueue] = useState<PermissionRequest[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [, setActiveWorkspaceId] = useState<string | null>(null);
   const permission = permissionQueue[0] ?? null;
 
   const {
