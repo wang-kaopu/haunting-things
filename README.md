@@ -64,12 +64,18 @@ npm install -g haunting-things
 haunting-things
 ```
 
-## 开发检查
+## 开发与打包
 
-提交代码前运行以下检查：
+项目只保留三条 npm script 命令：
 
 ```bash
+npm run dev
 npm run check
+npm run build
 ```
 
-`check` 会依次运行 ESLint、TypeScript 类型检查和测试。ESLint 覆盖项目中的 JavaScript、TypeScript 和 TSX 文件，并禁止使用显式 `any` 类型；只需单独检查代码规范时可运行 `npm run lint`。
+- `dev`：构建前端资源，并以 watch 模式热重启开发服务器。
+- `check`：执行 Node 与原生依赖检查、前端样式约束检查、ESLint、TypeScript 类型检查和测试。
+- `build`：检查构建环境与前端样式约束，然后构建前端和服务端产物。
+
+项目辅助脚本统一使用 TypeScript 编写，并通过 `tsx` 直接执行。

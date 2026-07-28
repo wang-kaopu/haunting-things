@@ -3,7 +3,7 @@
 ## 当前阶段
 
 第七阶段已完成工作区切换和工作区选择器周边迁移。后续 UI 迁移应优先复用 Tailwind token 和 shadcn/ui 组件，不再为通用控件新增大段全局 CSS。
-全局样式入口由 `npm run check:renderer-css` 约束，避免已迁移组件的旧 class 和大段组件样式回流到 `src/renderer/styles.css`。
+全局样式入口由 `npm run check` 约束，避免已迁移组件的旧 class 和大段组件样式回流到 `src/renderer/styles.css`。
 
 ## 主题入口
 
@@ -57,7 +57,7 @@
 1. 迁移组件到 shadcn/ui 或 Tailwind utility。
 2. 删除对应旧 class 的 CSS。
 3. 若旧 class 仍被引用，先调整引用再删除样式。
-4. 每个迁移 PR 至少运行 `npm run build:renderer` 和 `npm run typecheck`。
+4. 每个迁移 PR 至少运行 `npm run check` 和 `npm run build`。
 
 已废弃的旧样式组：
 
@@ -163,7 +163,7 @@
 - `src/renderer/features/workspace/WorkspacePanel.tsx`
 - `src/renderer/features/workspace/WorkspaceTree.tsx`
 
-这些组件已迁移到 Tailwind utility 和共享 `Button`。工作区文件面板和文件树不再依赖旧 `.workspace-panel*`、`.workspace-tree*` 全局样式；`npm run check:renderer-css` 会阻止这些已废弃选择器重新进入全局 CSS。
+这些组件已迁移到 Tailwind utility 和共享 `Button`。工作区文件面板和文件树不再依赖旧 `.workspace-panel*`、`.workspace-tree*` 全局样式；`npm run check` 会阻止这些已废弃选择器重新进入全局 CSS。
 
 ## 后续阶段建议
 

@@ -67,8 +67,6 @@ function serveRenderer(expressApp: express.Express, rendererDist: string): void 
     return;
   }
   expressApp.use((_req, res) => {
-    res
-      .status(503)
-      .send('Renderer is not built. Run `npm run build:renderer` or `npm run build` before starting the server.');
+    res.status(503).send('Renderer is not built. Run `npm run build` before starting the server.');
   });
 }

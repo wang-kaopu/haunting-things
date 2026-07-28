@@ -48,7 +48,7 @@ const deprecatedSelectorPrefixes = [
  * @param value - 待转义的 class 前缀
  * @returns 转义后的正则片段
  */
-function escapeRegExp(value) {
+function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -57,7 +57,7 @@ function escapeRegExp(value) {
  *
  * @returns 违规的 class 前缀集合
  */
-function findDeprecatedSelectors() {
+function findDeprecatedSelectors(): string[] {
   const css = readFileSync(stylesPath, 'utf8');
 
   return deprecatedSelectorPrefixes.filter((prefix) => {
@@ -71,7 +71,7 @@ function findDeprecatedSelectors() {
  *
  * @returns 当前行数
  */
-function countStylesLines() {
+function countStylesLines(): number {
   const css = readFileSync(stylesPath, 'utf8');
   return css.split(/\r?\n/).length;
 }

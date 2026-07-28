@@ -346,12 +346,8 @@ export function resolveTeamMcpStdioInvocation(currentModuleUrl: string = import.
       args: [path.join(path.dirname(current), 'teamMcpStdio.js')],
     };
   }
-  const projectRoot = path.resolve(path.dirname(current), '..', '..', '..');
   return {
     command: process.execPath,
-    args: [
-      path.join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs'),
-      path.join(path.dirname(current), 'teamMcpStdio.ts'),
-    ],
+    args: ['--import', 'tsx', path.join(path.dirname(current), 'teamMcpStdio.ts')],
   };
 }

@@ -1,6 +1,11 @@
 import { spawnSync } from 'node:child_process';
 
-async function isBetterSqlite3Usable() {
+/**
+ * 检查 better-sqlite3 原生绑定是否兼容当前 Node 运行时。
+ *
+ * @returns 原生绑定可正常加载时返回 true
+ */
+async function isBetterSqlite3Usable(): Promise<boolean> {
   try {
     await import('better-sqlite3');
     return true;

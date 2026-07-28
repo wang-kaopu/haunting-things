@@ -159,10 +159,7 @@ describe('TeamMcpServer', () => {
     const dev = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('src/server/mcp/teamMcpServer.ts')).href);
     expect(dev).toEqual({
       command: process.execPath,
-      args: [
-        path.resolve('node_modules/tsx/dist/cli.mjs'),
-        path.resolve('src/server/mcp/teamMcpStdio.ts'),
-      ],
+      args: ['--import', 'tsx', path.resolve('src/server/mcp/teamMcpStdio.ts')],
     });
 
     const prod = resolveTeamMcpStdioInvocation(pathToFileURL(path.resolve('dist-server/server/mcp/teamMcpServer.js')).href);

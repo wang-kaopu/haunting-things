@@ -4,12 +4,24 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
+type ExpectedNodeVersion = {
+  major: number;
+  source: string;
+  installHint: string;
+};
+
+type PackageManifest = {
+  engines?: {
+    node?: string;
+  };
+};
+
 /**
  * 读取项目期望的 Node 主版本。
  *
  * @returns 期望主版本与用于错误提示的来源说明
  */
-function readExpectedNodeVersion() {
+function readExpectedNodeVersion(): ExpectedNodeVersion {
   const nvmrcPath = join(projectRoot, '.nvmrc');
 
   if (existsSync(nvmrcPath)) {
@@ -22,7 +34,7 @@ function readExpectedNodeVersion() {
     };
   }
 
-  const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
+  const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')) as PackageManifest;
   const engineRange = packageJson.engines?.node ?? '';
   const majorMatch = engineRange.match(/>=\s*(\d+)/);
 
