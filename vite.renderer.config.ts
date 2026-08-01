@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+const backendTarget = "http://127.0.0.1:25808";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -23,5 +24,14 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
+    proxy: {
+      '/api': backendTarget,
+      '/login': backendTarget,
+      '/logout': backendTarget,
+      '/bridge': {
+        target: backendTarget,
+        ws: true,
+      },
+    },
   },
 });

@@ -88,7 +88,7 @@ class BrowserBridge {
       return;
     }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.socket = new WebSocket(`${protocol}//${window.location.host}`);
+    this.socket = new WebSocket(`${protocol}//${window.location.host}/bridge`);
     this.socket.addEventListener('open', () => {
       console.info('[diag] bridge socket open', {
         url: this.socket?.url,

@@ -28,7 +28,7 @@
     "npm": ">=10"
   },
   "scripts": {
-    "dev": "tsx scripts/preflight.ts && vite build --config vite.renderer.config.ts && tsx watch src/server/index.ts",
+    "dev": "tsx scripts/preflight.ts && tsx scripts/dev.ts",
     "check": "tsx scripts/preflight.ts && eslint . && tsc --noEmit && vitest run",
     "build": "tsx scripts/preflight.ts && vite build --config vite.renderer.config.ts && tsx scripts/build-server.ts"
   },
