@@ -21,7 +21,10 @@ export function registerBridgeHandlers(input: {
   teams: TeamService;
   workspaces: WorkspaceService;
   serverInfo: () => ServerInfo;
-  setRemoteAccess: (params: { allowRemote: boolean }) => ServerInfo;
+  setRemoteAccess: (params: { allowRemote: boolean }) => {
+    data: ServerInfo;
+    afterResponseSent: () => void | Promise<void>;
+  };
 }): void {
   const { bridge, attachments, attachmentService, conversations, teams, workspaces } = input;
 
@@ -107,7 +110,7 @@ export function registerBridgeHandlers(input: {
     return { stopped: true };
   });
   bridge.register('server.info', input.serverInfo);
-  bridge.register('server.setRemoteAccess', input.setRemoteAccess);
+  bridge.registerAfterResponse('server.setRemoteAccess', input.setRemoteAccess);
 
   /** 删除没有任何 Team/Conversation 引用的工作区记录。 */
   function cleanupEmptyWorkspace(workspaceId: string): void {

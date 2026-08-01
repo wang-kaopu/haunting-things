@@ -71,7 +71,10 @@ const serverManager = new ServerManager({
       teams,
       workspaces: workspaceService,
       serverInfo: () => serverManager.info(),
-      setRemoteAccess: ({ allowRemote }) => serverManager.setRemoteAccess(allowRemote),
+      setRemoteAccess: ({ allowRemote }) => ({
+        data: serverManager.setRemoteAccess(allowRemote),
+        afterResponseSent: () => serverManager.restartRemoteAccess(allowRemote),
+      }),
     });
 
     bridge.initialize(

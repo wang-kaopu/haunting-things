@@ -58,26 +58,25 @@ export class ServerManager {
     };
   }
 
-  /** 切换远程访问开关，并用异步重启避免阻塞前端设置响应。 */
+  /** 返回远程访问切换目标，供 Bridge 先写入响应再触发服务重绑。 */
   setRemoteAccess(allowRemote: boolean): ServerInfo {
     if (allowRemote === (this.instance?.allowRemote ?? this.input.allowRemote) && !this.restarting) {
       return this.info();
     }
 
-    const target = this.info({ allowRemote, restarting: true });
-    const restartTimer = setTimeout(() => {
-      this.restartQueue = this.restartQueue
-        .then(() => this.restart(allowRemote))
-        .catch((error) => {
-          this.input.logger.error('server_rebind_failed', {
-            allowRemote,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
-    }, 150);
-    restartTimer.unref();
+    return this.info({ allowRemote, restarting: true });
+  }
 
-    return target;
+  /** 在 Bridge 响应写入后排队重绑监听地址，避免中断当前 RPC。 */
+  restartRemoteAccess(allowRemote: boolean): void {
+    this.restartQueue = this.restartQueue
+      .then(() => this.restart(allowRemote))
+      .catch((error) => {
+        this.input.logger.error('server_rebind_failed', {
+          allowRemote,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
   }
 
   /** 关闭当前 HTTP 和 WebSocket 服务，通常用于进程退出。 */
@@ -128,6 +127,11 @@ export class ServerManager {
     const host = resolveListenHost(allowRemote);
     const server = http.createServer(this.input.app);
     const wss = new WebSocketServer({ server, maxPayload: 32 * 1024 * 1024 });
+    wss.on('error', (error) => {
+      this.input.logger.error('websocket_server_error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     const bridge = new WebBridge(wss, this.input.auth);
 
     this.input.configureBridge(bridge);
@@ -157,28 +161,29 @@ export class ServerManager {
     };
   }
 
-  /**
-   * 关闭指定服务实例，并终止仍未正常关闭的 WebSocket 连接。
-   */
+  /** 关闭指定服务实例，确认端口释放后才允许重新绑定。 */
   private async stopInstance(instance: ServerInstance | null, reason: string): Promise<void> {
     if (!instance) return;
+
+    const serverClosed = new Promise<void>((resolve) => {
+      instance.server.close(() => resolve());
+    });
+    instance.server.closeIdleConnections();
 
     for (const client of instance.wss.clients) {
       client.close(1001, reason);
     }
 
-    await new Promise<void>((resolve) => {
-      const timeout = setTimeout(resolve, 1000);
-      timeout.unref();
-      instance.server.close(() => {
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
+    const forceCloseTimer = setTimeout(() => {
+      for (const client of instance.wss.clients) {
+        client.terminate();
+      }
+      instance.server.closeAllConnections();
+    }, 1000);
+    forceCloseTimer.unref();
 
-    for (const client of instance.wss.clients) {
-      client.terminate();
-    }
+    await serverClosed;
+    clearTimeout(forceCloseTimer);
     instance.wss.close();
   }
 }

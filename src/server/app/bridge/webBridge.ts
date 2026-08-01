@@ -2,8 +2,18 @@ import type { IncomingMessage } from 'node:http';
 import type { WebSocketServer, WebSocket } from 'ws';
 import type { AuthService } from '@server/services/authService';
 import type { BridgeClientMessage, BridgeHandler, BridgeInvokeName, BridgeResultMessage } from '@shared/bridge';
+import type { InvokeMap } from '@shared/types';
 import { createLogger } from '@server/utils/logger';
 import { createRequestId, runWithRequestContext } from '@server/utils/requestContext';
+
+type BridgeHandlerResponse<Result> = {
+  data: Result;
+  afterResponseSent?: () => void | Promise<void>;
+};
+
+type AfterResponseBridgeHandler<Name extends BridgeInvokeName> = (
+  params: InvokeMap[Name]['params']
+) => BridgeHandlerResponse<InvokeMap[Name]['result']> | Promise<BridgeHandlerResponse<InvokeMap[Name]['result']>>;
 
 /**
  * 渲染端与服务端之间的已认证 WebSocket RPC bridge。
@@ -12,7 +22,10 @@ import { createRequestId, runWithRequestContext } from '@server/utils/requestCon
  * 并返回统一的成功或错误结果信封。
  */
 export class WebBridge {
-  private readonly handlers = new Map<BridgeInvokeName, (params: never) => unknown | Promise<unknown>>();
+  private readonly handlers = new Map<
+    BridgeInvokeName,
+    (params: never) => Promise<BridgeHandlerResponse<unknown>>
+  >();
   private readonly logger = createLogger('bridge');
 
   constructor(
@@ -22,7 +35,12 @@ export class WebBridge {
 
   /** 注册一个可由 renderer 调用的 RPC handler。 */
   register<Name extends BridgeInvokeName>(name: Name, handler: BridgeHandler<Name>): void {
-    this.handlers.set(name, handler);
+    this.handlers.set(name, async (params) => ({ data: await handler(params as InvokeMap[Name]['params']) }));
+  }
+
+  /** 注册一个会在成功响应写入当前 WebSocket 后执行副作用的 RPC handler。 */
+  registerAfterResponse<Name extends BridgeInvokeName>(name: Name, handler: AfterResponseBridgeHandler<Name>): void {
+    this.handlers.set(name, async (params) => handler(params as InvokeMap[Name]['params']));
   }
 
   /** 为 WebSocket server 挂载认证和消息处理逻辑。 */
@@ -93,13 +111,17 @@ export class WebBridge {
     );
 
     try {
-      const data = await handler(message.data as never);
+      const response = await handler(message.data as never);
       this.logger.info(
         `bridge response: name=${message.name}, invoke_id=${message.id}, status=ok, result=${formatBridgeValue(
-          summarizeInvokeResult(message.name, data)
+          summarizeInvokeResult(message.name, response.data)
         )} - ${Date.now() - startedAt}ms`
       );
-      this.send(socket, { id: message.id, type: 'result', name: message.name, data } as BridgeResultMessage);
+      this.send(
+        socket,
+        { id: message.id, type: 'result', name: message.name, data: response.data } as BridgeResultMessage,
+        response.afterResponseSent
+      );
     } catch (error) {
       this.logger.warn(
         `bridge response: name=${message.name}, invoke_id=${message.id}, status=error, error=${formatBridgeValue(
@@ -115,9 +137,24 @@ export class WebBridge {
     }
   }
 
-  /** 在 socket 仍打开时发送一条结果信封。 */
-  private send(socket: WebSocket, payload: BridgeResultMessage): void {
-    if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
+  /** 在 socket 仍打开时发送一条结果信封，并在数据帧写入后执行延后副作用。 */
+  private send(socket: WebSocket, payload: BridgeResultMessage, afterResponseSent?: () => void | Promise<void>): void {
+    if (socket.readyState !== socket.OPEN) return;
+
+    socket.send(JSON.stringify(payload), (error) => {
+      if (error) {
+        this.logger.warn('bridge_response_send_failed', { error: error.message });
+        return;
+      }
+
+      if (afterResponseSent) {
+        void Promise.resolve(afterResponseSent()).catch((callbackError) => {
+          this.logger.error('bridge_after_response_failed', {
+            error: callbackError instanceof Error ? callbackError.message : String(callbackError),
+          });
+        });
+      }
+    });
   }
 }
 

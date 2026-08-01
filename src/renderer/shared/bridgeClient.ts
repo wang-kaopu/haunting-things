@@ -8,6 +8,12 @@ type Pending = {
   reject: (error: Error) => void;
 };
 
+type ConnectionWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timeout: number;
+};  
+
 /** Bridge 事件订阅回调，按事件名推导 payload。 */
 type EventHandler<Name extends BridgeEventName> = (data: EventMap[Name]) => void;
 
@@ -16,6 +22,7 @@ class BrowserBridge {
   private socket: WebSocket | null = null;
   private readonly pending = new Map<string, Pending>();
   private readonly handlers = new Map<string, Set<(data: unknown) => void>>();
+  private readonly connectionWaiters = new Set<ConnectionWaiter>();
   private reconnectTimer: number | null = null;
 
   /**
@@ -51,6 +58,27 @@ class BrowserBridge {
     return () => set.delete(handler as (data: unknown) => void);
   }
 
+  /** 等待当前连接关闭并建立下一条可用的 Bridge 连接。 */
+  waitForReconnect(timeoutMs: number): Promise<void> {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return this.waitForOpen(timeoutMs);
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        socket.removeEventListener('close', onClose);
+        reject(new Error('Bridge reconnection timed out.'));
+      }, timeoutMs);
+      const onClose = () => {
+        window.clearTimeout(timeout);
+        void this.waitForOpen(timeoutMs).then(resolve, reject);
+      };
+
+      socket.addEventListener('close', onClose, { once: true });
+    });
+  }
+
   /** 建立或复用 WebSocket 连接。 */
   private connect(): void {
     if (
@@ -66,6 +94,7 @@ class BrowserBridge {
         url: this.socket?.url,
         at: new Date().toISOString(),
       });
+      this.resolveConnectionWaiters();
     });
     this.socket.addEventListener('message', (event) => this.handleMessage(String(event.data)));
     this.socket.addEventListener('close', (event) => {
@@ -138,6 +167,33 @@ class BrowserBridge {
       this.reconnectTimer = null;
       this.connect();
     }, 1000);
+  }
+
+  /** 建立连接后继续等待中的服务重启流程。 */
+  private waitForOpen(timeoutMs: number): Promise<void> {
+    this.connect();
+    if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      const waiter: ConnectionWaiter = {
+        resolve,
+        reject,
+        timeout: window.setTimeout(() => {
+          this.connectionWaiters.delete(waiter);
+          reject(new Error('Bridge reconnection timed out.'));
+        }, timeoutMs),
+      };
+      this.connectionWaiters.add(waiter);
+    });
+  }
+
+  /** 解析所有等待下一条已打开连接的调用。 */
+  private resolveConnectionWaiters(): void {
+    for (const waiter of this.connectionWaiters) {
+      window.clearTimeout(waiter.timeout);
+      waiter.resolve();
+    }
+    this.connectionWaiters.clear();
   }
 
   /**
