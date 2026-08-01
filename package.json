@@ -28,9 +28,9 @@
     "npm": ">=10"
   },
   "scripts": {
-    "dev": "tsx scripts/check-node-version.ts && tsx scripts/ensure-native-deps.ts && vite build --config vite.renderer.config.ts && tsx watch src/server/index.ts",
-    "check": "tsx scripts/check-node-version.ts && tsx scripts/ensure-native-deps.ts && tsx scripts/check-renderer-css.ts && eslint . && tsc --noEmit && vitest run",
-    "build": "tsx scripts/check-node-version.ts && tsx scripts/ensure-native-deps.ts && tsx scripts/check-renderer-css.ts && vite build --config vite.renderer.config.ts && tsx scripts/build-server.ts"
+    "dev": "tsx scripts/preflight.ts && vite build --config vite.renderer.config.ts && tsx watch src/server/index.ts",
+    "check": "tsx scripts/preflight.ts && eslint . && tsc --noEmit && vitest run",
+    "build": "tsx scripts/preflight.ts && vite build --config vite.renderer.config.ts && tsx scripts/build-server.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.2",
