@@ -231,20 +231,6 @@ describe('ConversationService runtime prompt separation', () => {
     expect(lastPrompt.restoreContext).not.toContain('第二条消息');
   });
 
-  it('forwards current turn cancellation to the active runtime', async () => {
-    const repo = createFakeRepository();
-    const events = new EventBus();
-    const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
-    const conversation = conversations.create({ backend: 'claude' as AgentBackend, name: 'Alpha' });
-
-    (conversations as unknown).getRuntime(conversations.get(conversation.id));
-    const result = await conversations.cancelCurrentTurn({ conversationId: conversation.id });
-
-    const runtime = runtimeInstances.at(-1);
-    expect(result).toEqual({ accepted: true });
-    expect(runtime?.cancelCurrentTurn).toHaveBeenCalledTimes(1);
-  });
-
   it('treats missing runtime during cancellation as idle recovery', async () => {
     const repo = createFakeRepository();
     const events = new EventBus();

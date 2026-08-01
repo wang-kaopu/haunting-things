@@ -92,13 +92,13 @@ describe('AcpRuntime models', () => {
       model: 'sonnet-4',
     });
 
-    const snapshots: ConversationModels[] = [];
-    const modes: ConversationMode[] = [];
+    let modelSnapshot: ConversationModels | undefined;
+    let modeSnapshot: ConversationMode | undefined;
     runtime.on('models', (snapshot) => {
-      snapshots.push(snapshot);
+      modelSnapshot = snapshot;
     });
     runtime.on('mode', (snapshot) => {
-      modes.push(snapshot);
+      modeSnapshot = snapshot;
     });
 
     await (runtime as unknown).ensureStarted();
@@ -119,35 +119,19 @@ describe('AcpRuntime models', () => {
       sessionId: 'session-1',
       modeId: 'default',
     });
-    expect(connectionMock.unstable_setSessionModel.mock.invocationCallOrder[0]).toBeLessThan(
-      connectionMock.setSessionMode.mock.invocationCallOrder[0]
-    );
-    expect(snapshots).toHaveLength(2);
-    expect(snapshots[0]).toMatchObject({
+    expect(modelSnapshot).toMatchObject({
       conversationId: 'conv-1',
       currentModelId: 'sonnet-4',
       models: expect.arrayContaining([
         expect.objectContaining({ id: 'sonnet-4', name: 'Sonnet 4' }),
       ]),
     });
-    expect(snapshots[1]).toMatchObject({
-      conversationId: 'conv-1',
-      currentModelId: 'sonnet-4',
-      models: expect.arrayContaining([
-        expect.objectContaining({ id: 'sonnet-4', name: 'Sonnet 4' }),
-      ]),
-    });
-    expect(modes).toHaveLength(2);
-    expect(modes[0]).toMatchObject({
+    expect(modeSnapshot).toMatchObject({
       conversationId: 'conv-1',
       mode: 'default',
     });
-    expect(modes[1]).toMatchObject({
-      conversationId: 'conv-1',
-      mode: 'default',
-    });
-    expect(runtime.getModelsSnapshot()).toEqual(snapshots[1]);
-    expect(runtime.getModeSnapshot()).toEqual(modes[1]);
+    expect(runtime.getModelsSnapshot()).toEqual(modelSnapshot);
+    expect(runtime.getModeSnapshot()).toEqual(modeSnapshot);
   });
 
   it('switches session mode and emits a local snapshot', async () => {

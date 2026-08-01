@@ -22,20 +22,37 @@ const conversation: Conversation = {
 };
 
 describe('InputBudgetService', () => {
-  it('requests compression when projected usage reaches 150k', () => {
-    const service = new InputBudgetService();
-    const plan = service.plan({
-      conversation: { ...conversation, usageUsed: COMPRESSION_TRIGGER_TOKENS },
+  it('requests compression at the projected 150k threshold', () => {
+    class FixedInputBudgetService extends InputBudgetService {
+      override estimateTextTokens(text: string | null | undefined): number {
+        return text ? 1 : 0;
+      }
+    }
+    const service = new FixedInputBudgetService();
+    const usage = {
+      conversationId: conversation.id,
+      size: 200_000,
+      ratio: 0,
+      updatedAt: 1,
+    };
+    const belowThreshold = service.plan({
+      conversation: { ...conversation, usageUsed: COMPRESSION_TRIGGER_TOKENS - 16_002 },
       text: 'hello',
       usage: {
-        conversationId: conversation.id,
-        size: 200_000,
-        used: COMPRESSION_TRIGGER_TOKENS,
-        ratio: 0.75,
-        updatedAt: 1,
+        ...usage,
+        used: COMPRESSION_TRIGGER_TOKENS - 16_002,
+      },
+    });
+    const plan = service.plan({
+      conversation: { ...conversation, usageUsed: COMPRESSION_TRIGGER_TOKENS - 16_001 },
+      text: 'hello',
+      usage: {
+        ...usage,
+        used: COMPRESSION_TRIGGER_TOKENS - 16_001,
       },
     });
 
+    expect(belowThreshold.action).toBe('allow');
     expect(plan.action).toBe('compress');
   });
 

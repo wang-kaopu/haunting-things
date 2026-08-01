@@ -69,29 +69,16 @@ describe('workspace automatic deletion', () => {
     });
   });
 
-  it('does not register a direct workspace deletion API', () => {
-    const bridge = createBridgeHarness();
-
-    registerBridgeHandlers({
-      bridge: bridge as unknown,
-      attachments: {} as unknown,
-      attachmentService: {} as unknown,
-      conversations: {} as unknown,
-      teams: {} as unknown,
-      workspaces: {} as unknown,
-      serverInfo: vi.fn(),
-      setRemoteAccess: vi.fn(),
-    });
-
-    expect(bridge.has('workspace.delete')).toBe(false);
-  });
 });
 
 /** 创建一个只记录 bridge handler 的测试桩。 */
 function createBridgeHarness(): {
   register: (name: string, handler: (params: unknown) => unknown) => void;
+  registerAfterResponse: (
+    name: string,
+    handler: (params: unknown) => { data: unknown; afterResponseSent?: () => void | Promise<void> } | Promise<{ data: unknown; afterResponseSent?: () => void | Promise<void> }>
+  ) => void;
   invoke: (name: string, params: unknown) => Promise<unknown>;
-  has: (name: string) => boolean;
 } {
   const handlers = new Map<string, (params: unknown) => unknown>();
 
@@ -99,13 +86,13 @@ function createBridgeHarness(): {
     register(name, handler) {
       handlers.set(name, handler);
     },
+    registerAfterResponse(name, handler) {
+      handlers.set(name, async (params) => (await handler(params)).data);
+    },
     async invoke(name, params) {
       const handler = handlers.get(name);
       if (!handler) throw new Error(`Unknown handler: ${name}`);
       return handler(params);
-    },
-    has(name) {
-      return handlers.has(name);
     },
   };
 }

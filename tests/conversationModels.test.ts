@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventBus } from '@server/events';
 import { ConversationService } from '@server/services/conversationService';
-import type { Conversation } from '@shared/types';
+import type { Conversation, ConversationCommands } from '@shared/types';
 
 function createFakeRepository() {
   const conversations = new Map<string, Conversation>();
+  const commands = new Map<string, ConversationCommands>();
 
   return {
     createConversation(conversation: Conversation): Conversation {
@@ -39,6 +40,13 @@ function createFakeRepository() {
       const updated = { ...conversation, ...patch, updatedAt: Date.now() };
       conversations.set(id, updated);
       return structuredClone(updated);
+    },
+    replaceConversationCommands(id: string, nextCommands: ConversationCommands['commands'], updatedAt: number): void {
+      commands.set(id, { conversationId: id, commands: structuredClone(nextCommands), updatedAt });
+    },
+    getConversationCommands(id: string): ConversationCommands | null {
+      const snapshot = commands.get(id);
+      return snapshot ? structuredClone(snapshot) : null;
     },
     updateConversationTurnResult(id: string, patch: Partial<Conversation>): Conversation | null {
       const conversation = conversations.get(id);
@@ -99,7 +107,10 @@ describe('ConversationService model snapshots', () => {
 
     expect(updated.model).toBe('sonnet-4');
     expect(restartSpy).toHaveBeenCalledWith(conversation.id);
-    expect(conversations.commands(conversation.id)).toBeNull();
+    expect(conversations.commands(conversation.id)).toMatchObject({
+      conversationId: conversation.id,
+      commands: [],
+    });
     expect(conversations.models(conversation.id)).toMatchObject({
       conversationId: conversation.id,
       currentModelId: 'sonnet-4',

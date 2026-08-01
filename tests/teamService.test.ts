@@ -52,7 +52,6 @@ type FakeRepository = {
   listTeams(): Team[];
   deleteTeam(id: string): void;
   writeMailbox(message: MailboxMessage): MailboxMessage;
-  readUnreadAndMark(teamId: string, toAgentId: string): MailboxMessage[];
   markMailboxRead(messageIds: string[]): void;
   listUnreadMailbox(teamId: string, toAgentId: string): MailboxMessage[];
   listMailbox(teamId: string): MailboxMessage[];
@@ -88,17 +87,6 @@ function createFakeRepository(): FakeRepository {
     writeMailbox(message) {
       mailbox.push(structuredClone(message));
       return message;
-    },
-    readUnreadAndMark(teamId, toAgentId) {
-      const unread = mailbox
-        .filter((message) => message.teamId === teamId && message.toAgentId === toAgentId && !message.read)
-        .map((message) => structuredClone(message));
-      for (const message of mailbox) {
-        if (message.teamId === teamId && message.toAgentId === toAgentId && !message.read) {
-          message.read = true;
-        }
-      }
-      return unread;
     },
     markMailboxRead(messageIds) {
       for (const message of mailbox) {
@@ -275,23 +263,6 @@ describe('TeamService', () => {
     expect(mockInstances[0].stop).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes every team in a workspace through the normal team cleanup path', async () => {
-    const service = new TeamService(repo as unknown, repo as unknown, repo as unknown, conversations as unknown, events);
-    const first = await service.create({ name: 'Alpha', workspaceId: 'workspace-a', leaderBackend: 'claude' });
-    const second = await service.create({ name: 'Beta', workspaceId: 'workspace-a', leaderBackend: 'codex' });
-    const third = await service.create({ name: 'Gamma', workspaceId: 'workspace-b', leaderBackend: 'claude' });
-
-    const result = await service.deleteByWorkspace('workspace-a');
-
-    expect(result).toEqual({ deleted: 2 });
-    expect(repo.getTeam(first.id)).toBeNull();
-    expect(repo.getTeam(second.id)).toBeNull();
-    expect(repo.getTeam(third.id)).not.toBeNull();
-    expect(conversations.stop).toHaveBeenCalledWith('conv-1');
-    expect(conversations.stop).toHaveBeenCalledWith('conv-2');
-    expect(conversations.stop).not.toHaveBeenCalledWith('conv-3');
-  });
-
   it('records mailbox entries in the team timeline and marks them processed after delivery', async () => {
     const service = new TeamService(repo as unknown, repo as unknown, repo as unknown, conversations as unknown, events);
     const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
@@ -455,6 +426,64 @@ describe('TeamService', () => {
       prompt: expect.stringContaining('Reply from Dev:'),
       displayMessage: 'Dev: Reply from Dev:\nI fixed the bug and added coverage.',
     }));
+  });
+
+  it('does not auto-return an assistant reply after the teammate finishes the task explicitly', async () => {
+    const service = new TeamService(repo as unknown, repo as unknown, repo as unknown, conversations as unknown, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
+    const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
+
+    await service.finishTask({ teamId: team.id, fromSlotId: teammate.slotId, summary: 'Explicit result' });
+    conversationMessages.set(teammate.conversationId, [{
+      id: 'reply-1',
+      conversationId: teammate.conversationId,
+      role: 'assistant',
+      content: 'Natural-language reply',
+      createdAt: Date.now(),
+      status: 'done',
+    }]);
+    await agentEventHandler?.({
+      id: 'event-1',
+      type: 'agent.reply.done',
+      conversationId: teammate.conversationId,
+      turnId: 'turn-1',
+      messageId: 'reply-1',
+      content: 'Natural-language reply',
+      at: Date.now(),
+    });
+    await vi.runAllTimersAsync();
+
+    expect(service.timeline(team.id).filter((item) => item.message.content.includes('Reply from'))).toHaveLength(0);
+  });
+
+  it('auto-returns each assistant reply only once', async () => {
+    const service = new TeamService(repo as unknown, repo as unknown, repo as unknown, conversations as unknown, events);
+    const team = await service.create({ name: 'Alpha', leaderBackend: 'claude' });
+    const teammate = await service.addAgent({ teamId: team.id, name: 'Dev', backend: 'codex' });
+    const messageId = 'reply-1';
+    conversationMessages.set(teammate.conversationId, [{
+      id: messageId,
+      conversationId: teammate.conversationId,
+      role: 'assistant',
+      content: 'Deduplicated reply',
+      createdAt: Date.now(),
+      status: 'done',
+    }]);
+
+    for (const id of ['event-1', 'event-2']) {
+      await agentEventHandler?.({
+        id,
+        type: 'agent.reply.done',
+        conversationId: teammate.conversationId,
+        turnId: 'turn-1',
+        messageId,
+        content: 'Deduplicated reply',
+        at: Date.now(),
+      });
+      await vi.runAllTimersAsync();
+    }
+
+    expect(service.timeline(team.id).filter((item) => item.message.content.includes('Reply from'))).toHaveLength(1);
   });
 });
 

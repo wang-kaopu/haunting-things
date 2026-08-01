@@ -69,7 +69,7 @@ function createFakeRepository() {
 }
 
 describe('ConversationService mode snapshots', () => {
-  it('forwards current_mode_update as conversation.mode without persisting an agent event', () => {
+  it('forwards runtime mode snapshots as conversation.mode', () => {
     const repo = createFakeRepository();
     const events = new EventBus();
     const conversations = new ConversationService(repo as unknown, events, '/tmp/Haunting-things-test');
@@ -81,12 +81,11 @@ describe('ConversationService mode snapshots', () => {
       if (name === 'conversation.mode') emitted.push(data);
     });
 
-    runtime['handleSessionUpdate']({
-      update: {
-        sessionUpdate: 'current_mode_update',
-        currentModeId: 'review',
-      },
-    } as unknown);
+    runtime.emit('mode', {
+      conversationId: conversation.id,
+      mode: 'review',
+      updatedAt: Date.now(),
+    });
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toMatchObject({

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PanelLeftIcon } from 'lucide-react';
+import { LoaderCircleIcon, PanelLeftIcon } from 'lucide-react';
 import type { PermissionRequest, PermissionResponse, TeamAgent, Workspace } from '@shared/types';
 import { ChatLayout } from '@renderer/features/chat/ChatLayout';
 import { SettingsDialog } from '@renderer/features/settings/components/SettingsDialog';
@@ -369,8 +369,12 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         </div>
       ) : null}
       {teamsState.loading ? (
-        <div className="fixed left-1/2 top-3 z-[70] -translate-x-1/2 rounded-full border border-border bg-background px-3 py-2 text-xs shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
-          加载团队...
+        <div
+          className="fixed left-1/2 top-3 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+          role="status"
+        >
+          <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" />
+          <span>加载团队...</span>
         </div>
       ) : null}
     </main>

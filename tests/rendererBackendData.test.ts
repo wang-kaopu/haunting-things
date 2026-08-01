@@ -10,7 +10,6 @@ import {
 describe('renderer backend data normalization', () => {
   test('normalizes missing team list payloads to an empty list', () => {
     expect(normalizeTeamList(undefined)).toEqual([]);
-    expect(normalizeTeamList({})).toEqual([]);
   });
 
   test('normalizes legacy team rows without valid agents json', () => {

@@ -6,7 +6,6 @@ import type { Conversation, ConversationCommands } from '@shared/types';
 function createFakeRepository() {
   const conversations = new Map<string, Conversation>();
   const messages = new Map<string, never[]>();
-  const agentEvents = new Map<string, never[]>();
 
   return {
     createConversation(conversation: Conversation): Conversation {
@@ -35,9 +34,6 @@ function createFakeRepository() {
     },
     addAgentEvent(event: never): never {
       return event;
-    },
-    listAgentEvents(conversationId: string): never[] {
-      return structuredClone(agentEvents.get(conversationId) ?? []);
     },
   };
 }
@@ -77,7 +73,6 @@ describe('ConversationService commands snapshots', () => {
 
     expect(emitted).toHaveLength(1);
     expect(conversations.commands(conversation.id)).toEqual(snapshot);
-    expect(repo.listAgentEvents(conversation.id)).toHaveLength(0);
     expect(emitSpy).toHaveBeenCalledWith('conversation.commands', snapshot);
   });
 });

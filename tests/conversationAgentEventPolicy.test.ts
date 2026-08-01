@@ -110,28 +110,42 @@ describe('ConversationService agent event policy', () => {
       at: Date.now(),
     } as AgentEvent);
 
-    runtime['handleSessionUpdate']({
-      update: {
-        sessionUpdate: 'tool_call_update',
-        toolCallId: 'tool-1',
-        title: 'Read file',
-        status: 'completed',
-        output: 'done',
-      },
-    } as unknown);
-
-    runtime['handleSessionUpdate']({
-      update: {
-        sessionUpdate: 'tool_call_update',
-        toolCallId: 'tool-2',
-        title: 'Write file',
-        status: 'failed',
-        error: { message: 'boom' },
-      },
-    } as unknown);
+    runtime.emit('agentEvent', {
+      id: '3',
+      type: 'agent.tool.result',
+      conversationId: conversation.id,
+      turnId: 'turn-1',
+      toolCallId: 'tool-1',
+      title: 'Read file',
+      status: 'completed',
+      output: 'done',
+      at: Date.now(),
+    } as AgentEvent);
 
     runtime.emit('agentEvent', {
       id: '4',
+      type: 'agent.tool.result',
+      conversationId: conversation.id,
+      turnId: 'turn-1',
+      toolCallId: 'tool-2',
+      title: 'Write file',
+      status: 'failed',
+      isError: true,
+      at: Date.now(),
+    } as AgentEvent);
+
+    runtime.emit('agentEvent', {
+      id: '5',
+      type: 'agent.error',
+      conversationId: conversation.id,
+      turnId: 'turn-1',
+      source: 'tool',
+      message: 'boom',
+      at: Date.now(),
+    } as AgentEvent);
+
+    runtime.emit('agentEvent', {
+      id: '6',
       type: 'agent.reply.done',
       conversationId: conversation.id,
       turnId: 'turn-1',

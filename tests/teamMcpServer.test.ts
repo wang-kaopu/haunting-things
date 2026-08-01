@@ -169,12 +169,6 @@ describe('TeamMcpServer', () => {
     });
   });
 
-  it('returns the current team members', async () => {
-    const response = await callTool(port, authToken, 'team_members');
-    expect(response.result).toContain('Leader');
-    expect(response.result).toContain('Dev');
-  });
-
   it('writes mailbox messages and wakes the teammate when sending through MCP', async () => {
     const response = await callTool(port, authToken, 'team_send_message', {
       to: 'Dev',
@@ -199,13 +193,14 @@ describe('TeamMcpServer', () => {
     const added = await callTool(port, authToken, 'team_add_agent', {
       name: 'Researcher',
       backend: 'claude',
+      model: 'sonnet',
     });
     expect(added.result).toContain('Researcher');
     expect(addAgent).toHaveBeenCalledWith({
       teamId: 'team-1',
       name: 'Researcher',
       backend: 'claude',
-      model: undefined,
+      model: 'sonnet',
     });
 
     const membersAfterAdd = await callTool(port, authToken, 'team_members');
@@ -227,6 +222,7 @@ describe('TeamMcpServer', () => {
   it('delegates a task in one call by provisioning and assigning work', async () => {
     const response = await callTool(port, authToken, 'team_delegate_task', {
       backend: 'claude',
+      model: 'opus',
       name: 'Researcher',
       task: 'Inspect the failing assertion and patch the regression.',
       summary: 'Investigate the flaky test',
@@ -237,7 +233,7 @@ describe('TeamMcpServer', () => {
       teamId: 'team-1',
       name: 'Researcher',
       backend: 'claude',
-      model: undefined,
+      model: 'opus',
     });
     expect(taskCreate).toHaveBeenCalledWith({
       teamId: 'team-1',
@@ -283,39 +279,6 @@ describe('TeamMcpServer', () => {
     expect(mailboxWrites[0]).toMatchObject({
       toAgentId: 'slot-claude',
       summary: 'Review the implementation for edge cases and regressions.',
-    });
-  });
-
-  it('passes model when adding an agent through team_add_agent', async () => {
-    const response = await callTool(port, authToken, 'team_add_agent', {
-      name: 'Claude Reviewer',
-      backend: 'claude',
-      model: 'sonnet',
-    });
-
-    expect(response.result).toContain('Claude Reviewer');
-    expect(addAgent).toHaveBeenCalledWith({
-      teamId: 'team-1',
-      name: 'Claude Reviewer',
-      backend: 'claude',
-      model: 'sonnet',
-    });
-  });
-
-  it('passes model when delegating a task to a new teammate', async () => {
-    const response = await callTool(port, authToken, 'team_delegate_task', {
-      backend: 'claude',
-      model: 'opus',
-      name: 'Claude Reviewer',
-      task: 'review code',
-    });
-
-    expect(response.result).toContain('Delegated task to Claude Reviewer');
-    expect(addAgent).toHaveBeenCalledWith({
-      teamId: 'team-1',
-      name: 'Claude Reviewer',
-      backend: 'claude',
-      model: 'opus',
     });
   });
 
