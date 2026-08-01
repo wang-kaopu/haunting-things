@@ -33,7 +33,7 @@ export function TeamMemberCard({
       variant="ghost"
       className={cn(
         'grid h-auto min-h-[76px] w-full grid-cols-[28px_minmax(0,1fr)] items-start gap-3 rounded-lg px-3 py-3 text-left font-normal',
-        active && 'bg-[#e7e7e7] hover:bg-[#e7e7e7]'
+        active && 'bg-[var(--sidebar-active)] hover:bg-[var(--sidebar-active)]'
       )}
       title={agent.name}
       onClick={onSelect}

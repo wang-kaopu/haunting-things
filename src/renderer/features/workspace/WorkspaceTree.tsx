@@ -18,7 +18,7 @@ function WorkspaceTreeItem({ entry }: { entry: WorkspaceEntry }): React.ReactEle
   return (
     <li>
       <div
-        className="flex h-6 min-w-0 items-center gap-1.5 rounded px-1 hover:bg-[#f1f1f1]"
+        className="flex h-6 min-w-0 items-center gap-1.5 rounded px-1 hover:bg-accent"
         title={entry.relativePath}
       >
         <FileIcon name={entry.name} isDirectory={entry.isDir} />

@@ -140,7 +140,7 @@ function TeamGroupHeader({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-6 text-muted-foreground hover:bg-[#dedede]"
+          className="size-6 text-muted-foreground hover:bg-[var(--sidebar-hover)]"
           aria-label={`在 ${group.label} 中创建 Team`}
           onClick={() => onCreateTeamInWorkspace(group.createWorkspaceId)}
         >

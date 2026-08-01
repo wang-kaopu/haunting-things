@@ -9,8 +9,8 @@
 :root {
   color-scheme: light;
   font-family: var(--app-font-sans);
-  background: #ffffff;
-  color: #0d0d0d;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 html,
@@ -27,6 +27,8 @@ body,
 
 body {
   margin: 0;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 h1,

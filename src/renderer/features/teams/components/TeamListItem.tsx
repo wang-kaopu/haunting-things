@@ -22,7 +22,7 @@ export function TeamListItem({ team, active, onSelect, onDelete }: TeamListItemP
         variant="ghost"
         className={cn(
           'h-8 min-w-0 justify-start gap-2 rounded-lg px-2 pl-12 text-left text-sm font-normal',
-          active && 'bg-[#e7e7e7] hover:bg-[#e7e7e7]'
+          active && 'bg-[var(--sidebar-active)] hover:bg-[var(--sidebar-active)]'
         )}
         title={team.name}
         onClick={onSelect}

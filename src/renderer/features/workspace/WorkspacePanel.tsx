@@ -14,7 +14,7 @@ export function WorkspacePanel({ team }: WorkspacePanelProps): React.ReactElemen
   const tree = useWorkspaceTree(team.workspaceId);
 
   return (
-    <aside className="min-h-0 min-w-0 overflow-auto border-l border-border bg-[#fbfbfb] p-3 text-[13px] text-[#202124] max-md:hidden">
+    <aside className="min-h-0 min-w-0 overflow-auto border-l border-border bg-[var(--panel-muted)] p-3 text-[13px] text-foreground max-md:hidden">
       <div className="mb-2 flex items-center justify-between gap-2">
         <strong className="font-semibold">Workspace</strong>
         <Button

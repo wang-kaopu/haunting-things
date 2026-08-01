@@ -86,14 +86,14 @@ function Login({ onLogin }: { onLogin: (user: AuthUser) => void }): React.ReactE
   }
 
   return (
-    <main className="relative grid min-h-screen place-items-center bg-[#eef2f7]">
+    <main className="relative grid min-h-screen place-items-center bg-muted">
       <form
         className="grid w-[min(380px,calc(100vw-32px))] gap-4 rounded-xl border border-border bg-card px-6 py-6 shadow-[0_12px_40px_rgb(24_32_47_/_8%)]"
         onSubmit={submit}
       >
         <div className="flex h-[80px] items-center justify-center overflow-hidden" aria-hidden="true">
           <img
-            className="h-full w-full select-none object-contain object-center mix-blend-multiply"
+            className="h-full w-full select-none object-contain object-center [filter:var(--brand-filter)] [mix-blend-mode:var(--brand-blend-mode)]"
             src={brandLogoUrl}
             alt=""
             draggable={false}

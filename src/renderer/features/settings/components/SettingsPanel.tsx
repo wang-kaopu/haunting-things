@@ -2,6 +2,7 @@ import type React from 'react';
 import { LogOutIcon } from 'lucide-react';
 import type { ServerInfo } from '@shared/types';
 import { RemoteAccessSetting } from '@renderer/features/settings/components/RemoteAccessSetting';
+import { ThemeSetting } from '@renderer/features/settings/components/ThemeSetting';
 import { Button } from '@renderer/shared/components/ui/button';
 
 /** 设置面板聚合展示的服务信息与偏好设置回调。 */
@@ -25,6 +26,7 @@ export function SettingsPanel({
     <div className="grid min-h-0 gap-6 overflow-y-auto px-6 py-5">
       <section className="grid gap-4">
         <h3 className="text-xs font-medium text-muted-foreground">通用</h3>
+        <ThemeSetting />
         <RemoteAccessSetting
           serverInfo={serverInfo}
           loading={loading}

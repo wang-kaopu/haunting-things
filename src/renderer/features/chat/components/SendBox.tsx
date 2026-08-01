@@ -157,7 +157,7 @@ export function SendBox({
   const sendButtonLabel = canCancel ? (cancelling ? '正在取消' : '停止生成') : (sending ? '发送中' : '发送消息');
 
   return (
-    <div className="shrink-0 bg-[linear-gradient(to_top,#ffffff_76%,rgba(255,255,255,0))] px-6 pb-6 pt-4 max-[600px]:px-3 max-[600px]:pb-[calc(12px+env(safe-area-inset-bottom))] max-[600px]:pt-2.5">
+    <div className="shrink-0 bg-[linear-gradient(to_top,var(--background)_76%,transparent)] px-6 pb-6 pt-4 max-[600px]:px-3 max-[600px]:pb-[calc(12px+env(safe-area-inset-bottom))] max-[600px]:pt-2.5">
       <div className="mx-auto grid max-w-[760px] gap-2 rounded-3xl border border-input bg-background p-3 shadow-[var(--composer-shadow)]">
         <ImageAttachmentPreview
           attachments={attachments}

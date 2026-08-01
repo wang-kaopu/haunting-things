@@ -45,7 +45,7 @@ export function SidebarAgentList({
               variant="ghost"
               className={cn(
                 'grid h-8 w-full grid-cols-[8px_20px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 text-left text-sm font-normal',
-                selected && 'bg-[#e7e7e7] hover:bg-[#e7e7e7]'
+                selected && 'bg-[var(--sidebar-active)] hover:bg-[var(--sidebar-active)]'
               )}
               title={agent.name}
               onClick={() => onSelectAgent(agent.slotId)}

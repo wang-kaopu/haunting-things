@@ -37,7 +37,7 @@ export function WorkspaceSwitcher({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs text-[#175cd3]"
+          className="h-7 gap-1 px-2 text-xs text-[var(--accent)]"
           onClick={onOpenDirectoryPicker}
         >
           <FolderPlusIcon aria-hidden="true" className="size-3.5" />

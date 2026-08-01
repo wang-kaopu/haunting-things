@@ -50,7 +50,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[300px] min-w-0 flex-col overflow-hidden border-r border-border bg-[#f9f9f9] p-3 transition-transform md:static md:z-auto md:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[300px] min-w-0 flex-col overflow-hidden border-r border-border bg-[var(--sidebar-bg)] p-3 transition-transform md:static md:z-auto md:translate-x-0',
         mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       )}
     >
@@ -58,7 +58,7 @@ export function Sidebar({
         <img
           src={brandLogoUrl}
           alt="Haunting Things"
-          className="h-full w-full select-none object-contain object-center mix-blend-multiply"
+          className="h-full w-full select-none object-contain object-center [filter:var(--brand-filter)] [mix-blend-mode:var(--brand-blend-mode)]"
           draggable={false}
         />
       </div>
@@ -70,7 +70,7 @@ export function Sidebar({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 gap-1 px-2 text-xs text-[#175cd3]"
+            className="h-7 gap-1 px-2 text-xs text-[var(--accent)]"
             disabled={!activeTeam}
             onClick={onAddAgentClick}
           >
@@ -94,7 +94,7 @@ export function Sidebar({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 gap-1 px-2 text-xs text-[#175cd3]"
+            className="h-7 gap-1 px-2 text-xs text-[var(--accent)]"
             onClick={onOpenDirectoryPicker}
           >
             <PlusIcon aria-hidden="true" className="size-3.5" />
