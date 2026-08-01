@@ -164,7 +164,7 @@ export function SendBox({
           onRemove={(id) => void removeAttachment(id)}
         />
         <textarea
-          className="min-h-12 max-h-[200px] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-12 max-h-[200px] w-full resize-none border-0 bg-transparent p-0 font-sans text-[15px] leading-[1.65] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
           ref={textareaRef}
           value={content}
           disabled={disabled || sending}
@@ -213,11 +213,11 @@ export function SendBox({
             title={sendButtonLabel}
           >
             {canCancel ? (
-              <SquareIcon aria-hidden="true" className="size-3 fill-current" />
+              <SquareIcon aria-hidden="true" className="size-2.5 fill-current" />
             ) : sending ? (
               <span aria-hidden="true" className="text-base leading-none">…</span>
             ) : (
-              <ArrowUpIcon aria-hidden="true" className="size-4" />
+              <ArrowUpIcon aria-hidden="true" className="size-3.5" />
             )}
           </Button>
         </div>

@@ -1,6 +1,6 @@
 import type React from 'react';
 import type { AgentTurnPhase, ChatMessage, TeamAgent } from '@shared/types';
-import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
+import { AgentIcon } from '@renderer/shared/components/AgentIcon';
 import { getMessageFallbackText } from '@renderer/shared/utils/format';
 import { isWrappedTeamPrompt } from '@renderer/shared/utils/guards';
 import { CollapsibleMessageContent } from '@renderer/features/chat/components/CollapsibleMessageContent';
@@ -78,21 +78,14 @@ export function MessageBubble({ message, activePhase, assistantAgent }: MessageB
   }
 
   const showAssistantIcon = message.role === 'assistant';
-  const assistantIconSrc = showAssistantIcon
-    ? getAgentIconSrc(assistantAgent?.backend)
-    : null;
-  const assistantIconAlt = showAssistantIcon
-    ? getAgentIconAlt(assistantAgent?.backend)
-    : '';
 
   return (
     <article className="flex w-full min-w-0 items-start gap-3.5">
-      {assistantIconSrc ? (
-        <img
+      {showAssistantIcon ? (
+        <AgentIcon
           className="size-7 shrink-0 rounded-md object-contain"
-          src={assistantIconSrc}
-          alt={assistantIconAlt}
-          title={assistantAgent?.name ?? assistantIconAlt}
+          backend={assistantAgent?.backend}
+          title={assistantAgent?.name}
         />
       ) : (
         <div className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">

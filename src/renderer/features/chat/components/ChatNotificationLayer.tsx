@@ -71,7 +71,7 @@ function ChatNotificationCard({
       className={`pointer-events-auto grid grid-cols-[20px_minmax(0,1fr)_28px] gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-[0_16px_48px_rgba(15,23,42,0.16)] ${tone}`}
       role="status"
     >
-      <Icon aria-hidden="true" className="mt-0.5 size-4" />
+      <Icon aria-hidden="true" className="mt-0.5 size-3.5" />
       <button
         type="button"
         className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left disabled:cursor-default"
@@ -90,7 +90,7 @@ function ChatNotificationCard({
         title="关闭通知"
         onClick={() => onDismiss(item.id)}
       >
-        <XIcon aria-hidden="true" className="size-3.5" />
+        <XIcon aria-hidden="true" className="size-3" />
       </Button>
     </div>
   );

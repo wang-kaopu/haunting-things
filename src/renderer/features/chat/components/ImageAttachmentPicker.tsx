@@ -75,7 +75,7 @@ export function ImageAttachmentPicker({
         aria-label={uploading ? '图片上传中' : '添加图片'}
         title={uploading ? '图片上传中' : '添加图片'}
       >
-        {uploading ? <span aria-hidden="true" className="text-base leading-none">…</span> : <PlusIcon aria-hidden="true" className="size-4" />}
+        {uploading ? <span aria-hidden="true" className="text-base leading-none">…</span> : <PlusIcon aria-hidden="true" className="size-3.5" />}
       </Button>
     </div>
   );
@@ -114,7 +114,7 @@ export function ImageAttachmentPreview({
             title={`移除 ${attachment.name}`}
             onClick={() => onRemove(attachment.id)}
           >
-            <XIcon aria-hidden="true" className="size-3" />
+            <XIcon aria-hidden="true" className="size-2.5" />
           </Button>
         </figure>
       ))}

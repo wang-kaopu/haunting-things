@@ -1,8 +1,8 @@
 import type React from 'react';
 import type { AgentTurnPhase, ConversationCommands, ConversationMode, TeamAgent } from '@shared/types';
+import { AgentIcon } from '@renderer/shared/components/AgentIcon';
 import { Button } from '@renderer/shared/components/ui/button';
 import { cn } from '@renderer/shared/lib/utils';
-import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
 import { formatAgentStatus, formatPhase } from '@renderer/shared/utils/format';
 
 /** 团队成员卡片展示的 Agent 状态、运行时快照和选中回调。 */
@@ -38,10 +38,10 @@ export function TeamMemberCard({
       title={agent.name}
       onClick={onSelect}
     >
-      <img
+      <AgentIcon
         className="mt-0.5 size-7 shrink-0 rounded object-contain"
-        src={getAgentIconSrc(agent.backend)}
-        alt={getAgentIconAlt(agent.backend)}
+        backend={agent.backend}
+        title={agent.name}
       />
       <span className="grid min-w-0 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-2">

@@ -110,12 +110,12 @@ export function CollapsibleMessageContent({
             {expanded ? (
               <>
                 收起
-                <ChevronUpIcon aria-hidden="true" className="size-3.5" />
+                <ChevronUpIcon aria-hidden="true" className="size-3" />
               </>
             ) : (
               <>
                 展开
-                <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+                <ChevronDownIcon aria-hidden="true" className="size-3" />
               </>
             )}
           </Button>

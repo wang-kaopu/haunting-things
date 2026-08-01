@@ -40,7 +40,7 @@ export function WorkspaceSwitcher({
           className="h-7 gap-1 px-2 text-xs text-[var(--accent)]"
           onClick={onOpenDirectoryPicker}
         >
-          <FolderPlusIcon aria-hidden="true" className="size-3.5" />
+          <FolderPlusIcon aria-hidden="true" className="size-3" />
           选择
         </Button>
       </div>
@@ -69,7 +69,7 @@ export function WorkspaceSwitcher({
         className="h-8 justify-start gap-2 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
         onClick={() => void onCreateTemporaryWorkspace()}
       >
-        <MessageSquarePlusIcon aria-hidden="true" className="size-3.5" />
+        <MessageSquarePlusIcon aria-hidden="true" className="size-3" />
         创建对话
       </Button>
     </section>

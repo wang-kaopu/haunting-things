@@ -69,9 +69,9 @@ export function TeamDrawer({
         aria-label={open ? '收起团队抽屉' : '展开团队抽屉'}
       >
         {open ? (
-          <ChevronRightIcon aria-hidden="true" className="size-4" />
+          <ChevronRightIcon aria-hidden="true" className="size-3.5" />
         ) : (
-          <ChevronLeftIcon aria-hidden="true" className="size-4" />
+          <ChevronLeftIcon aria-hidden="true" className="size-3.5" />
         )}
       </Button>
     </>

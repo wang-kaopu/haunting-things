@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useMemo } from 'react';
-import { SquarePenIcon } from 'lucide-react';
+import { MessageSquareIcon, SquarePenIcon } from 'lucide-react';
 import type { Team, Workspace } from '@shared/types';
 import { TeamListItem } from '@renderer/features/teams/components/TeamListItem';
 import { FileIcon } from '@renderer/shared/components/FileIcon';
@@ -129,8 +129,8 @@ function TeamGroupHeader({
 
   return (
     <div className="group/header grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 text-[13px] text-foreground">
-      <span className={isWorkspace ? 'grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center gap-2' : 'min-w-0 pl-7'}>
-        {isWorkspace ? <FileIcon name={group.label} isDirectory isRoot className="size-[18px]" /> : null}
+      <span className="grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center gap-2">
+        {isWorkspace ? <FileIcon isDirectory className="size-4" /> : <MessageSquareIcon aria-hidden="true" className="size-4" />}
         <span className="truncate" title={group.label}>
           {group.label}
         </span>
@@ -144,7 +144,7 @@ function TeamGroupHeader({
           aria-label={`在 ${group.label} 中创建 Team`}
           onClick={() => onCreateTeamInWorkspace(group.createWorkspaceId)}
         >
-          <SquarePenIcon aria-hidden="true" className="size-4" />
+          <SquarePenIcon aria-hidden="true" className="size-3.5" />
         </Button>
       </span>
     </div>

@@ -37,7 +37,6 @@ export type ChatLayoutProps = {
   onCancelTurn: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onSetMode: (mode: string) => Promise<void>;
-  onCompressMemory: () => Promise<void>;
 };
 
 /**
@@ -64,7 +63,6 @@ export function ChatLayout({
   onCancelTurn,
   onSetModel,
   onSetMode,
-  onCompressMemory,
 }: ChatLayoutProps): React.ReactElement {
   if (!team) {
     return (
@@ -90,7 +88,6 @@ export function ChatLayout({
         usage={usage}
         memory={memory}
         onOpenSidebar={onOpenSidebar}
-        onCompressMemory={onCompressMemory}
       />
       <ChatNotificationLayer
         items={chatNotifications}
@@ -130,7 +127,7 @@ function ChatEmpty(): React.ReactElement {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-8">
       <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <LightbulbIcon aria-hidden="true" className="size-5" />
+        <LightbulbIcon aria-hidden="true" className="size-4" />
       </div>
       <h1 className="mb-6 text-[28px] font-medium leading-tight tracking-normal text-foreground">
         What can I help with?

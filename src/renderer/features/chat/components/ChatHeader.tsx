@@ -1,10 +1,9 @@
-import { useState, type ReactElement } from 'react';
-import { ArchiveIcon, Loader2Icon, MenuIcon } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { MenuIcon } from 'lucide-react';
 import type { AgentTurnPhase, ConversationMemoryState, ConversationUsage, Team, TeamAgent } from '@shared/types';
 import { formatPhase } from '@renderer/shared/utils/format';
 import { UsageChip } from '@renderer/features/chat/components/UsageChip';
 import { Button } from '@renderer/shared/components/ui/button';
-import { ConfirmDialog } from '@renderer/shared/components/ui/confirm-dialog';
 
 /** 聊天顶部栏展示的团队、Agent、阶段和移动端侧栏入口。 */
 export type ChatHeaderProps = {
@@ -14,7 +13,6 @@ export type ChatHeaderProps = {
   usage?: ConversationUsage | null;
   memory?: ConversationMemoryState | null;
   onOpenSidebar?: () => void;
-  onCompressMemory?: () => Promise<void>;
 };
 
 /** 新 风格简化的顶部状态栏——移动端左侧显示 SVG 菜单图标按钮。 */
@@ -25,19 +23,7 @@ export function ChatHeader({
   usage,
   memory,
   onOpenSidebar,
-  onCompressMemory,
 }: ChatHeaderProps): ReactElement {
-  const compressing = memory?.status === 'compressing';
-  const [confirmCompressOpen, setConfirmCompressOpen] = useState(false);
-
-  /**
-   * 手动确认后触发当前会话的上下文压缩。
-   */
-  async function confirmCompressMemory(): Promise<void> {
-    if (!onCompressMemory) return;
-    await onCompressMemory();
-  }
-
   return (
     <header className="flex h-14 min-h-14 items-center gap-4 border-b border-border bg-background/90 px-6 backdrop-blur md:px-6 max-[600px]:px-3">
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -51,7 +37,7 @@ export function ChatHeader({
             title="打开侧边栏"
             onClick={onOpenSidebar}
           >
-            <MenuIcon aria-hidden="true" className="size-[18px]" />
+            <MenuIcon aria-hidden="true" className="size-4" />
           </Button>
         ) : null}
         <div className="flex min-w-0 items-baseline gap-2">
@@ -67,40 +53,12 @@ export function ChatHeader({
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <UsageChip usage={usage} />
         <MemoryStatusChip memory={memory} />
-        {activeAgent?.conversationId && onCompressMemory ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 rounded-full"
-            aria-label="压缩上下文"
-            title="压缩上下文"
-            disabled={compressing}
-            onClick={() => setConfirmCompressOpen(true)}
-          >
-            {compressing ? (
-              <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
-            ) : (
-              <ArchiveIcon aria-hidden="true" className="size-4" />
-            )}
-          </Button>
-        ) : null}
         {activePhase ? (
-          <span className="inline-flex whitespace-nowrap rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+          <span className="inline-flex whitespace-nowrap rounded-md border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">
             {formatPhase(activePhase)}
           </span>
         ) : null}
       </div>
-      <ConfirmDialog
-        open={confirmCompressOpen}
-        onOpenChange={setConfirmCompressOpen}
-        title="是否确认压缩上下文？"
-        description="压缩会把较早历史整理为摘要，并在下一轮发送时使用新的上下文记忆。"
-        confirmLabel="确认压缩"
-        loadingLabel="压缩中"
-        disabled={compressing}
-        onConfirm={confirmCompressMemory}
-      />
     </header>
   );
 }
@@ -117,7 +75,7 @@ function MemoryStatusChip({ memory }: { memory?: ConversationMemoryState | null 
         : 'border-sky-200 bg-sky-50 text-sky-700';
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${tone}`}
+      className={`inline-flex whitespace-nowrap rounded-md border px-2.5 py-1 text-xs ${tone}`}
       title={memory.error ?? memory.reason ?? label}
     >
       {label}

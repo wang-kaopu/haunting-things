@@ -1,9 +1,9 @@
 import type React from 'react';
 import type { AgentTurnPhase, TeamAgent } from '@shared/types';
+import { AgentIcon } from '@renderer/shared/components/AgentIcon';
 import { Button } from '@renderer/shared/components/ui/button';
 import { ScrollArea } from '@renderer/shared/components/ui/scroll-area';
 import { cn } from '@renderer/shared/lib/utils';
-import { getAgentIconAlt, getAgentIconSrc } from '@renderer/shared/utils/agentIcon';
 
 /** 侧边栏成员列表的 Agent 集合、选中项和运行阶段快照。 */
 export type SidebarAgentListProps = {
@@ -54,10 +54,10 @@ export function SidebarAgentList({
                 className={cn('size-[7px] rounded-full', busy ? 'bg-red-500' : 'bg-green-500')}
                 aria-label={busy ? '忙碌中' : '空闲'}
               />
-              <img
+              <AgentIcon
                 className="size-[18px] shrink-0 rounded object-contain"
-                src={getAgentIconSrc(agent.backend)}
-                alt={getAgentIconAlt(agent.backend)}
+                backend={agent.backend}
+                title={agent.name}
               />
               <span className="min-w-0 truncate text-[13px]">{agent.name}</span>
             </Button>

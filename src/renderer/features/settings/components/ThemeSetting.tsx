@@ -37,7 +37,7 @@ export function ThemeSetting(): React.ReactElement {
               title={option.label}
               className="group flex h-8 w-auto items-center gap-1.5 rounded-md border-0 px-2.5 text-xs text-muted-foreground transition-colors data-[state=checked]:bg-background data-[state=checked]:text-foreground data-[state=checked]:shadow-sm [&_[data-slot=radio-group-indicator]]:hidden"
             >
-              <Icon aria-hidden="true" className="size-3.5" />
+              <Icon aria-hidden="true" className="size-3" />
               <span>{option.label}</span>
             </RadioGroupItem>
           );

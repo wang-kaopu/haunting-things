@@ -87,7 +87,7 @@ export function WorkspacePickerDialog({
                     className="grid h-10 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-md px-3 text-left text-sm font-normal"
                     onClick={() => void goParent()}
                   >
-                    <ArrowUpIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                    <ArrowUpIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
                     <span className="min-w-0 truncate">返回上一级</span>
                   </Button>
                 ) : null}
@@ -105,8 +105,8 @@ export function WorkspacePickerDialog({
                         className="grid h-10 w-full grid-cols-[18px_20px_minmax(0,1fr)] items-center gap-2 rounded-md px-3 text-left text-sm font-normal"
                         onClick={() => void browse(entry.relativePath)}
                       >
-                        <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-                        <FileIcon name={entry.name} isDirectory />
+                        <ChevronRightIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                        <FileIcon isDirectory />
                         <span className="min-w-0 truncate">{entry.name}</span>
                       </Button>
                     ))

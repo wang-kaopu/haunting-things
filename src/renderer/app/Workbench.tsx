@@ -203,26 +203,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
     pushActiveChatNotification({ title: '权限模式已切换', message: nextMode });
   }
 
-  /** 手动压缩当前 Agent 的上下文记忆。 */
-  async function compressMemory(): Promise<void> {
-    if (!active.activeAgent?.conversationId) return;
-    const state = await bridge.invoke('conversation.compressMemory', {
-      conversationId: active.activeAgent.conversationId,
-    });
-    if (state.status !== 'failed') {
-      pushActiveChatNotification({
-        title: '上下文已压缩',
-        message: state.reason ?? active.activeAgent.name,
-      });
-      return;
-    }
-    notifications.push({
-      title: '上下文压缩失败',
-      message: state.error ?? state.reason ?? active.activeAgent.name,
-      level: 'error',
-    });
-  }
-
   /** 将权限请求加入队列；同一会话和 callId 的请求会被更新。 */
   function enqueuePermission(request: PermissionRequest): void {
     setPermissionQueue((current) => {
@@ -278,7 +258,7 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
           title="打开侧边栏"
           onClick={() => setMobileSidebarOpen(true)}
         >
-          <PanelLeftIcon aria-hidden="true" className="size-5" />
+          <PanelLeftIcon aria-hidden="true" className="size-4" />
         </Button>
       ) : null}
       {mobileSidebarOpen ? (
@@ -328,7 +308,6 @@ export function Workbench({ user, onLogout }: WorkbenchProps): React.ReactElemen
         onCancelTurn={conversation.cancelCurrentTurn}
         onSetModel={setModel}
         onSetMode={setMode}
-        onCompressMemory={compressMemory}
         chatNotifications={notifications.chatItems}
         onDismissChatNotification={notifications.removeChat}
         onOpenChatNotification={openChatNotificationTarget}

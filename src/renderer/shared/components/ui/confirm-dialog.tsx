@@ -91,7 +91,7 @@ export function ConfirmDialog({
           >
             {pending ? (
               <>
-                <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
+                <Loader2Icon aria-hidden="true" className="size-3.5 animate-spin" />
                 {loadingLabel}
               </>
             ) : (

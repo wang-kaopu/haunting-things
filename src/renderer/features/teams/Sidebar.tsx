@@ -74,7 +74,7 @@ export function Sidebar({
             disabled={!activeTeam}
             onClick={onAddAgentClick}
           >
-            <PlusIcon aria-hidden="true" className="size-3.5" />
+            <PlusIcon aria-hidden="true" className="size-3" />
             添加
           </Button>
         </div>
@@ -97,7 +97,7 @@ export function Sidebar({
             className="h-7 gap-1 px-2 text-xs text-[var(--accent)]"
             onClick={onOpenDirectoryPicker}
           >
-            <PlusIcon aria-hidden="true" className="size-3.5" />
+            <PlusIcon aria-hidden="true" className="size-3" />
             新建工作区
           </Button>
         </div>
@@ -119,7 +119,7 @@ export function Sidebar({
           className="h-9 justify-start gap-2 px-2 text-sm font-normal"
           onClick={onSettingsClick}
         >
-          <SettingsIcon aria-hidden="true" className="size-4" />
+          <SettingsIcon aria-hidden="true" className="size-3.5" />
           设置
         </Button>
       </div>

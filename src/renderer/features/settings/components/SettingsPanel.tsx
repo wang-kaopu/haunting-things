@@ -49,7 +49,7 @@ export function SettingsPanel({
             title="退出登录"
             onClick={onLogout}
           >
-            <LogOutIcon aria-hidden="true" className="size-4" />
+            <LogOutIcon aria-hidden="true" className="size-3.5" />
           </Button>
         </div>
       </section>
