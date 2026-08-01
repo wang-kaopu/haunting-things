@@ -72,15 +72,16 @@ function ChatNotificationCard({
       role="status"
     >
       <Icon aria-hidden="true" className="mt-0.5 size-3.5" />
-      <button
+      <Button
         type="button"
-        className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left disabled:cursor-default"
+        variant="ghost"
+        className="h-auto min-w-0 justify-start whitespace-normal border-0 bg-transparent p-0 text-left font-normal hover:bg-transparent hover:text-inherit disabled:cursor-default disabled:opacity-100"
         disabled={!canOpen}
         onClick={() => onOpenTarget?.(item)}
       >
         <div className="truncate text-sm font-semibold leading-5">{item.title}</div>
         <div className="mt-0.5 line-clamp-2 text-sm leading-5 text-muted-foreground">{item.message}</div>
-      </button>
+      </Button>
       <Button
         type="button"
         variant="ghost"

@@ -119,19 +119,6 @@
   font-size: 12px;
 }
 
-.markdown-code-header button {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
-  border-radius: 6px;
-  padding: 3px 8px;
-  cursor: pointer;
-}
-
-.markdown-code-header button:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
 .markdown-code-block pre {
   margin: 0;
   padding: 12px;

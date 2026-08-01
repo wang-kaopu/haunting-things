@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@renderer/shared/components/ui/button';
 
 /** Markdown 代码块的源码文本与可选语言标记。 */
 export type CodeBlockProps = {
@@ -25,9 +26,15 @@ export function CodeBlock({ code, language }: CodeBlockProps): React.ReactElemen
     <div className="markdown-code-block">
       <div className="markdown-code-header">
         <span>{language || 'text'}</span>
-        <button type="button" onClick={() => void copyCode()}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto border border-white/15 bg-white/5 px-2 py-[3px] text-xs font-normal text-slate-200 hover:bg-white/10 hover:text-slate-200"
+          onClick={() => void copyCode()}
+        >
           {copied ? '已复制' : '复制'}
-        </button>
+        </Button>
       </div>
 
       <pre>

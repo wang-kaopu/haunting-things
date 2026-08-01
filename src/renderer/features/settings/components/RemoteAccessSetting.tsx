@@ -1,7 +1,7 @@
 import type React from 'react';
+import * as SwitchPrimitive from '@radix-ui/react-switch';
 import type { ServerInfo } from '@shared/types';
 import { Button } from '@renderer/shared/components/ui/button';
-import { cn } from '@renderer/shared/lib/utils';
 
 /** 远程访问设置项需要的服务状态和切换回调。 */
 export type RemoteAccessSettingProps = {
@@ -80,26 +80,15 @@ function RemoteAccessSwitch({
   onCheckedChange: (checked: boolean) => void;
 }): React.ReactElement {
   return (
-    <button
-      type="button"
-      role="switch"
+    <SwitchPrimitive.Root
+      checked={checked}
+      onCheckedChange={onCheckedChange}
       aria-label="远程访问"
-      aria-checked={checked}
       disabled={disabled}
-      className={cn(
-        'relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border-0 p-0 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-foreground' : 'bg-muted'
-      )}
-      onClick={() => onCheckedChange(!checked)}
+      className="relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border-0 bg-muted p-0 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=checked]:bg-foreground disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          'ml-1 size-4 rounded-full bg-background shadow-sm transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-0'
-        )}
-      />
-    </button>
+      <SwitchPrimitive.Thumb className="block size-4 translate-x-1 rounded-full bg-background shadow-sm transition-transform data-[state=checked]:translate-x-5" />
+    </SwitchPrimitive.Root>
   );
 }
 
